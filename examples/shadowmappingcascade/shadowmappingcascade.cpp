@@ -133,21 +133,21 @@ public:
 	~VulkanExample()
 	{
 		for (auto cascade : cascades) {
-			cascade.destroy(device);
+			cascade.destroy(m_vkDevice);
 		}
-		depth.destroy(device);
+		depth.destroy(m_vkDevice);
 
-		vkDestroyRenderPass(device, depthPass.renderPass, nullptr);
+		vkDestroyRenderPass(m_vkDevice, depthPass.renderPass, nullptr);
 
-		vkDestroyPipeline(device, pipelines.debugShadowMap, nullptr);
-		vkDestroyPipeline(device, depthPass.pipeline, nullptr);
-		vkDestroyPipeline(device, pipelines.sceneShadow, nullptr);
-		vkDestroyPipeline(device, pipelines.sceneShadowPCF, nullptr);
+		vkDestroyPipeline(m_vkDevice, pipelines.debugShadowMap, nullptr);
+		vkDestroyPipeline(m_vkDevice, depthPass.pipeline, nullptr);
+		vkDestroyPipeline(m_vkDevice, pipelines.sceneShadow, nullptr);
+		vkDestroyPipeline(m_vkDevice, pipelines.sceneShadowPCF, nullptr);
 
-		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-		vkDestroyPipelineLayout(device, depthPass.pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, depthPass.pipelineLayout, nullptr);
 
-		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 
 		cascadeViewProjMatricesBuffer.destroy();
 		uniformBuffers.VS.destroy();
@@ -251,7 +251,7 @@ public:
 		renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		renderPassCreateInfo.pDependencies = dependencies.data();
 
-		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &depthPass.renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassCreateInfo, nullptr, &depthPass.renderPass));
 
 		/*
 			Layered depth image and views
@@ -268,14 +268,14 @@ public:
 		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageInfo.format = depthFormat;
 		imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &depth.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageInfo, nullptr, &depth.image));
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(device, depth.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &depth.mem));
-		VK_CHECK_RESULT(vkBindImageMemory(device, depth.image, depth.mem, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &depth.mem));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, depth.image, depth.mem, 0));
 		// Full depth map view (all layers)
 		VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
@@ -287,7 +287,7 @@ public:
 		viewInfo.subresourceRange.baseArrayLayer = 0;
 		viewInfo.subresourceRange.layerCount = SHADOW_MAP_CASCADE_COUNT;
 		viewInfo.image = depth.image;
-		VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, &depth.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &depth.view));
 
 		// One image view and framebuffer per cascade
 		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
@@ -303,7 +303,7 @@ public:
 			viewInfo.subresourceRange.baseArrayLayer = i;
 			viewInfo.subresourceRange.layerCount = 1;
 			viewInfo.image = depth.image;
-			VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, &cascades[i].view));
+			VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &cascades[i].view));
 			// Framebuffer
 			VkFramebufferCreateInfo framebufferInfo = vks::initializers::framebufferCreateInfo();
 			framebufferInfo.renderPass = depthPass.renderPass;
@@ -312,7 +312,7 @@ public:
 			framebufferInfo.width = SHADOWMAP_DIM;
 			framebufferInfo.height = SHADOWMAP_DIM;
 			framebufferInfo.layers = 1;
-			VK_CHECK_RESULT(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &cascades[i].frameBuffer));
+			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &framebufferInfo, nullptr, &cascades[i].frameBuffer));
 		}
 
 		// Shared sampler for cascade depth reads
@@ -328,7 +328,7 @@ public:
 		sampler.minLod = 0.0f;
 		sampler.maxLod = 1.0f;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(device, &sampler, nullptr, &depth.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &depth.sampler));
 	}
 
 	void buildCommandBuffers()
@@ -446,7 +446,7 @@ public:
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo =
 			vks::initializers::descriptorPoolCreateInfo(static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), 4 + SHADOW_MAP_CASCADE_COUNT);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		/*
 			Descriptor set layouts
@@ -460,7 +460,7 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 3),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		/*
 			Descriptor sets
@@ -473,14 +473,14 @@ public:
 			vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
 
 		// Scene rendering / debug display
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		const std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.VS.descriptor),
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthMapDescriptor),
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers.FS.descriptor),
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3, &cascadeViewProjMatricesBuffer.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
 
 		/*
 			Pipeline layouts
@@ -493,7 +493,7 @@ public:
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 		}
 
 		// Depth pass pipeline layout
@@ -503,7 +503,7 @@ public:
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &depthPass.pipelineLayout));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &depthPass.pipelineLayout));
 		}
 	}
 
@@ -538,7 +538,7 @@ public:
 		// Empty vertex input state
 		VkPipelineVertexInputStateCreateInfo emptyInputState = vks::initializers::pipelineVertexInputStateCreateInfo();
 		pipelineCI.pVertexInputState = &emptyInputState;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.debugShadowMap));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.debugShadowMap));
 
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal });
 		/*
@@ -552,9 +552,9 @@ public:
 		VkSpecializationMapEntry specializationMapEntry = vks::initializers::specializationMapEntry(0, 0, sizeof(uint32_t));
 		VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(1, &specializationMapEntry, sizeof(uint32_t), &enablePCF);
 		shaderStages[1].pSpecializationInfo = &specializationInfo;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadow));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadow));
 		enablePCF = 1;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadowPCF));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadowPCF));
 
 		/*
 			Depth map generation
@@ -568,7 +568,7 @@ public:
 		rasterizationState.depthClampEnable = deviceFeatures.depthClamp;
 		pipelineCI.layout = depthPass.pipelineLayout;
 		pipelineCI.renderPass = depthPass.renderPass;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &depthPass.pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &depthPass.pipeline));
 	}
 
 	void prepareUniformBuffers()

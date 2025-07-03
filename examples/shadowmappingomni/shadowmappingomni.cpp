@@ -94,38 +94,38 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
+		if (m_vkDevice) {
 			// Cube map
 			for (uint32_t i = 0; i < 6; i++) {
-				vkDestroyImageView(device, shadowCubeMapFaceImageViews[i], nullptr);
+				vkDestroyImageView(m_vkDevice, shadowCubeMapFaceImageViews[i], nullptr);
 			}
 
-			vkDestroyImageView(device, shadowCubeMap.view, nullptr);
-			vkDestroyImage(device, shadowCubeMap.image, nullptr);
-			vkDestroySampler(device, shadowCubeMap.sampler, nullptr);
-			vkFreeMemory(device, shadowCubeMap.deviceMemory, nullptr);
+			vkDestroyImageView(m_vkDevice, shadowCubeMap.view, nullptr);
+			vkDestroyImage(m_vkDevice, shadowCubeMap.image, nullptr);
+			vkDestroySampler(m_vkDevice, shadowCubeMap.sampler, nullptr);
+			vkFreeMemory(m_vkDevice, shadowCubeMap.deviceMemory, nullptr);
 
 			// Depth attachment
-			vkDestroyImageView(device, offscreenPass.depth.view, nullptr);
-			vkDestroyImage(device, offscreenPass.depth.image, nullptr);
-			vkFreeMemory(device, offscreenPass.depth.mem, nullptr);
+			vkDestroyImageView(m_vkDevice, offscreenPass.depth.view, nullptr);
+			vkDestroyImage(m_vkDevice, offscreenPass.depth.image, nullptr);
+			vkFreeMemory(m_vkDevice, offscreenPass.depth.mem, nullptr);
 
 			for (uint32_t i = 0; i < 6; i++)
 			{
-				vkDestroyFramebuffer(device, offscreenPass.frameBuffers[i], nullptr);
+				vkDestroyFramebuffer(m_vkDevice, offscreenPass.frameBuffers[i], nullptr);
 			}
 
-			vkDestroyRenderPass(device, offscreenPass.renderPass, nullptr);
+			vkDestroyRenderPass(m_vkDevice, offscreenPass.renderPass, nullptr);
 
 			// Pipelines
-			vkDestroyPipeline(device, pipelines.scene, nullptr);
-			vkDestroyPipeline(device, pipelines.offscreen, nullptr);
-			vkDestroyPipeline(device, pipelines.cubemapDisplay, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.scene, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.offscreen, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.cubemapDisplay, nullptr);
 
-			vkDestroyPipelineLayout(device, pipelineLayouts.scene, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayouts.offscreen, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.scene, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.offscreen, nullptr);
 
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 
 			// Uniform buffers
 			uniformBuffers.offscreen.destroy();
@@ -158,14 +158,14 @@ public:
 		VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Create cube map image
-		VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &shadowCubeMap.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &shadowCubeMap.image));
 
-		vkGetImageMemoryRequirements(device, shadowCubeMap.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, shadowCubeMap.image, &memReqs);
 
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAllocInfo, nullptr, &shadowCubeMap.deviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(device, shadowCubeMap.image, shadowCubeMap.deviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &shadowCubeMap.deviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, shadowCubeMap.image, shadowCubeMap.deviceMemory, 0));
 
 		// Image barrier for optimal image (target)
 		VkImageSubresourceRange subresourceRange = {};
@@ -196,7 +196,7 @@ public:
 		sampler.minLod = 0.0f;
 		sampler.maxLod = 1.0f;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(device, &sampler, nullptr, &shadowCubeMap.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &shadowCubeMap.sampler));
 
 		// Create image view
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
@@ -207,7 +207,7 @@ public:
 		view.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 		view.subresourceRange.layerCount = 6;
 		view.image = shadowCubeMap.image;
-		VK_CHECK_RESULT(vkCreateImageView(device, &view, nullptr, &shadowCubeMap.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &view, nullptr, &shadowCubeMap.view));
 
 		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		view.subresourceRange.layerCount = 1;
@@ -216,7 +216,7 @@ public:
 		for (uint32_t i = 0; i < 6; i++)
 		{
 			view.subresourceRange.baseArrayLayer = i;
-			VK_CHECK_RESULT(vkCreateImageView(device, &view, nullptr, &shadowCubeMapFaceImageViews[i]));
+			VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &view, nullptr, &shadowCubeMapFaceImageViews[i]));
 		}
 	}
 
@@ -271,7 +271,7 @@ public:
 		renderPassCreateInfo.subpassCount = 1;
 		renderPassCreateInfo.pSubpasses = &subpass;
 
-		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &offscreenPass.renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassCreateInfo, nullptr, &offscreenPass.renderPass));
 	}
 
 	// Prepare a new framebuffer for offscreen rendering
@@ -329,16 +329,16 @@ public:
 		depthStencilView.subresourceRange.baseArrayLayer = 0;
 		depthStencilView.subresourceRange.layerCount = 1;
 
-		VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &offscreenPass.depth.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &offscreenPass.depth.image));
 
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(device, offscreenPass.depth.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, offscreenPass.depth.image, &memReqs);
 		
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &offscreenPass.depth.mem));
-		VK_CHECK_RESULT(vkBindImageMemory(device, offscreenPass.depth.image, offscreenPass.depth.mem, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &offscreenPass.depth.mem));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, offscreenPass.depth.image, offscreenPass.depth.mem, 0));
 
 		vks::tools::setImageLayout(
 			layoutCmd,
@@ -350,7 +350,7 @@ public:
 		vulkanDevice->flushCommandBuffer(layoutCmd, queue, true);
 
 		depthStencilView.image = offscreenPass.depth.image;
-		VK_CHECK_RESULT(vkCreateImageView(device, &depthStencilView, nullptr, &offscreenPass.depth.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &depthStencilView, nullptr, &offscreenPass.depth.view));
 
 		VkImageView attachments[2];
 		attachments[1] = offscreenPass.depth.view;
@@ -366,7 +366,7 @@ public:
 		for (uint32_t i = 0; i < 6; i++)
 		{
 			attachments[0] = shadowCubeMapFaceImageViews[i];
-			VK_CHECK_RESULT(vkCreateFramebuffer(device, &fbufCreateInfo, nullptr, &offscreenPass.frameBuffers[i]));
+			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &fbufCreateInfo, nullptr, &offscreenPass.frameBuffers[i]));
 		}
 	}
 
@@ -525,7 +525,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 3);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -535,13 +535,13 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Sets
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
 		
 		// 3D scene
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.scene));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.scene));
 		// Image descriptor for the cube map
 		VkDescriptorImageInfo texDescriptor =
 			vks::initializers::descriptorImageInfo(
@@ -555,15 +555,15 @@ public:
 			// Binding 1 : Fragment shader shadow sampler
 			vks::initializers::writeDescriptorSet(descriptorSets.scene, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texDescriptor)
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(sceneDescriptorSets.size()), sceneDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(sceneDescriptorSets.size()), sceneDescriptorSets.data(), 0, nullptr);
 
 		// Offscreen
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.offscreen));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.offscreen));
 		std::vector<VkWriteDescriptorSet> offScreenWriteDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSets.offscreen, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.offscreen.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(offScreenWriteDescriptorSets.size()), offScreenWriteDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(offScreenWriteDescriptorSets.size()), offScreenWriteDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
@@ -571,7 +571,7 @@ public:
 		// Layouts
 		// 3D scene pipeline layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.scene));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.scene));
 
 		// Offscreen pipeline layout
 		// Push constants for cube map face view matrices
@@ -579,7 +579,7 @@ public:
 		// Push constant ranges are part of the pipeline layout
 		pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 		pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.offscreen));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.offscreen));
 
 
 		// Pipelines
@@ -611,14 +611,14 @@ public:
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal});
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.scene));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.scene));
 
 		// Offscreen pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "shadowmappingomni/offscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "shadowmappingomni/offscreen.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		pipelineCI.layout = pipelineLayouts.offscreen;
 		pipelineCI.renderPass = offscreenPass.renderPass;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.offscreen));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.offscreen));
 
 		// Cube map display pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "shadowmappingomni/cubemapdisplay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -628,7 +628,7 @@ public:
 		pipelineCI.layout = pipelineLayouts.scene;
 		pipelineCI.renderPass = renderPass;
 		rasterizationState.cullMode = VK_CULL_MODE_NONE;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.cubemapDisplay));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.cubemapDisplay));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms

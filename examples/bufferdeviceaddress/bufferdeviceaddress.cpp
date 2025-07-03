@@ -1,8 +1,8 @@
 /*
-* Vulkan Example - Buffer device address
+* Vulkan Example - Buffer m_vkDevice address
 *
-* This sample shows how to read data from a buffer device address (aka "reference") instead of using uniforms
-* The application passes buffer device addresses to the shader via push constants, and the shader then simply reads the data behind that address
+* This sample shows how to read data from a buffer m_vkDevice address (aka "reference") instead of using uniforms
+* The application passes buffer m_vkDevice addresses to the shader via push constants, and the shader then simply reads the data behind that address
 * See cube.vert for the shader side of things
 * 
 * Copyright (C) 2024 by Sascha Willems - www.saschawillems.de
@@ -53,7 +53,7 @@ public:
 
 	VulkanExample() : VulkanExampleBase()
 	{
-		title = "Buffer device address";
+		title = "Buffer m_vkDevice address";
 		camera.type = Camera::CameraType::lookat;
 		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 512.0f);
 		camera.setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
@@ -72,10 +72,10 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
-			vkDestroyPipeline(device, pipeline, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+		if (m_vkDevice) {
+			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			texture.destroy();
 			for (auto cube : cubes) {
 				cube.buffer.destroy();
@@ -98,7 +98,7 @@ public:
 		texture.loadFromFile(getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue);
 	}
 
-	// We pass all data via buffer device addresses, so we only allocate descriptors for the images
+	// We pass all data via buffer m_vkDevice addresses, so we only allocate descriptors for the images
 	void setupDescriptors()
 	{
 		// Pool
@@ -106,23 +106,23 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(descriptorPoolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &texture.descriptor)
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
@@ -139,7 +139,7 @@ public:
 		pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
 		pipelineLayoutCI.setLayoutCount = 1;
 		pipelineLayoutCI.pSetLayouts = &descriptorSetLayout;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
 
 		const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
@@ -167,7 +167,7 @@ public:
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color });
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	void prepareBuffers()
@@ -176,20 +176,20 @@ public:
 		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene.buffer, sizeof(glm::mat4)));
 		VK_CHECK_RESULT(scene.buffer.map());
 
-		// Get the device of this buffer that is later on passed to the shader (aka "reference")
+		// Get the m_vkDevice of this buffer that is later on passed to the shader (aka "reference")
 		VkBufferDeviceAddressInfo bufferDeviceAdressInfo{};
 		bufferDeviceAdressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
 		bufferDeviceAdressInfo.buffer = scene.buffer.buffer;
-		scene.bufferDeviceAddress = vkGetBufferDeviceAddressKHR(device, &bufferDeviceAdressInfo);
+		scene.bufferDeviceAddress = vkGetBufferDeviceAddressKHR(m_vkDevice, &bufferDeviceAdressInfo);
 
 		for (auto& cube : cubes) {
 			// Note that we don't use this buffer for uniforms but rather pass it's address as a reference to the shader, so isntead of the uniform buffer usage we use a different flag
 			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &cube.buffer, sizeof(glm::mat4)));
 			VK_CHECK_RESULT(cube.buffer.map());
 
-			// Get the device of this buffer that is later on passed to the shader (aka "reference")
+			// Get the m_vkDevice of this buffer that is later on passed to the shader (aka "reference")
 			bufferDeviceAdressInfo.buffer = cube.buffer.buffer;
-			cube.bufferDeviceAddress = vkGetBufferDeviceAddressKHR(device, &bufferDeviceAdressInfo);
+			cube.bufferDeviceAddress = vkGetBufferDeviceAddressKHR(m_vkDevice, &bufferDeviceAdressInfo);
 		}
 		updateBuffers();
 	}
@@ -216,7 +216,7 @@ public:
 		VulkanExampleBase::prepare();
 
 		// We need this extension function to get the address of a buffer so we can pass it to the shader
-		vkGetBufferDeviceAddressKHR = reinterpret_cast<PFN_vkGetBufferDeviceAddressKHR>(vkGetDeviceProcAddr(device, "vkGetBufferDeviceAddressKHR"));
+		vkGetBufferDeviceAddressKHR = reinterpret_cast<PFN_vkGetBufferDeviceAddressKHR>(vkGetDeviceProcAddr(m_vkDevice, "vkGetBufferDeviceAddressKHR"));
 
 		loadAssets();
 		prepareBuffers();
@@ -265,12 +265,12 @@ public:
 			// Instead of using descriptors to pass global and per-model matrices to the shader, we can now simply pass buffer references via push constants
 			// The shader then simply reads data from the address of that reference
 			PushConstantBlock references{};
-			// Pass pointer to the global matrix via a buffer device address
+			// Pass pointer to the global matrix via a buffer m_vkDevice address
 			references.sceneReference = scene.bufferDeviceAddress;
 
 			for (auto& cube : cubes) {
-				// Pass pointer to this cube's data buffer via a buffer device address
-				// So instead of having to bind different descriptors, we only pass a different device address
+				// Pass pointer to this cube's data buffer via a buffer m_vkDevice address
+				// So instead of having to bind different descriptors, we only pass a different m_vkDevice address
 				// This doesn't have to be an address from a different buffer, but could very well be just another address in the same buffer
 				references.modelReference = cube.bufferDeviceAddress;
 				vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantBlock), &references);

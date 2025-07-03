@@ -91,33 +91,33 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
+		if (m_vkDevice) {
 			// Frame buffer
 
 			// Color attachment
-			vkDestroyImageView(device, offscreenPass.color.view, nullptr);
-			vkDestroyImage(device, offscreenPass.color.image, nullptr);
-			vkFreeMemory(device, offscreenPass.color.mem, nullptr);
+			vkDestroyImageView(m_vkDevice, offscreenPass.color.view, nullptr);
+			vkDestroyImage(m_vkDevice, offscreenPass.color.image, nullptr);
+			vkFreeMemory(m_vkDevice, offscreenPass.color.mem, nullptr);
 
 			// Depth attachment
-			vkDestroyImageView(device, offscreenPass.depth.view, nullptr);
-			vkDestroyImage(device, offscreenPass.depth.image, nullptr);
-			vkFreeMemory(device, offscreenPass.depth.mem, nullptr);
+			vkDestroyImageView(m_vkDevice, offscreenPass.depth.view, nullptr);
+			vkDestroyImage(m_vkDevice, offscreenPass.depth.image, nullptr);
+			vkFreeMemory(m_vkDevice, offscreenPass.depth.mem, nullptr);
 
-			vkDestroyRenderPass(device, offscreenPass.renderPass, nullptr);
-			vkDestroySampler(device, offscreenPass.sampler, nullptr);
-			vkDestroyFramebuffer(device, offscreenPass.frameBuffer, nullptr);
+			vkDestroyRenderPass(m_vkDevice, offscreenPass.renderPass, nullptr);
+			vkDestroySampler(m_vkDevice, offscreenPass.sampler, nullptr);
+			vkDestroyFramebuffer(m_vkDevice, offscreenPass.frameBuffer, nullptr);
 
-			vkDestroyPipeline(device, pipelines.radialBlur, nullptr);
-			vkDestroyPipeline(device, pipelines.phongPass, nullptr);
-			vkDestroyPipeline(device, pipelines.colorPass, nullptr);
-			vkDestroyPipeline(device, pipelines.offscreenDisplay, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.radialBlur, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.phongPass, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.colorPass, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.offscreenDisplay, nullptr);
 
-			vkDestroyPipelineLayout(device, pipelineLayouts.radialBlur, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayouts.scene, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.radialBlur, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.scene, nullptr);
 
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.scene, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.radialBlur, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.scene, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.radialBlur, nullptr);
 
 			uniformBuffers.scene.destroy();
 			uniformBuffers.blurParams.destroy();
@@ -155,12 +155,12 @@ public:
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs;
 
-		VK_CHECK_RESULT(vkCreateImage(device, &image, nullptr, &offscreenPass.color.image));
-		vkGetImageMemoryRequirements(device, offscreenPass.color.image, &memReqs);
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &image, nullptr, &offscreenPass.color.image));
+		vkGetImageMemoryRequirements(m_vkDevice, offscreenPass.color.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &offscreenPass.color.mem));
-		VK_CHECK_RESULT(vkBindImageMemory(device, offscreenPass.color.image, offscreenPass.color.mem, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &offscreenPass.color.mem));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, offscreenPass.color.image, offscreenPass.color.mem, 0));
 
 		VkImageViewCreateInfo colorImageView = vks::initializers::imageViewCreateInfo();
 		colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -172,7 +172,7 @@ public:
 		colorImageView.subresourceRange.baseArrayLayer = 0;
 		colorImageView.subresourceRange.layerCount = 1;
 		colorImageView.image = offscreenPass.color.image;
-		VK_CHECK_RESULT(vkCreateImageView(device, &colorImageView, nullptr, &offscreenPass.color.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &colorImageView, nullptr, &offscreenPass.color.view));
 
 		// Create sampler to sample from the attachment in the fragment shader
 		VkSamplerCreateInfo samplerInfo = vks::initializers::samplerCreateInfo();
@@ -187,18 +187,18 @@ public:
 		samplerInfo.minLod = 0.0f;
 		samplerInfo.maxLod = 1.0f;
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &offscreenPass.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &samplerInfo, nullptr, &offscreenPass.sampler));
 
 		// Depth stencil attachment
 		image.format = fbDepthFormat;
 		image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-		VK_CHECK_RESULT(vkCreateImage(device, &image, nullptr, &offscreenPass.depth.image));
-		vkGetImageMemoryRequirements(device, offscreenPass.depth.image, &memReqs);
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &image, nullptr, &offscreenPass.depth.image));
+		vkGetImageMemoryRequirements(m_vkDevice, offscreenPass.depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &offscreenPass.depth.mem));
-		VK_CHECK_RESULT(vkBindImageMemory(device, offscreenPass.depth.image, offscreenPass.depth.mem, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &offscreenPass.depth.mem));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, offscreenPass.depth.image, offscreenPass.depth.mem, 0));
 
 		VkImageViewCreateInfo depthStencilView = vks::initializers::imageViewCreateInfo();
 		depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -213,7 +213,7 @@ public:
 		depthStencilView.subresourceRange.baseArrayLayer = 0;
 		depthStencilView.subresourceRange.layerCount = 1;
 		depthStencilView.image = offscreenPass.depth.image;
-		VK_CHECK_RESULT(vkCreateImageView(device, &depthStencilView, nullptr, &offscreenPass.depth.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &depthStencilView, nullptr, &offscreenPass.depth.view));
 
 		// Create a separate render pass for the offscreen rendering as it may differ from the one used for scene rendering
 
@@ -275,7 +275,7 @@ public:
 		renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		renderPassInfo.pDependencies = dependencies.data();
 
-		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &offscreenPass.renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfo, nullptr, &offscreenPass.renderPass));
 
 		VkImageView attachments[2];
 		attachments[0] = offscreenPass.color.view;
@@ -289,7 +289,7 @@ public:
 		fbufCreateInfo.height = offscreenPass.height;
 		fbufCreateInfo.layers = 1;
 
-		VK_CHECK_RESULT(vkCreateFramebuffer(device, &fbufCreateInfo, nullptr, &offscreenPass.frameBuffer));
+		VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &fbufCreateInfo, nullptr, &offscreenPass.frameBuffer));
 
 		// Fill a descriptor for later use in a descriptor set
 		offscreenPass.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -398,7 +398,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Layouts
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
@@ -414,7 +414,7 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 2)
 		};
 		descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings.data(), static_cast<uint32_t>(setLayoutBindings.size()));
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayouts.scene));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayouts.scene));
 
 		// Fullscreen radial blur
 		setLayoutBindings = {
@@ -424,14 +424,14 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings.data(), static_cast<uint32_t>(setLayoutBindings.size()));
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayouts.radialBlur));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayouts.radialBlur));
 
 		// Sets
 		VkDescriptorSetAllocateInfo descriptorSetAllocInfo;
 
 		// Scene rendering
 		descriptorSetAllocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.scene, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocInfo, &descriptorSets.scene));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &descriptorSetAllocInfo, &descriptorSets.scene));
 
 		std::vector<VkWriteDescriptorSet> offScreenWriteDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
@@ -439,11 +439,11 @@ public:
 			// Binding 1: Color gradient sampler
 			vks::initializers::writeDescriptorSet(descriptorSets.scene, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &gradientTexture.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(offScreenWriteDescriptorSets.size()), offScreenWriteDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(offScreenWriteDescriptorSets.size()), offScreenWriteDescriptorSets.data(), 0, nullptr);
 
 		// Fullscreen radial blur
 		descriptorSetAllocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.radialBlur, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocInfo, &descriptorSets.radialBlur));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &descriptorSetAllocInfo, &descriptorSets.radialBlur));
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
@@ -451,17 +451,17 @@ public:
 			// Binding 1: Fragment shader texture sampler
 			vks::initializers::writeDescriptorSet(descriptorSets.radialBlur, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,	1, &offscreenPass.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
 	{
 		// Layouts
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.scene, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.scene));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.scene));
 
 		pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.radialBlur, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.radialBlur));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.radialBlur));
 
 		// Pipelines
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -502,11 +502,11 @@ public:
 		blendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
 		blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.radialBlur));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.radialBlur));
 
 		// No blending (for debug display)
 		blendAttachmentState.blendEnable = VK_FALSE;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.offscreenDisplay));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.offscreenDisplay));
 
 		// Phong pass
 		pipelineCI.layout = pipelineLayouts.scene;
@@ -515,13 +515,13 @@ public:
 		blendAttachmentState.blendEnable = VK_FALSE;
 		depthStencilStateCI.depthWriteEnable = VK_TRUE;
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal });;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.phongPass));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.phongPass));
 
 		// Color only pass (offscreen blur base)
 		shaderStages[0] = loadShader(getShadersPath() + "radialblur/colorpass.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "radialblur/colorpass.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		pipelineCI.renderPass = offscreenPass.renderPass;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.colorPass));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.colorPass));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms

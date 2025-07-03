@@ -90,22 +90,22 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
+		if (m_vkDevice) {
 			// Graphics
 			graphics.uniformBuffer.destroy();
-			vkDestroyPipeline(device, graphics.pipeline, nullptr);
-			vkDestroyPipelineLayout(device, graphics.pipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(device, graphics.descriptorSetLayout, nullptr);
-			vkDestroySemaphore(device, graphics.semaphore, nullptr);
+			vkDestroyPipeline(m_vkDevice, graphics.pipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, graphics.pipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, graphics.descriptorSetLayout, nullptr);
+			vkDestroySemaphore(m_vkDevice, graphics.semaphore, nullptr);
 
 			// Compute
 			compute.uniformBuffer.destroy();
-			vkDestroyPipelineLayout(device, compute.pipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(device, compute.descriptorSetLayout, nullptr);
-			vkDestroyPipeline(device, compute.pipelineCalculate, nullptr);
-			vkDestroyPipeline(device, compute.pipelineIntegrate, nullptr);
-			vkDestroySemaphore(device, compute.semaphore, nullptr);
-			vkDestroyCommandPool(device, compute.commandPool, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, compute.pipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, compute.descriptorSetLayout, nullptr);
+			vkDestroyPipeline(m_vkDevice, compute.pipelineCalculate, nullptr);
+			vkDestroyPipeline(m_vkDevice, compute.pipelineIntegrate, nullptr);
+			vkDestroySemaphore(m_vkDevice, compute.semaphore, nullptr);
+			vkDestroyCommandPool(m_vkDevice, compute.commandPool, nullptr);
 
 			storageBuffer.destroy();
 
@@ -371,7 +371,7 @@ public:
 		VkDeviceSize storageBufferSize = particleBuffer.size() * sizeof(Particle);
 
 		// Staging
-		// SSBO won't be changed on the host after upload so copy to device local memory
+		// SSBO won't be changed on the host after upload so copy to m_vkDevice local memory
 
 		vks::Buffer stagingBuffer;
 
@@ -427,7 +427,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Descriptor layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
@@ -438,22 +438,22 @@ public:
 		};
 
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &graphics.descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &graphics.descriptorSetLayout));
 
 		// Descriptor set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &graphics.descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &graphics.descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &graphics.descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 		   vks::initializers::writeDescriptorSet(graphics.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &textures.particle.descriptor),
 		   vks::initializers::writeDescriptorSet(graphics.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textures.gradient.descriptor),
 		   vks::initializers::writeDescriptorSet(graphics.descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &graphics.uniformBuffer.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 
 		// Pipeline layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&graphics.descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &graphics.pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &graphics.pipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_POINT_LIST, 0, VK_FALSE);
@@ -510,11 +510,11 @@ public:
 		blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
 
 		// We use a semaphore to synchronize compute and graphics
 		VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
-		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &graphics.semaphore));
+		VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCreateInfo, nullptr, &graphics.semaphore));
 
 		// Signal the semaphore for the first run
 		VkSubmitInfo submitInfo = vks::initializers::submitInfo();
@@ -528,11 +528,11 @@ public:
 
 	void prepareCompute()
 	{
-		// Create a compute capable device queue
+		// Create a compute capable m_vkDevice queue
 		// The VulkanDevice::createLogicalDevice functions finds a compute capable queue and prefers queue families that only support compute
 		// Depending on the implementation this may result in different queue family indices for graphics and computes,
 		// requiring proper synchronization (see the memory barriers in buildComputeCommandBuffer)
-		vkGetDeviceQueue(device, compute.queueFamilyIndex, 0, &compute.queue);
+		vkGetDeviceQueue(m_vkDevice, compute.queueFamilyIndex, 0, &compute.queue);
 
 		// Compute shader uniform buffer block
 		vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &compute.uniformBuffer, sizeof(Compute::UniformData));
@@ -549,10 +549,10 @@ public:
 		};
 
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &compute.descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &compute.descriptorSetLayout));
 
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &compute.descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &compute.descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &compute.descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
 			// Binding 0 : Particle position storage buffer
@@ -560,42 +560,42 @@ public:
 			// Binding 1 : Uniform buffer
 			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1,&compute.uniformBuffer.descriptor)
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
 
 		// Create pipelines
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&compute.descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &compute.pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &compute.pipelineLayout));
 
 		VkComputePipelineCreateInfo computePipelineCreateInfo = vks::initializers::computePipelineCreateInfo(compute.pipelineLayout, 0);
 
 		// 1st pass
 		computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computenbody/particle_calculate.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
 
-		// We want to use as much shared memory for the compute shader invocations as available, so we calculate it based on the device limits and pass it to the shader via specialization constants
+		// We want to use as much shared memory for the compute shader invocations as available, so we calculate it based on the m_vkDevice limits and pass it to the shader via specialization constants
 		uint32_t sharedDataSize = std::min((uint32_t)1024, (uint32_t)(vulkanDevice->properties.limits.maxComputeSharedMemorySize / sizeof(glm::vec4)));
 		VkSpecializationMapEntry specializationMapEntry = vks::initializers::specializationMapEntry(0, 0, sizeof(uint32_t));
 		VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(1, &specializationMapEntry, sizeof(int32_t), &sharedDataSize);
 		computePipelineCreateInfo.stage.pSpecializationInfo = &specializationInfo;
 
-		VK_CHECK_RESULT(vkCreateComputePipelines(device, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineCalculate));
+		VK_CHECK_RESULT(vkCreateComputePipelines(m_vkDevice, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineCalculate));
 
 		// 2nd pass
 		computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computenbody/particle_integrate.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
-		VK_CHECK_RESULT(vkCreateComputePipelines(device, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineIntegrate));
+		VK_CHECK_RESULT(vkCreateComputePipelines(m_vkDevice, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineIntegrate));
 
 		// Separate command pool as queue family for compute may be different than graphics
 		VkCommandPoolCreateInfo cmdPoolInfo = {};
 		cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		cmdPoolInfo.queueFamilyIndex = compute.queueFamilyIndex;
 		cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &compute.commandPool));
+		VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &cmdPoolInfo, nullptr, &compute.commandPool));
 
 		// Create a command buffer for compute operations
 		compute.commandBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute.commandPool);
 
 		// Semaphore for compute & graphics sync
 		VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
-		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &compute.semaphore));
+		VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCreateInfo, nullptr, &compute.semaphore));
 
 		// Build a single command buffer containing the compute dispatch commands
 		buildComputeCommandBuffer();

@@ -419,14 +419,14 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
-			vkDestroyPipeline(device, pipelines.solid, nullptr);
+		if (m_vkDevice) {
+			vkDestroyPipeline(m_vkDevice, pipelines.solid, nullptr);
 			if (pipelines.wireframe != VK_NULL_HANDLE) {
-				vkDestroyPipeline(device, pipelines.wireframe, nullptr);
+				vkDestroyPipeline(m_vkDevice, pipelines.wireframe, nullptr);
 			}
-			vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.matrices, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.textures, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.matrices, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.textures, nullptr);
 			shaderData.buffer.destroy();
 		}
 	}
@@ -482,7 +482,7 @@ public:
 		tinygltf::TinyGLTF gltfContext;
 		std::string error, warning;
 
-		this->device = device;
+		this->m_vkDevice = m_vkDevice;
 
 #if defined(__ANDROID__)
 		// On Android all assets are packed with the apk in a compressed form, so we need to open them using the asset manager
@@ -543,7 +543,7 @@ public:
 			&indexStaging.memory,
 			indexBuffer.data()));
 
-		// Create device local buffers (target)
+		// Create m_vkDevice local buffers (target)
 		VK_CHECK_RESULT(vulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -557,7 +557,7 @@ public:
 			&glTFModel.indices.buffer,
 			&glTFModel.indices.memory));
 
-		// Copy data from staging buffers (host) do device local buffer (gpu)
+		// Copy data from staging buffers (host) do m_vkDevice local buffer (gpu)
 		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = {};
 
@@ -580,10 +580,10 @@ public:
 		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 
 		// Free staging resources
-		vkDestroyBuffer(device, vertexStaging.buffer, nullptr);
-		vkFreeMemory(device, vertexStaging.memory, nullptr);
-		vkDestroyBuffer(device, indexStaging.buffer, nullptr);
-		vkFreeMemory(device, indexStaging.memory, nullptr);
+		vkDestroyBuffer(m_vkDevice, vertexStaging.buffer, nullptr);
+		vkFreeMemory(m_vkDevice, vertexStaging.memory, nullptr);
+		vkDestroyBuffer(m_vkDevice, indexStaging.buffer, nullptr);
+		vkFreeMemory(m_vkDevice, indexStaging.memory, nullptr);
 	}
 
 	void loadAssets()
@@ -605,27 +605,27 @@ public:
 		// One set for matrices and one per model image/texture
 		const uint32_t maxSetCount = static_cast<uint32_t>(glTFModel.images.size()) + 1;
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, maxSetCount);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Descriptor set layout for passing matrices
 		VkDescriptorSetLayoutBinding setLayoutBinding = vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0);
 		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(&setLayoutBinding, 1);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.matrices));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.matrices));
 		// Descriptor set layout for passing material textures
 		setLayoutBinding = vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.textures));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.textures));
 
 		// Descriptor set for scene matrices
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.matrices, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &shaderData.buffer.descriptor);
-		vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
 		// Descriptor sets for materials
 		for (auto& image : glTFModel.images) {
 			const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.textures, 1);
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &image.descriptorSet));
+			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &image.descriptorSet));
 			VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(image.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &image.texture.descriptor);
-			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
 		}
 	}
 
@@ -640,7 +640,7 @@ public:
 		// Push constant ranges are part of the pipeline layout
 		pipelineLayoutCI.pushConstantRangeCount = 1;
 		pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -686,13 +686,13 @@ public:
 		pipelineCI.pStages = shaderStages.data();
 
 		// Solid rendering pipeline
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.solid));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.solid));
 
 		// Wire frame rendering pipeline
 		if (deviceFeatures.fillModeNonSolid) {
 			rasterizationStateCI.polygonMode = VK_POLYGON_MODE_LINE;
 			rasterizationStateCI.lineWidth = 1.0f;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.wireframe));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.wireframe));
 		}
 	}
 

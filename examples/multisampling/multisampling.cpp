@@ -62,26 +62,26 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
-			vkDestroyPipeline(device, pipelines.MSAA, nullptr);
-			vkDestroyPipeline(device, pipelines.MSAASampleShading, nullptr);
+		if (m_vkDevice) {
+			vkDestroyPipeline(m_vkDevice, pipelines.MSAA, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.MSAASampleShading, nullptr);
 
-			vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 
 			// Destroy MSAA target
-			vkDestroyImage(device, multisampleTarget.color.image, nullptr);
-			vkDestroyImageView(device, multisampleTarget.color.view, nullptr);
-			vkFreeMemory(device, multisampleTarget.color.memory, nullptr);
-			vkDestroyImage(device, multisampleTarget.depth.image, nullptr);
-			vkDestroyImageView(device, multisampleTarget.depth.view, nullptr);
-			vkFreeMemory(device, multisampleTarget.depth.memory, nullptr);
+			vkDestroyImage(m_vkDevice, multisampleTarget.color.image, nullptr);
+			vkDestroyImageView(m_vkDevice, multisampleTarget.color.view, nullptr);
+			vkFreeMemory(m_vkDevice, multisampleTarget.color.memory, nullptr);
+			vkDestroyImage(m_vkDevice, multisampleTarget.depth.image, nullptr);
+			vkDestroyImageView(m_vkDevice, multisampleTarget.depth.view, nullptr);
+			vkFreeMemory(m_vkDevice, multisampleTarget.depth.memory, nullptr);
 
 			uniformBuffer.destroy();
 		}
 	}
 
-	// Enable physical device features required for this example
+	// Enable physical m_vkDevice features required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Enable sample rate shading filtering if supported
@@ -98,7 +98,7 @@ public:
 	// into the visible frame buffer target in the render pass
 	void setupMultisampleTarget()
 	{
-		// Check if device supports requested sample count for color and depth frame buffer
+		// Check if m_vkDevice supports requested sample count for color and depth frame buffer
 		assert((deviceProperties.limits.framebufferColorSampleCounts & sampleCount) && (deviceProperties.limits.framebufferDepthSampleCounts & sampleCount));
 
 		// Color target
@@ -117,10 +117,10 @@ public:
 		info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		VK_CHECK_RESULT(vkCreateImage(device, &info, nullptr, &multisampleTarget.color.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &info, nullptr, &multisampleTarget.color.image));
 
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(device, multisampleTarget.color.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, multisampleTarget.color.image, &memReqs);
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		memAlloc.allocationSize = memReqs.size;
 		// We prefer a lazily allocated memory type
@@ -129,11 +129,11 @@ public:
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
 		if (!lazyMemTypePresent)
 		{
-			// If this is not available, fall back to device local memory
+			// If this is not available, fall back to m_vkDevice local memory
 			memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		}
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &multisampleTarget.color.memory));
-		vkBindImageMemory(device, multisampleTarget.color.image, multisampleTarget.color.memory, 0);
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &multisampleTarget.color.memory));
+		vkBindImageMemory(m_vkDevice, multisampleTarget.color.image, multisampleTarget.color.memory, 0);
 
 		// Create image view for the MSAA target
 		VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
@@ -148,7 +148,7 @@ public:
 		viewInfo.subresourceRange.levelCount = 1;
 		viewInfo.subresourceRange.layerCount = 1;
 
-		VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, &multisampleTarget.color.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &multisampleTarget.color.view));
 
 		// Depth target
 		info.imageType = VK_IMAGE_TYPE_2D;
@@ -165,9 +165,9 @@ public:
 		info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		VK_CHECK_RESULT(vkCreateImage(device, &info, nullptr, &multisampleTarget.depth.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &info, nullptr, &multisampleTarget.depth.image));
 
-		vkGetImageMemoryRequirements(device, multisampleTarget.depth.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, multisampleTarget.depth.image, &memReqs);
 		memAlloc = vks::initializers::memoryAllocateInfo();
 		memAlloc.allocationSize = memReqs.size;
 
@@ -177,8 +177,8 @@ public:
 			memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		}
 
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &multisampleTarget.depth.memory));
-		vkBindImageMemory(device, multisampleTarget.depth.image, multisampleTarget.depth.memory, 0);
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &multisampleTarget.depth.memory));
+		vkBindImageMemory(m_vkDevice, multisampleTarget.depth.image, multisampleTarget.depth.memory, 0);
 
 		// Create image view for the MSAA target
 		viewInfo.image = multisampleTarget.depth.image;
@@ -194,7 +194,7 @@ public:
 		viewInfo.subresourceRange.levelCount = 1;
 		viewInfo.subresourceRange.layerCount = 1;
 
-		VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, &multisampleTarget.depth.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &multisampleTarget.depth.view));
 	}
 
 	// Setup a render pass for using a multi sampled attachment
@@ -287,7 +287,7 @@ public:
 		renderPassInfo.dependencyCount = 2;
 		renderPassInfo.pDependencies = dependencies.data();
 
-		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfo, nullptr, &renderPass));
 	}
 
 	// Frame buffer attachments must match with render pass setup,
@@ -303,12 +303,12 @@ public:
 			attachmentSize = { width, height };
 			
 			// Destroy MSAA target
-			vkDestroyImage(device, multisampleTarget.color.image, nullptr);
-			vkDestroyImageView(device, multisampleTarget.color.view, nullptr);
-			vkFreeMemory(device, multisampleTarget.color.memory, nullptr);
-			vkDestroyImage(device, multisampleTarget.depth.image, nullptr);
-			vkDestroyImageView(device, multisampleTarget.depth.view, nullptr);
-			vkFreeMemory(device, multisampleTarget.depth.memory, nullptr);
+			vkDestroyImage(m_vkDevice, multisampleTarget.color.image, nullptr);
+			vkDestroyImageView(m_vkDevice, multisampleTarget.color.view, nullptr);
+			vkFreeMemory(m_vkDevice, multisampleTarget.color.memory, nullptr);
+			vkDestroyImage(m_vkDevice, multisampleTarget.depth.image, nullptr);
+			vkDestroyImageView(m_vkDevice, multisampleTarget.depth.view, nullptr);
+			vkFreeMemory(m_vkDevice, multisampleTarget.depth.memory, nullptr);
 		}
 		
 		std::array<VkImageView, 3> attachments;
@@ -334,7 +334,7 @@ public:
 		for (uint32_t i = 0; i < frameBuffers.size(); i++)
 		{
 			attachments[1] = swapChain.imageViews[i];
-			VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCreateInfo, nullptr, &frameBuffers[i]));
+			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCreateInfo, nullptr, &frameBuffers[i]));
 		}
 	}
 
@@ -395,7 +395,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Layout
 		const std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -403,16 +403,16 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
@@ -423,7 +423,7 @@ public:
 			vkglTF::descriptorSetLayoutImage,
 		};
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), 2);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -457,7 +457,7 @@ public:
 		// MSAA rendering pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "multisampling/mesh.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "multisampling/mesh.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.MSAA));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.MSAA));
 
 		if (vulkanDevice->features.sampleRateShading)
 		{
@@ -469,7 +469,7 @@ public:
 			multisampleState.sampleShadingEnable = VK_TRUE;
 			// Minimum fraction for sample shading
 			multisampleState.minSampleShading = 0.25f;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.MSAASampleShading));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.MSAASampleShading));
 		}
 	}
 

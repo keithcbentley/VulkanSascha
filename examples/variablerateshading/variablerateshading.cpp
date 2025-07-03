@@ -25,13 +25,13 @@ VulkanExample::VulkanExample() : VulkanExampleBase()
 
 VulkanExample::~VulkanExample()
 {
-	vkDestroyPipeline(device, pipelines.masked, nullptr);
-	vkDestroyPipeline(device, pipelines.opaque, nullptr);
-	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-	vkDestroyImageView(device, shadingRateImage.view, nullptr);
-	vkDestroyImage(device, shadingRateImage.image, nullptr);
-	vkFreeMemory(device, shadingRateImage.memory, nullptr);
+	vkDestroyPipeline(m_vkDevice, pipelines.masked, nullptr);
+	vkDestroyPipeline(m_vkDevice, pipelines.opaque, nullptr);
+	vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+	vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+	vkDestroyImageView(m_vkDevice, shadingRateImage.view, nullptr);
+	vkDestroyImage(m_vkDevice, shadingRateImage.image, nullptr);
+	vkFreeMemory(m_vkDevice, shadingRateImage.memory, nullptr);
 	shaderData.buffer.destroy();
 }
 
@@ -52,14 +52,14 @@ void VulkanExample::getEnabledFeatures()
 */
 void VulkanExample::handleResize()
 {
-	vkDeviceWaitIdle(device);
+	vkDeviceWaitIdle(m_vkDevice);
 	// Invalidate the shading rate image, will be recreated in the renderpass setup
-	vkDestroyImageView(device, shadingRateImage.view, nullptr);
-	vkDestroyImage(device, shadingRateImage.image, nullptr);
-	vkFreeMemory(device, shadingRateImage.memory, nullptr);
+	vkDestroyImageView(m_vkDevice, shadingRateImage.view, nullptr);
+	vkDestroyImage(m_vkDevice, shadingRateImage.image, nullptr);
+	vkFreeMemory(m_vkDevice, shadingRateImage.memory, nullptr);
 	prepareShadingRateImage();
 	// Recreate the render pass and update it with the new fragment shading rate image resolution
-	vkDestroyRenderPass(device, renderPass, nullptr);
+	vkDestroyRenderPass(m_vkDevice, renderPass, nullptr);
 	setupRenderPass();
 	resized = false;
 }
@@ -94,7 +94,7 @@ void VulkanExample::setupFrameBuffer()
 	frameBuffers.resize(swapChain.images.size());
 	for (uint32_t i = 0; i < frameBuffers.size(); i++) {
 		attachments[0] = swapChain.imageViews[i];
-		VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCreateInfo, nullptr, &frameBuffers[i]));
+		VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCreateInfo, nullptr, &frameBuffers[i]));
 	}
 }
 
@@ -209,14 +209,14 @@ void VulkanExample::setupRenderPass()
 	renderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
 	renderPassCI.pDependencies = dependencies.data();
 
-	VK_CHECK_RESULT(vkCreateRenderPass2KHR(device, &renderPassCI, nullptr, &renderPass));
+	VK_CHECK_RESULT(vkCreateRenderPass2KHR(m_vkDevice, &renderPassCI, nullptr, &renderPass));
 }
 
 void VulkanExample::buildCommandBuffers()
 {
 	// As this is an extension, we need to manually load the extension pointers
 	if (!vkCmdSetFragmentShadingRateKHR) {
-		vkCmdSetFragmentShadingRateKHR = reinterpret_cast<PFN_vkCmdSetFragmentShadingRateKHR>(vkGetDeviceProcAddr(device, "vkCmdSetFragmentShadingRateKHR"));
+		vkCmdSetFragmentShadingRateKHR = reinterpret_cast<PFN_vkCmdSetFragmentShadingRateKHR>(vkGetDeviceProcAddr(m_vkDevice, "vkCmdSetFragmentShadingRateKHR"));
 	}
 
 	VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
@@ -292,14 +292,14 @@ void VulkanExample::setupDescriptors()
 		vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 	};
 	VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
-	VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+	VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 	// Descriptor set layout
 	const std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 		vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0),
 	};
 	VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 	// Pipeline layout
 	const std::vector<VkDescriptorSetLayout> setLayouts = {
@@ -307,15 +307,15 @@ void VulkanExample::setupDescriptors()
 		vkglTF::descriptorSetLayoutImage,
 	};
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), 2);
-	VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
 	// Descriptor set
 	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+	VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 	std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 		vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &shaderData.buffer.descriptor),
 	};
-	vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+	vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 }
 
 // [POI]
@@ -361,16 +361,16 @@ void VulkanExample::prepareShadingRateImage()
 	imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageCI.usage = VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &shadingRateImage.image));
+	VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &shadingRateImage.image));
 	VkMemoryRequirements memReqs{};
-	vkGetImageMemoryRequirements(device, shadingRateImage.image, &memReqs);
+	vkGetImageMemoryRequirements(m_vkDevice, shadingRateImage.image, &memReqs);
 	
 	VkMemoryAllocateInfo memAllloc{};
 	memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	memAllloc.allocationSize = memReqs.size;
 	memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	VK_CHECK_RESULT(vkAllocateMemory(device, &memAllloc, nullptr, &shadingRateImage.memory));
-	VK_CHECK_RESULT(vkBindImageMemory(device, shadingRateImage.image, shadingRateImage.memory, 0));
+	VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllloc, nullptr, &shadingRateImage.memory));
+	VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, shadingRateImage.image, shadingRateImage.memory, 0));
 
 	VkImageViewCreateInfo imageViewCI{};
 	imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -382,7 +382,7 @@ void VulkanExample::prepareShadingRateImage()
 	imageViewCI.subresourceRange.baseArrayLayer = 0;
 	imageViewCI.subresourceRange.layerCount = 1;
 	imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCI, nullptr, &shadingRateImage.view));
+	VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewCI, nullptr, &shadingRateImage.view));
 
 	// The shading rates are stored in a buffer that'll be copied to the shading rate image
 	VkDeviceSize bufferSize = imageExtent.width * imageExtent.height * sizeof(uint8_t);
@@ -446,20 +446,20 @@ void VulkanExample::prepareShadingRateImage()
 	bufferCreateInfo.size = bufferSize;
 	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	VK_CHECK_RESULT(vkCreateBuffer(device, &bufferCreateInfo, nullptr, &stagingBuffer));
+	VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, &stagingBuffer));
 	VkMemoryAllocateInfo memAllocInfo{};
 	memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	memReqs = {};
-	vkGetBufferMemoryRequirements(device, stagingBuffer, &memReqs);
+	vkGetBufferMemoryRequirements(m_vkDevice, stagingBuffer, &memReqs);
 	memAllocInfo.allocationSize = memReqs.size;
 	memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	VK_CHECK_RESULT(vkAllocateMemory(device, &memAllocInfo, nullptr, &stagingMemory));
-	VK_CHECK_RESULT(vkBindBufferMemory(device, stagingBuffer, stagingMemory, 0));
+	VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &stagingMemory));
+	VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, stagingBuffer, stagingMemory, 0));
 
 	uint8_t* mapped;
-	VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, memReqs.size, 0, (void**)&mapped));
+	VK_CHECK_RESULT(vkMapMemory(m_vkDevice, stagingMemory, 0, memReqs.size, 0, (void**)&mapped));
 	memcpy(mapped, shadingRatePatternData, bufferSize);
-	vkUnmapMemory(device, stagingMemory);
+	vkUnmapMemory(m_vkDevice, stagingMemory);
 
 	delete[] shadingRatePatternData;
 
@@ -500,8 +500,8 @@ void VulkanExample::prepareShadingRateImage()
 	}
 	vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 
-	vkFreeMemory(device, stagingMemory, nullptr);
-	vkDestroyBuffer(device, stagingBuffer, nullptr);
+	vkFreeMemory(m_vkDevice, stagingMemory, nullptr);
+	vkDestroyBuffer(m_vkDevice, stagingBuffer, nullptr);
 }
 
 void VulkanExample::preparePipelines()
@@ -545,11 +545,11 @@ void VulkanExample::preparePipelines()
 	};
 	VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(specializationMapEntries, sizeof(specializationData), &specializationData);
 	shaderStages[1].pSpecializationInfo = &specializationInfo;
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.opaque));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.opaque));
 
 	specializationData.alphaMask = true;
 	rasterizationStateCI.cullMode = VK_CULL_MODE_NONE;
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.masked));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.masked));
 }
 
 void VulkanExample::prepareUniformBuffers()

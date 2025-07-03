@@ -82,24 +82,24 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
+		if (m_vkDevice) {
 			for (uint32_t i = 0; i < attachments.size(); i++) {
-				vkDestroyImageView(device, attachments[i].color.view, nullptr);
-				vkDestroyImage(device, attachments[i].color.image, nullptr);
-				vkFreeMemory(device, attachments[i].color.memory, nullptr);
-				vkDestroyImageView(device, attachments[i].depth.view, nullptr);
-				vkDestroyImage(device, attachments[i].depth.image, nullptr);
-				vkFreeMemory(device, attachments[i].depth.memory, nullptr);
+				vkDestroyImageView(m_vkDevice, attachments[i].color.view, nullptr);
+				vkDestroyImage(m_vkDevice, attachments[i].color.image, nullptr);
+				vkFreeMemory(m_vkDevice, attachments[i].color.memory, nullptr);
+				vkDestroyImageView(m_vkDevice, attachments[i].depth.view, nullptr);
+				vkDestroyImage(m_vkDevice, attachments[i].depth.image, nullptr);
+				vkFreeMemory(m_vkDevice, attachments[i].depth.memory, nullptr);
 			}
 
-			vkDestroyPipeline(device, pipelines.attachmentRead, nullptr);
-			vkDestroyPipeline(device, pipelines.attachmentWrite, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.attachmentRead, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.attachmentWrite, nullptr);
 
-			vkDestroyPipelineLayout(device, pipelineLayouts.attachmentWrite, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayouts.attachmentRead, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentWrite, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentRead, nullptr);
 
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.attachmentWrite, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.attachmentRead, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentWrite, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentRead, nullptr);
 
 			uniformBuffers.matrices.destroy();
 			uniformBuffers.params.destroy();
@@ -108,9 +108,9 @@ public:
 
 	void clearAttachment(FrameBufferAttachment* attachment)
 	{
-		vkDestroyImageView(device, attachment->view, nullptr);
-		vkDestroyImage(device, attachment->image, nullptr);
-		vkFreeMemory(device, attachment->memory, nullptr);
+		vkDestroyImageView(m_vkDevice, attachment->view, nullptr);
+		vkDestroyImage(m_vkDevice, attachment->image, nullptr);
+		vkFreeMemory(m_vkDevice, attachment->memory, nullptr);
 	}
 
 	// Create a frame buffer attachment
@@ -143,15 +143,15 @@ public:
 		// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT flag is required for input attachments;
 		imageCI.usage = usage | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 		imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &attachment->image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &attachment->image));
 
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(device, attachment->image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &attachment->memory));
-		VK_CHECK_RESULT(vkBindImageMemory(device, attachment->image, attachment->memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &attachment->memory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, attachment->image, attachment->memory, 0));
 
 		VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
 		imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -163,7 +163,7 @@ public:
 		imageViewCI.subresourceRange.baseArrayLayer = 0;
 		imageViewCI.subresourceRange.layerCount = 1;
 		imageViewCI.image = attachment->image;
-		VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCI, nullptr, &attachment->view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewCI, nullptr, &attachment->view));
 	}
 
 	// Override framebuffer setup from base class
@@ -186,11 +186,11 @@ public:
 				createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments[i].depth);
 			}
 
-			vkDestroyPipelineLayout(device, pipelineLayouts.attachmentWrite, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayouts.attachmentRead, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.attachmentWrite, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.attachmentRead, nullptr);
-			vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentWrite, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentRead, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentWrite, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentRead, nullptr);
+			vkDestroyDescriptorPool(m_vkDevice, descriptorPool, nullptr);
 
 			// Since the framebuffers/attachments are referred in the descriptor sets, these need to be updated on resize
 			setupDescriptors();
@@ -213,7 +213,7 @@ public:
 			views[0] = swapChain.imageViews[i];
 			views[1] = attachments[i].color.view;
 			views[2] = attachments[i].depth.view;
-			VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCI, nullptr, &frameBuffers[i]));
+			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCI, nullptr, &frameBuffers[i]));
 		}
 	}
 
@@ -337,7 +337,7 @@ public:
 		renderPassInfoCI.pSubpasses = subpassDescriptions.data();
 		renderPassInfoCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		renderPassInfoCI.pDependencies = dependencies.data();
-		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfoCI, nullptr, &renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfoCI, nullptr, &renderPass));
 	}
 
 	void buildCommandBuffers()
@@ -430,7 +430,7 @@ public:
 			// Binding 2: Display parameters uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSets.attachmentRead[index], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers.params.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void setupDescriptors()
@@ -444,7 +444,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, static_cast<uint32_t>(attachments.size()) * 2 + 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), static_cast<uint32_t>(attachments.size()) + 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		/*
 			Attachment write
@@ -454,16 +454,16 @@ public:
 				vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
 			};
 			VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayouts.attachmentWrite));
+			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayouts.attachmentWrite));
 
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.attachmentWrite, 1);
-			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.attachmentWrite));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.attachmentWrite));
 
 			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.attachmentWrite, 1);
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.attachmentWrite));
+			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.attachmentWrite));
 
 			VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSets.attachmentWrite, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.matrices.descriptor);
-			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
 		}
 
 		/*
@@ -478,15 +478,15 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 2),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.attachmentRead));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.attachmentRead));
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.attachmentRead, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayouts.attachmentRead));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayouts.attachmentRead));
 
 		descriptorSets.attachmentRead.resize(attachments.size());
 		for (auto i = 0; i < descriptorSets.attachmentRead.size(); i++) {
 			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.attachmentRead, 1);
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.attachmentRead[i]));
+			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.attachmentRead[i]));
 			updateAttachmentReadDescriptors(i);
 		}
 
@@ -530,7 +530,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "inputattachments/attachmentwrite.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inputattachments/attachmentwrite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentWrite));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentWrite));
 
 		/*
 			Attachment read
@@ -550,7 +550,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "inputattachments/attachmentread.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inputattachments/attachmentread.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentRead));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentRead));
 	}
 
 	void prepareUniformBuffers()

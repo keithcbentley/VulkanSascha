@@ -77,7 +77,7 @@
 
 class VulkanExampleBase
 {
-private:
+
 	std::string getWindowTitle() const;
 	uint32_t destWidth{};
 	uint32_t destHeight{};
@@ -93,6 +93,7 @@ private:
 	void createCommandBuffers();
 	void destroyCommandBuffers();
 	std::string shaderDir = "glsl";
+
 protected:
 	// Returns the path to the root of the glsl, hlsl or slang shader directory.
 	std::string getShadersPath() const;
@@ -104,13 +105,13 @@ protected:
 	// Vulkan instance, stores all per-application states
 	VkInstance instance{ VK_NULL_HANDLE };
 	std::vector<std::string> supportedInstanceExtensions;
-	// Physical device (GPU) that Vulkan will use
+	// Physical m_vkDevice (GPU) that Vulkan will use
 	VkPhysicalDevice physicalDevice{ VK_NULL_HANDLE };
-	// Stores physical device properties (for e.g. checking device limits)
+	// Stores physical m_vkDevice properties (for e.g. checking m_vkDevice limits)
 	VkPhysicalDeviceProperties deviceProperties{};
-	// Stores the features available on the selected physical device (for e.g. checking if a feature is available)
+	// Stores the features available on the selected physical m_vkDevice (for e.g. checking if a feature is available)
 	VkPhysicalDeviceFeatures deviceFeatures{};
-	// Stores all available memory (type) properties for the physical device
+	// Stores all available memory (type) properties for the physical m_vkDevice
 	VkPhysicalDeviceMemoryProperties deviceMemoryProperties{};
 	/** @brief Set of physical device features to be enabled for this example (must be set in the derived constructor) */
 	VkPhysicalDeviceFeatures enabledFeatures{};
@@ -123,8 +124,8 @@ protected:
 	/** @brief Optional pNext structure for passing extension structures to device creation */
 	void* deviceCreatepNextChain = nullptr;
 	/** @brief Logical device, application's view of the physical device (GPU) */
-	VkDevice device{ VK_NULL_HANDLE };
-	// Handle to the device graphics queue that command buffers are submitted to
+	VkDevice m_vkDevice{ VK_NULL_HANDLE };
+	// Handle to the m_vkDevice graphics queue that command buffers are submitted to
 	VkQueue queue{ VK_NULL_HANDLE };
 	// Depth buffer format (selected during Vulkan initialization)
 	VkFormat depthFormat{VK_FORMAT_UNDEFINED};
@@ -159,7 +160,9 @@ protected:
 	} semaphores{};
 	std::vector<VkFence> waitFences;
 	bool requiresStencil{ false };
+
 public:
+
 	bool prepared = false;
 	bool resized = false;
 	bool viewUpdated = false;
@@ -167,7 +170,7 @@ public:
 	uint32_t height = 720;
 
 	vks::UIOverlay ui;
-	CommandLineParser commandLineParser;
+	CommandLineParser m_commandLineParser;
 
 	/** @brief Last frame time measured using a high performance timer (if available) */
 	float frameTimer = 1.0f;
@@ -178,16 +181,16 @@ public:
 	vks::VulkanDevice *vulkanDevice{};
 
 	/** @brief Example settings that can be changed e.g. by command line arguments */
-	struct Settings {
+	struct ExampleSettings {
 		/** @brief Activates validation layers (and message output) when set to true */
-		bool validation = false;
+		bool m_useValidationLayers = false;
 		/** @brief Set to true if fullscreen mode has been requested via command line */
-		bool fullscreen = false;
+		bool m_fullscreen = false;
 		/** @brief Set to true if v-sync will be forced for the swapchain */
-		bool vsync = false;
+		bool m_forceSwapChainVsync = false;
 		/** @brief Enable UI overlay */
-		bool overlay = true;
-	} settings;
+		bool m_showOverlayUI = true;
+	} m_exampleSettings;
 
 	/** @brief State of gamepad input (only used on Android) */
 	struct {
@@ -292,6 +295,7 @@ public:
 	/** @brief Default base class constructor */
 	VulkanExampleBase();
 	virtual ~VulkanExampleBase();
+        void setCommandLineOptions();
 	/** @brief Setup the vulkan instance, enable required extensions and connect to the physical device (GPU) */
 	bool initVulkan();
 

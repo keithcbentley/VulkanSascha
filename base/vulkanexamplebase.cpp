@@ -109,7 +109,7 @@ VkResult VulkanExampleBase::createInstance()
 	instanceCreateInfo.pApplicationInfo = &appInfo;
 
 	VkDebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCI{};
-	if (settings.validation) {
+	if (m_exampleSettings.m_useValidationLayers) {
 		vks::debug::setupDebugingMessengerCreateInfo(debugUtilsMessengerCI);
 		debugUtilsMessengerCI.pNext = instanceCreateInfo.pNext;
 		instanceCreateInfo.pNext = &debugUtilsMessengerCI;
@@ -125,7 +125,7 @@ VkResult VulkanExampleBase::createInstance()
 #endif
 
 	// Enable the debug utils extension if available (e.g. when debugging tools are present)
-	if (settings.validation || std::find(supportedInstanceExtensions.begin(), supportedInstanceExtensions.end(), VK_EXT_DEBUG_UTILS_EXTENSION_NAME) != supportedInstanceExtensions.end()) {
+        if (m_exampleSettings.m_useValidationLayers || std::find(supportedInstanceExtensions.begin(), supportedInstanceExtensions.end(), VK_EXT_DEBUG_UTILS_EXTENSION_NAME) != supportedInstanceExtensions.end()) {
 		instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	}
 
@@ -137,7 +137,7 @@ VkResult VulkanExampleBase::createInstance()
 	// The VK_LAYER_KHRONOS_validation contains all current validation functionality.
 	// Note that on Android this layer requires at least NDK r20
 	const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
-	if (settings.validation) {
+        if (m_exampleSettings.m_useValidationLayers) {
 		// Check if this layer is available at instance level
 		uint32_t instanceLayerCount;
 		vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr);
@@ -191,7 +191,7 @@ void VulkanExampleBase::renderFrame()
 std::string VulkanExampleBase::getWindowTitle() const
 {
 	std::string windowTitle{ title + " - " + deviceProperties.deviceName };
-	if (!settings.overlay) {
+    if (!m_exampleSettings.m_showOverlayUI) {
 		windowTitle += " - " + std::to_string(frameCounter) + " fps";
 	}
 	return windowTitle;
@@ -202,12 +202,12 @@ void VulkanExampleBase::createCommandBuffers()
 	// Create one command buffer for each swap chain image
 	drawCmdBuffers.resize(swapChain.images.size());
 	VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, drawCmdBuffers.data()));
+        VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, drawCmdBuffers.data()));
 }
 
 void VulkanExampleBase::destroyCommandBuffers()
 {
-	vkFreeCommandBuffers(device, cmdPool, static_cast<uint32_t>(drawCmdBuffers.size()), drawCmdBuffers.data());
+    vkFreeCommandBuffers(m_vkDevice, cmdPool, static_cast<uint32_t>(drawCmdBuffers.size()), drawCmdBuffers.data());
 }
 
 std::string VulkanExampleBase::getShadersPath() const
@@ -219,7 +219,7 @@ void VulkanExampleBase::createPipelineCache()
 {
 	VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
 	pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-	VK_CHECK_RESULT(vkCreatePipelineCache(device, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
+        VK_CHECK_RESULT(vkCreatePipelineCache(m_vkDevice, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
 }
 
 void VulkanExampleBase::prepare()
@@ -233,8 +233,8 @@ void VulkanExampleBase::prepare()
 	setupRenderPass();
 	createPipelineCache();
 	setupFrameBuffer();
-	settings.overlay = settings.overlay && (!benchmark.active);
-	if (settings.overlay) {
+        m_exampleSettings.m_showOverlayUI = m_exampleSettings.m_showOverlayUI && (!benchmark.active);
+        if (m_exampleSettings.m_showOverlayUI) {
 		ui.device = vulkanDevice;
 		ui.queue = queue;
 		ui.shaders = {
@@ -252,9 +252,9 @@ VkPipelineShaderStageCreateInfo VulkanExampleBase::loadShader(std::string fileNa
 	shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStage.stage = stage;
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	shaderStage.module = vks::tools::loadShader(androidApp->activity->assetManager, fileName.c_str(), device);
+	shaderStage.module = vks::tools::loadShader(androidApp->activity->assetManager, fileName.c_str(), m_vkDevice);
 #else
-	shaderStage.module = vks::tools::loadShader(fileName.c_str(), device);
+        shaderStage.module = vks::tools::loadShader(fileName.c_str(), m_vkDevice);
 #endif
 	shaderStage.pName = "main";
 	assert(shaderStage.module != VK_NULL_HANDLE);
@@ -299,7 +299,7 @@ void VulkanExampleBase::nextFrame()
 	{
 		lastFPS = static_cast<uint32_t>((float)frameCounter * (1000.0f / fpsTimer));
 #if defined(_WIN32)
-		if (!settings.overlay)	{
+                if (!m_exampleSettings.m_showOverlayUI) {
 			std::string windowTitle = getWindowTitle();
 			SetWindowText(window, windowTitle.c_str());
 		}
@@ -336,7 +336,7 @@ void VulkanExampleBase::renderLoop()
 #endif
 
 		benchmark.run([=] { render(); }, vulkanDevice->properties);
-		vkDeviceWaitIdle(device);
+                vkDeviceWaitIdle(m_vkDevice);
 		if (!benchmark.filename.empty()) {
 			benchmark.saveResults();
 		}
@@ -686,15 +686,15 @@ void VulkanExampleBase::renderLoop()
 		}
 	}
 #endif
-	// Flush device to make sure all resources can be freed
-	if (device != VK_NULL_HANDLE) {
-		vkDeviceWaitIdle(device);
+	// Flush m_vkDevice to make sure all resources can be freed
+        if (m_vkDevice != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(m_vkDevice);
 	}
 }
 
 void VulkanExampleBase::updateOverlay()
 {
-	if (!settings.overlay)
+    if (!m_exampleSettings.m_showOverlayUI)
 		return;
 
 	// The overlay does not need to be updated with each frame, so we limit the update rate
@@ -754,7 +754,7 @@ void VulkanExampleBase::updateOverlay()
 
 void VulkanExampleBase::drawUI(const VkCommandBuffer commandBuffer)
 {
-	if (settings.overlay && ui.visible) {
+    if (m_exampleSettings.m_showOverlayUI && ui.visible) {
 		const VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
 		const VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -797,103 +797,109 @@ void VulkanExampleBase::submitFrame()
 	VK_CHECK_RESULT(vkQueueWaitIdle(queue));
 }
 
+void VulkanExampleBase::setCommandLineOptions() {
+    m_commandLineParser.add("help", { "--help" }, 0, "Show help");
+    m_commandLineParser.add("validation", { "-v", "--validation" }, 0, "Enable validation layers");
+    m_commandLineParser.add("validationlogfile", { "-vl", "--validationlogfile" }, 0, "Log validation messages to a textfile");
+    m_commandLineParser.add("vsync", { "-vs", "--vsync" }, 0, "Enable V-Sync");
+    m_commandLineParser.add("fullscreen", { "-f", "--fullscreen" }, 0, "Start in fullscreen mode");
+    m_commandLineParser.add("width", { "-w", "--width" }, 1, "Set window width");
+    m_commandLineParser.add("height", { "-h", "--height" }, 1, "Set window height");
+    m_commandLineParser.add("shaders", { "-s", "--shaders" }, 1, "Select shader type to use (gls, hlsl or slang)");
+    m_commandLineParser.add("gpuselection", { "-g", "--gpu" }, 1, "Select GPU to run on");
+    m_commandLineParser.add("gpulist", { "-gl", "--listgpus" }, 0, "Display a list of available Vulkan devices");
+    m_commandLineParser.add("benchmark", { "-b", "--benchmark" }, 0, "Run example in benchmark mode");
+    m_commandLineParser.add("benchmarkwarmup", { "-bw", "--benchwarmup" }, 1, "Set warmup time for benchmark mode in seconds");
+    m_commandLineParser.add("benchmarkruntime", { "-br", "--benchruntime" }, 1, "Set duration time for benchmark mode in seconds");
+    m_commandLineParser.add("benchmarkresultfile", { "-bf", "--benchfilename" }, 1, "Set file name for benchmark results");
+    m_commandLineParser.add("benchmarkresultframes", { "-bt", "--benchframetimes" }, 0, "Save frame times to benchmark results file");
+    m_commandLineParser.add("benchmarkframes", { "-bfs", "--benchmarkframes" }, 1, "Only render the given number of frames");
+#if (!(defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT)))
+    m_commandLineParser.add("resourcepath", { "-rp", "--resourcepath" }, 1, "Set path for dir where assets and shaders folder is present");
+#endif
+    m_commandLineParser.parse(args);
+    if (m_commandLineParser.isSet("help")) {
+#if defined(_WIN32)
+        setupConsole("Vulkan example");
+#endif
+        m_commandLineParser.printHelp();
+        std::cin.get();
+        exit(0);
+    }
+    if (m_commandLineParser.isSet("validation")) {
+        m_exampleSettings.m_useValidationLayers = true;
+    }
+    if (m_commandLineParser.isSet("validationlogfile")) {
+        vks::debug::logToFile = true;
+    }
+    if (m_commandLineParser.isSet("vsync")) {
+        m_exampleSettings.m_forceSwapChainVsync = true;
+    }
+    if (m_commandLineParser.isSet("height")) {
+        height = m_commandLineParser.getValueAsInt("height", height);
+    }
+    if (m_commandLineParser.isSet("width")) {
+        width = m_commandLineParser.getValueAsInt("width", width);
+    }
+    if (m_commandLineParser.isSet("fullscreen")) {
+        m_exampleSettings.m_fullscreen = true;
+    }
+    if (m_commandLineParser.isSet("shaders")) {
+        std::string value = m_commandLineParser.getValueAsString("shaders", "glsl");
+        if ((value != "glsl") && (value != "hlsl") && (value != "slang")) {
+            std::cerr << "Shader type must be one of 'glsl', 'hlsl' or 'slang'\n";
+        } else {
+            shaderDir = value;
+        }
+    }
+    if (m_commandLineParser.isSet("benchmark")) {
+        benchmark.active = true;
+        vks::tools::errorModeSilent = true;
+    }
+    if (m_commandLineParser.isSet("benchmarkwarmup")) {
+        benchmark.warmup = m_commandLineParser.getValueAsInt("benchmarkwarmup", 0);
+    }
+    if (m_commandLineParser.isSet("benchmarkruntime")) {
+        benchmark.duration = m_commandLineParser.getValueAsInt("benchmarkruntime", benchmark.duration);
+    }
+    if (m_commandLineParser.isSet("benchmarkresultfile")) {
+        benchmark.filename = m_commandLineParser.getValueAsString("benchmarkresultfile", benchmark.filename);
+    }
+    if (m_commandLineParser.isSet("benchmarkresultframes")) {
+        benchmark.outputFrameTimes = true;
+    }
+    if (m_commandLineParser.isSet("benchmarkframes")) {
+        benchmark.outputFrames = m_commandLineParser.getValueAsInt("benchmarkframes", benchmark.outputFrames);
+    }
+#if (!(defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT)))
+    if (m_commandLineParser.isSet("resourcepath")) {
+        vks::tools::resourcePath = m_commandLineParser.getValueAsString("resourcepath", "");
+    }
+#else
+    // On Apple platforms, use layer settings extension to configure MoltenVK with common project config settings
+    enabledInstanceExtensions.push_back(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME);
+
+    // Configure MoltenVK to use to use a dedicated compute queue (see compute[*] and timelinesemaphore samples)
+    VkLayerSettingEXT layerSetting;
+    layerSetting.pLayerName = "MoltenVK";
+    layerSetting.pSettingName = "MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES";
+    layerSetting.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
+    layerSetting.valueCount = 1;
+
+    // Make this static so layer setting reference remains valid after leaving constructor scope
+    static const VkBool32 layerSettingOn = VK_TRUE;
+    layerSetting.pValues = &layerSettingOn;
+    enabledLayerSettings.push_back(layerSetting);
+#endif
+
+
+}
+
+
 VulkanExampleBase::VulkanExampleBase()
 {
 	// Command line arguments
-	commandLineParser.add("help", { "--help" }, 0, "Show help");
-	commandLineParser.add("validation", { "-v", "--validation" }, 0, "Enable validation layers");
-	commandLineParser.add("validationlogfile", { "-vl", "--validationlogfile" }, 0, "Log validation messages to a textfile");
-	commandLineParser.add("vsync", { "-vs", "--vsync" }, 0, "Enable V-Sync");
-	commandLineParser.add("fullscreen", { "-f", "--fullscreen" }, 0, "Start in fullscreen mode");
-	commandLineParser.add("width", { "-w", "--width" }, 1, "Set window width");
-	commandLineParser.add("height", { "-h", "--height" }, 1, "Set window height");
-	commandLineParser.add("shaders", { "-s", "--shaders" }, 1, "Select shader type to use (gls, hlsl or slang)");
-	commandLineParser.add("gpuselection", { "-g", "--gpu" }, 1, "Select GPU to run on");
-	commandLineParser.add("gpulist", { "-gl", "--listgpus" }, 0, "Display a list of available Vulkan devices");
-	commandLineParser.add("benchmark", { "-b", "--benchmark" }, 0, "Run example in benchmark mode");
-	commandLineParser.add("benchmarkwarmup", { "-bw", "--benchwarmup" }, 1, "Set warmup time for benchmark mode in seconds");
-	commandLineParser.add("benchmarkruntime", { "-br", "--benchruntime" }, 1, "Set duration time for benchmark mode in seconds");
-	commandLineParser.add("benchmarkresultfile", { "-bf", "--benchfilename" }, 1, "Set file name for benchmark results");
-	commandLineParser.add("benchmarkresultframes", { "-bt", "--benchframetimes" }, 0, "Save frame times to benchmark results file");
-	commandLineParser.add("benchmarkframes", { "-bfs", "--benchmarkframes" }, 1, "Only render the given number of frames");
-#if (!(defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT)))
-	commandLineParser.add("resourcepath", { "-rp", "--resourcepath" }, 1, "Set path for dir where assets and shaders folder is present");
-#endif
-	commandLineParser.parse(args);
-	if (commandLineParser.isSet("help")) {
-#if defined(_WIN32)
-		setupConsole("Vulkan example");
-#endif
-		commandLineParser.printHelp();
-		std::cin.get();
-		exit(0);
-	}
-	if (commandLineParser.isSet("validation")) {
-		settings.validation = true;
-	}
-	if (commandLineParser.isSet("validationlogfile")) {
-		vks::debug::logToFile = true;
-	}
-	if (commandLineParser.isSet("vsync")) {
-		settings.vsync = true;
-	}
-	if (commandLineParser.isSet("height")) {
-		height = commandLineParser.getValueAsInt("height", height);
-	}
-	if (commandLineParser.isSet("width")) {
-		width = commandLineParser.getValueAsInt("width", width);
-	}
-	if (commandLineParser.isSet("fullscreen")) {
-		settings.fullscreen = true;
-	}
-	if (commandLineParser.isSet("shaders")) {
-		std::string value = commandLineParser.getValueAsString("shaders", "glsl");
-		if ((value != "glsl") && (value != "hlsl") && (value != "slang")) {
-			std::cerr << "Shader type must be one of 'glsl', 'hlsl' or 'slang'\n";
-		}
-		else {
-			shaderDir = value;
-		}
-	}
-	if (commandLineParser.isSet("benchmark")) {
-		benchmark.active = true;
-		vks::tools::errorModeSilent = true;
-	}
-	if (commandLineParser.isSet("benchmarkwarmup")) {
-		benchmark.warmup = commandLineParser.getValueAsInt("benchmarkwarmup", 0);
-	}
-	if (commandLineParser.isSet("benchmarkruntime")) {
-		benchmark.duration = commandLineParser.getValueAsInt("benchmarkruntime", benchmark.duration);
-	}
-	if (commandLineParser.isSet("benchmarkresultfile")) {
-		benchmark.filename = commandLineParser.getValueAsString("benchmarkresultfile", benchmark.filename);
-	}
-	if (commandLineParser.isSet("benchmarkresultframes")) {
-		benchmark.outputFrameTimes = true;
-	}
-	if (commandLineParser.isSet("benchmarkframes")) {
-		benchmark.outputFrames = commandLineParser.getValueAsInt("benchmarkframes", benchmark.outputFrames);
-	}
-#if (!(defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT)))
-	if(commandLineParser.isSet("resourcepath")) {
-		vks::tools::resourcePath = commandLineParser.getValueAsString("resourcepath", "");
-	}
-#else
-	// On Apple platforms, use layer settings extension to configure MoltenVK with common project config settings
-	enabledInstanceExtensions.push_back(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME);
-
-	// Configure MoltenVK to use to use a dedicated compute queue (see compute[*] and timelinesemaphore samples)
-	VkLayerSettingEXT layerSetting;
-	layerSetting.pLayerName   = "MoltenVK";
-	layerSetting.pSettingName = "MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES";
-	layerSetting.type         = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
-	layerSetting.valueCount   = 1;
-
-	// Make this static so layer setting reference remains valid after leaving constructor scope
-	static const VkBool32 layerSettingOn = VK_TRUE;
-	layerSetting.pValues = &layerSettingOn;
-	enabledLayerSettings.push_back(layerSetting);
-#endif
+    setCommandLineOptions();
 
 #if !defined(VK_USE_PLATFORM_ANDROID_KHR)
 	// Check for a valid asset path
@@ -929,7 +935,7 @@ VulkanExampleBase::VulkanExampleBase()
 
 #if defined(_WIN32)
 	// Enable console if validation is active, debug message callback will output to it
-	if (this->settings.validation)
+        if (this->m_exampleSettings.m_useValidationLayers)
 	{
 		setupConsole("Vulkan example");
 	}
@@ -943,43 +949,43 @@ VulkanExampleBase::~VulkanExampleBase()
 	swapChain.cleanup();
 	if (descriptorPool != VK_NULL_HANDLE)
 	{
-		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+            vkDestroyDescriptorPool(m_vkDevice, descriptorPool, nullptr);
 	}
 	destroyCommandBuffers();
 	if (renderPass != VK_NULL_HANDLE)
 	{
-		vkDestroyRenderPass(device, renderPass, nullptr);
+            vkDestroyRenderPass(m_vkDevice, renderPass, nullptr);
 	}
 	for (auto& frameBuffer : frameBuffers)
 	{
-		vkDestroyFramebuffer(device, frameBuffer, nullptr);
+            vkDestroyFramebuffer(m_vkDevice, frameBuffer, nullptr);
 	}
 
 	for (auto& shaderModule : shaderModules)
 	{
-		vkDestroyShaderModule(device, shaderModule, nullptr);
+            vkDestroyShaderModule(m_vkDevice, shaderModule, nullptr);
 	}
-	vkDestroyImageView(device, depthStencil.view, nullptr);
-	vkDestroyImage(device, depthStencil.image, nullptr);
-	vkFreeMemory(device, depthStencil.memory, nullptr);
+	vkDestroyImageView(m_vkDevice, depthStencil.view, nullptr);
+        vkDestroyImage(m_vkDevice, depthStencil.image, nullptr);
+        vkFreeMemory(m_vkDevice, depthStencil.memory, nullptr);
 
-	vkDestroyPipelineCache(device, pipelineCache, nullptr);
+	vkDestroyPipelineCache(m_vkDevice, pipelineCache, nullptr);
 
-	vkDestroyCommandPool(device, cmdPool, nullptr);
+	vkDestroyCommandPool(m_vkDevice, cmdPool, nullptr);
 
-	vkDestroySemaphore(device, semaphores.presentComplete, nullptr);
-	vkDestroySemaphore(device, semaphores.renderComplete, nullptr);
+	vkDestroySemaphore(m_vkDevice, semaphores.presentComplete, nullptr);
+        vkDestroySemaphore(m_vkDevice, semaphores.renderComplete, nullptr);
 	for (auto& fence : waitFences) {
-		vkDestroyFence(device, fence, nullptr);
+            vkDestroyFence(m_vkDevice, fence, nullptr);
 	}
 
-	if (settings.overlay) {
+	if (m_exampleSettings.m_showOverlayUI) {
 		ui.freeResources();
 	}
 
 	delete vulkanDevice;
 
-	if (settings.validation)
+	if (m_exampleSettings.m_useValidationLayers)
 	{
 		vks::debug::freeDebugCallback(instance);
 	}
@@ -1031,7 +1037,7 @@ bool VulkanExampleBase::initVulkan()
 #endif
 
 	// Validation messages can be stored, e.g. to be used in external tools like CI/CD
-	if (commandLineParser.isSet("validationlogfile")) {
+        if (m_commandLineParser.isSet("validationlogfile")) {
 		vks::debug::log("Sample: " + title);
 	}
 
@@ -1047,17 +1053,17 @@ bool VulkanExampleBase::initVulkan()
 #endif
 
 	// If requested, we enable the default validation layers for debugging
-	if (settings.validation)
+        if (m_exampleSettings.m_useValidationLayers)
 	{
 		vks::debug::setupDebugging(instance);
 	}
 
-	// Physical device
+	// Physical m_vkDevice
 	uint32_t gpuCount = 0;
 	// Get number of available physical devices
 	VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr));
 	if (gpuCount == 0) {
-		vks::tools::exitFatal("No device with Vulkan support found", -1);
+		vks::tools::exitFatal("No m_vkDevice with Vulkan support found", -1);
 		return false;
 	}
 	// Enumerate devices
@@ -1070,21 +1076,21 @@ bool VulkanExampleBase::initVulkan()
 
 	// GPU selection
 
-	// Select physical device to be used for the Vulkan example
-	// Defaults to the first device unless specified by command line
+	// Select physical m_vkDevice to be used for the Vulkan example
+	// Defaults to the first m_vkDevice unless specified by command line
 	uint32_t selectedDevice = 0;
 
 #if !defined(VK_USE_PLATFORM_ANDROID_KHR)
 	// GPU selection via command line argument
-	if (commandLineParser.isSet("gpuselection")) {
-		uint32_t index = commandLineParser.getValueAsInt("gpuselection", 0);
+        if (m_commandLineParser.isSet("gpuselection")) {
+            uint32_t index = m_commandLineParser.getValueAsInt("gpuselection", 0);
 		if (index > gpuCount - 1) {
-			std::cerr << "Selected device index " << index << " is out of range, reverting to device 0 (use -listgpus to show available Vulkan devices)" << "\n";
+			std::cerr << "Selected m_vkDevice index " << index << " is out of range, reverting to m_vkDevice 0 (use -listgpus to show available Vulkan devices)" << "\n";
 		} else {
 			selectedDevice = index;
 		}
 	}
-	if (commandLineParser.isSet("gpulist")) {
+        if (m_commandLineParser.isSet("gpulist")) {
 		std::cout << "Available Vulkan devices" << "\n";
 		for (uint32_t i = 0; i < gpuCount; i++) {
 			VkPhysicalDeviceProperties deviceProperties;
@@ -1098,31 +1104,31 @@ bool VulkanExampleBase::initVulkan()
 
 	physicalDevice = physicalDevices[selectedDevice];
 
-	// Store properties (including limits), features and memory properties of the physical device (so that examples can check against them)
+	// Store properties (including limits), features and memory properties of the physical m_vkDevice (so that examples can check against them)
 	vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
 	vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
 	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
 
-	// Derived examples can override this to set actual features (based on above readings) to enable for logical device creation
+	// Derived examples can override this to set actual features (based on above readings) to enable for logical m_vkDevice creation
 	getEnabledFeatures();
 
-	// Vulkan device creation
-	// This is handled by a separate class that gets a logical device representation
-	// and encapsulates functions related to a device
+	// Vulkan m_vkDevice creation
+	// This is handled by a separate class that gets a logical m_vkDevice representation
+	// and encapsulates functions related to a m_vkDevice
 	vulkanDevice = new vks::VulkanDevice(physicalDevice);
 
-	// Derived examples can enable extensions based on the list of supported extensions read from the physical device
+	// Derived examples can enable extensions based on the list of supported extensions read from the physical m_vkDevice
 	getEnabledExtensions();
 
 	result = vulkanDevice->createLogicalDevice(enabledFeatures, enabledDeviceExtensions, deviceCreatepNextChain);
 	if (result != VK_SUCCESS) {
-		vks::tools::exitFatal("Could not create Vulkan device: \n" + vks::tools::errorString(result), result);
+		vks::tools::exitFatal("Could not create Vulkan m_vkDevice: \n" + vks::tools::errorString(result), result);
 		return false;
 	}
-	device = vulkanDevice->logicalDevice;
+        m_vkDevice = vulkanDevice->logicalDevice;
 
-	// Get a graphics queue from the device
-	vkGetDeviceQueue(device, vulkanDevice->queueFamilyIndices.graphics, 0, &queue);
+	// Get a graphics queue from the m_vkDevice
+        vkGetDeviceQueue(m_vkDevice, vulkanDevice->queueFamilyIndices.graphics, 0, &queue);
 
 	// Find a suitable depth and/or stencil format
 	VkBool32 validFormat{ false };
@@ -1134,16 +1140,16 @@ bool VulkanExampleBase::initVulkan()
 	}
 	assert(validFormat);
 
-	swapChain.setContext(instance, physicalDevice, device);
+	swapChain.setContext(instance, physicalDevice, m_vkDevice);
 
 	// Create synchronization objects
 	VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
 	// Create a semaphore used to synchronize image presentation
 	// Ensures that the image is displayed before we start submitting new commands to the queue
-	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &semaphores.presentComplete));
+        VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCreateInfo, nullptr, &semaphores.presentComplete));
 	// Create a semaphore used to synchronize command submission
 	// Ensures that the image is not presented until all commands have been submitted and executed
-	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &semaphores.renderComplete));
+        VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCreateInfo, nullptr, &semaphores.renderComplete));
 
 	// Set up submit info structure
 	// Semaphores will stay the same during application lifetime
@@ -1225,7 +1231,7 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 	int screenWidth = GetSystemMetrics(SM_CXSCREEN);
 	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-	if (settings.fullscreen)
+	if (m_exampleSettings.m_fullscreen)
 	{
 		if ((width != (uint32_t)screenWidth) && (height != (uint32_t)screenHeight))
 		{
@@ -1240,7 +1246,7 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 			{
 				if (MessageBox(NULL, "Fullscreen Mode not supported!\n Switch to window mode?", "Error", MB_YESNO | MB_ICONEXCLAMATION) == IDYES)
 				{
-					settings.fullscreen = false;
+                                m_exampleSettings.m_fullscreen = false;
 				}
 				else
 				{
@@ -1256,7 +1262,7 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 	DWORD dwExStyle;
 	DWORD dwStyle;
 
-	if (settings.fullscreen)
+	if (m_exampleSettings.m_fullscreen)
 	{
 		dwExStyle = WS_EX_APPWINDOW;
 		dwStyle = WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
@@ -1270,8 +1276,8 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 	RECT windowRect = {
 		0L,
 		0L,
-		settings.fullscreen ? (long)screenWidth : (long)width,
-		settings.fullscreen ? (long)screenHeight : (long)height
+            m_exampleSettings.m_fullscreen ? (long)screenWidth : (long)width,
+            m_exampleSettings.m_fullscreen ? (long)screenHeight : (long)height
 	};
 
 	AdjustWindowRectEx(&windowRect, dwStyle, FALSE, dwExStyle);
@@ -1297,7 +1303,7 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 		return nullptr;
 	}
 
-	if (!settings.fullscreen)
+	if (!m_exampleSettings.m_fullscreen)
 	{
 		// Center on screen
 		uint32_t x = (GetSystemMetrics(SM_CXSCREEN) - windowRect.right) / 2;
@@ -3059,7 +3065,7 @@ void VulkanExampleBase::createSynchronizationPrimitives()
 	VkFenceCreateInfo fenceCreateInfo = vks::initializers::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
 	waitFences.resize(drawCmdBuffers.size());
 	for (auto& fence : waitFences) {
-		VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, nullptr, &fence));
+            VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceCreateInfo, nullptr, &fence));
 	}
 }
 
@@ -3069,7 +3075,7 @@ void VulkanExampleBase::createCommandPool()
 	cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	cmdPoolInfo.queueFamilyIndex = swapChain.queueNodeIndex;
 	cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &cmdPool));
+        VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &cmdPoolInfo, nullptr, &cmdPool));
 }
 
 void VulkanExampleBase::setupDepthStencil()
@@ -3085,16 +3091,16 @@ void VulkanExampleBase::setupDepthStencil()
 	imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 	imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-	VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &depthStencil.image));
+	VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &depthStencil.image));
 	VkMemoryRequirements memReqs{};
-	vkGetImageMemoryRequirements(device, depthStencil.image, &memReqs);
+        vkGetImageMemoryRequirements(m_vkDevice, depthStencil.image, &memReqs);
 
 	VkMemoryAllocateInfo memAllloc{};
 	memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	memAllloc.allocationSize = memReqs.size;
 	memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	VK_CHECK_RESULT(vkAllocateMemory(device, &memAllloc, nullptr, &depthStencil.memory));
-	VK_CHECK_RESULT(vkBindImageMemory(device, depthStencil.image, depthStencil.memory, 0));
+        VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllloc, nullptr, &depthStencil.memory));
+        VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, depthStencil.image, depthStencil.memory, 0));
 
 	VkImageViewCreateInfo imageViewCI{};
 	imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -3110,7 +3116,7 @@ void VulkanExampleBase::setupDepthStencil()
 	if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
 		imageViewCI.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
-	VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCI, nullptr, &depthStencil.view));
+        VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewCI, nullptr, &depthStencil.view));
 }
 
 void VulkanExampleBase::setupFrameBuffer()
@@ -3132,7 +3138,7 @@ void VulkanExampleBase::setupFrameBuffer()
 		frameBufferCreateInfo.width = width;
 		frameBufferCreateInfo.height = height;
 		frameBufferCreateInfo.layers = 1;
-		VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCreateInfo, nullptr, &frameBuffers[i]));
+                VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCreateInfo, nullptr, &frameBuffers[i]));
 	}
 }
 
@@ -3205,7 +3211,7 @@ void VulkanExampleBase::setupRenderPass()
 	renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 	renderPassInfo.pDependencies = dependencies.data();
 
-	VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
+	VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfo, nullptr, &renderPass));
 }
 
 void VulkanExampleBase::getEnabledFeatures() {}
@@ -3221,8 +3227,8 @@ void VulkanExampleBase::windowResize()
 	prepared = false;
 	resized = true;
 
-	// Ensure all operations on the device have been finished before destroying resources
-	vkDeviceWaitIdle(device);
+	// Ensure all operations on the m_vkDevice have been finished before destroying resources
+        vkDeviceWaitIdle(m_vkDevice);
 
 	// Recreate swap chain
 	width = destWidth;
@@ -3230,17 +3236,17 @@ void VulkanExampleBase::windowResize()
 	createSwapChain();
 
 	// Recreate the frame buffers
-	vkDestroyImageView(device, depthStencil.view, nullptr);
-	vkDestroyImage(device, depthStencil.image, nullptr);
-	vkFreeMemory(device, depthStencil.memory, nullptr);
+        vkDestroyImageView(m_vkDevice, depthStencil.view, nullptr);
+        vkDestroyImage(m_vkDevice, depthStencil.image, nullptr);
+        vkFreeMemory(m_vkDevice, depthStencil.memory, nullptr);
 	setupDepthStencil();
 	for (auto& frameBuffer : frameBuffers) {
-		vkDestroyFramebuffer(device, frameBuffer, nullptr);
+            vkDestroyFramebuffer(m_vkDevice, frameBuffer, nullptr);
 	}
 	setupFrameBuffer();
 
 	if ((width > 0.0f) && (height > 0.0f)) {
-		if (settings.overlay) {
+            if (m_exampleSettings.m_showOverlayUI) {
 			ui.resize(width, height);
 		}
 	}
@@ -3253,11 +3259,11 @@ void VulkanExampleBase::windowResize()
 
 	// SRS - Recreate fences in case number of swapchain images has changed on resize
 	for (auto& fence : waitFences) {
-		vkDestroyFence(device, fence, nullptr);
+            vkDestroyFence(m_vkDevice, fence, nullptr);
 	}
 	createSynchronizationPrimitives();
 
-	vkDeviceWaitIdle(device);
+	vkDeviceWaitIdle(m_vkDevice);
 
 	if ((width > 0.0f) && (height > 0.0f)) {
 		camera.updateAspectRatio((float)width / (float)height);
@@ -3276,7 +3282,7 @@ void VulkanExampleBase::handleMouseMove(int32_t x, int32_t y)
 
 	bool handled = false;
 
-	if (settings.overlay) {
+	if (m_exampleSettings.m_showOverlayUI) {
 		ImGuiIO& io = ImGui::GetIO();
 		handled = io.WantCaptureMouse && ui.visible;
 	}
@@ -3329,7 +3335,7 @@ void VulkanExampleBase::createSurface()
 
 void VulkanExampleBase::createSwapChain()
 {
-	swapChain.create(width, height, settings.vsync, settings.fullscreen);
+    swapChain.create(width, height, m_exampleSettings.m_forceSwapChainVsync, m_exampleSettings.m_fullscreen);
 }
 
 void VulkanExampleBase::OnUpdateUIOverlay(vks::UIOverlay *overlay) {}

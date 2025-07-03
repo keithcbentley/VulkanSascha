@@ -114,15 +114,15 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
-			vkDestroyPipeline(device, pipelines.phong, nullptr);
-			vkDestroyPipeline(device, pipelines.starsphere, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+		if (m_vkDevice) {
+			vkDestroyPipeline(m_vkDevice, pipelines.phong, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.starsphere, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
 			for (auto& thread : threadData) {
-				vkFreeCommandBuffers(device, thread.commandPool, static_cast<uint32_t>(thread.commandBuffer.size()), thread.commandBuffer.data());
-				vkDestroyCommandPool(device, thread.commandPool, nullptr);
+				vkFreeCommandBuffers(m_vkDevice, thread.commandPool, static_cast<uint32_t>(thread.commandBuffer.size()), thread.commandBuffer.data());
+				vkDestroyCommandPool(m_vkDevice, thread.commandPool, nullptr);
 			}
-			vkDestroyFence(device, renderFence, nullptr);
+			vkDestroyFence(m_vkDevice, renderFence, nullptr);
 		}
 	}
 
@@ -143,12 +143,12 @@ public:
 				cmdPool,
 				VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 				1);
-		VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &primaryCommandBuffer));
+		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, &primaryCommandBuffer));
 
 		// Create additional secondary CBs for background and ui
 		cmdBufAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-		VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &secondaryCommandBuffers.background));
-		VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &secondaryCommandBuffers.ui));
+		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, &secondaryCommandBuffers.background));
+		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, &secondaryCommandBuffers.ui));
 
 		threadData.resize(numThreads);
 
@@ -163,7 +163,7 @@ public:
 			VkCommandPoolCreateInfo cmdPoolInfo = vks::initializers::commandPoolCreateInfo();
 			cmdPoolInfo.queueFamilyIndex = swapChain.queueNodeIndex;
 			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-			VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &thread->commandPool));
+			VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &cmdPoolInfo, nullptr, &thread->commandPool));
 
 			// One secondary command buffer per object that is updated by this thread
 			thread->commandBuffer.resize(numObjectsPerThread);
@@ -173,7 +173,7 @@ public:
 					thread->commandPool,
 					VK_COMMAND_BUFFER_LEVEL_SECONDARY,
 					static_cast<uint32_t>(thread->commandBuffer.size()));
-			VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &secondaryCmdBufAllocateInfo, thread->commandBuffer.data()));
+			VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &secondaryCmdBufAllocateInfo, thread->commandBuffer.data()));
 
 			thread->pushConstBlock.resize(numObjectsPerThread);
 			thread->objectData.resize(numObjectsPerThread);
@@ -416,7 +416,7 @@ public:
 		// Push constant ranges are part of the pipeline layout
 		pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 		pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
 		// Pipelines
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -445,14 +445,14 @@ public:
 		// Object rendering pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "multithreading/phong.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "multithreading/phong.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.phong));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.phong));
 
 		// Star sphere rendering pipeline
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
 		depthStencilState.depthWriteEnable = VK_FALSE;
 		shaderStages[0] = loadShader(getShadersPath() + "multithreading/starsphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "multithreading/starsphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.starsphere));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.starsphere));
 	}
 
 	void updateMatrices()
@@ -467,7 +467,7 @@ public:
 		VulkanExampleBase::prepare();
 		// Create a fence for synchronization
 		VkFenceCreateInfo fenceCreateInfo = vks::initializers::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
-		vkCreateFence(device, &fenceCreateInfo, nullptr, &renderFence);
+		vkCreateFence(m_vkDevice, &fenceCreateInfo, nullptr, &renderFence);
 		loadAssets();
 		preparePipelines();
 		prepareMultiThreadedRenderer();
@@ -480,10 +480,10 @@ public:
 		// Wait for fence to signal that all command buffers are ready
 		VkResult fenceRes;
 		do {
-			fenceRes = vkWaitForFences(device, 1, &renderFence, VK_TRUE, 100000000);
+			fenceRes = vkWaitForFences(m_vkDevice, 1, &renderFence, VK_TRUE, 100000000);
 		} while (fenceRes == VK_TIMEOUT);
 		VK_CHECK_RESULT(fenceRes);
-		vkResetFences(device, 1, &renderFence);
+		vkResetFences(m_vkDevice, 1, &renderFence);
 
 		VulkanExampleBase::prepareFrame();
 

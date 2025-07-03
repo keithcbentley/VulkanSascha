@@ -47,9 +47,9 @@ public:
 
 	~VulkanExample()
 	{
-		vkDestroyPipeline(device, pipeline, nullptr);
-		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+		vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 		for (auto cube : cubes) {
 			cube.uniformBuffer.destroy();
 			cube.texture.destroy();
@@ -171,7 +171,7 @@ public:
 		descriptorLayoutCI.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
 		descriptorLayoutCI.pBindings = setLayoutBindings.data();
 
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayoutCI, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayout));
 
 		/*
 
@@ -181,7 +181,7 @@ public:
 			descriptors this application will use
 
 			An application can have multiple pools (e.g. for multiple threads) with any number of descriptor types
-			as long as device limits are not surpassed
+			as long as m_vkDevice limits are not surpassed
 
 			It's good practice to allocate pools with actually required descriptor types and counts
 
@@ -205,7 +205,7 @@ public:
 		// Max. number of descriptor sets that can be allocated from this pool (one per object)
 		descriptorPoolCI.maxSets = static_cast<uint32_t>(cubes.size());
 
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCI, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCI, nullptr, &descriptorPool));
 
 		/*
 
@@ -225,7 +225,7 @@ public:
 			allocateInfo.descriptorPool = descriptorPool;
 			allocateInfo.descriptorSetCount = 1;
 			allocateInfo.pSetLayouts = &descriptorSetLayout;
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocateInfo, &cube.descriptorSet));
+			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocateInfo, &cube.descriptorSet));
 
 			// Update the descriptor set with the actual descriptors matching shader bindings set in the layout
 
@@ -257,7 +257,7 @@ public:
 			// This is possible because each VkWriteDescriptorSet also contains the destination set to be updated
 			// For simplicity we will update once per set instead
 
-			vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+			vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 		}
 
 	}
@@ -272,7 +272,7 @@ public:
 		// The pipeline layout is based on the descriptor set layout we created above
 		pipelineLayoutCI.setLayoutCount = 1;
 		pipelineLayoutCI.pSetLayouts = &descriptorSetLayout;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
 
 		const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
@@ -300,7 +300,7 @@ public:
 
 	    shaderStages[0] = loadShader(getShadersPath() + "descriptorsets/cube.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "descriptorsets/cube.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	void prepareUniformBuffers()

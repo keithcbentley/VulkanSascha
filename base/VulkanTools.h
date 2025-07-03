@@ -80,7 +80,7 @@ namespace vks
 		std::string physicalDeviceTypeString(VkPhysicalDeviceType type);
 
 		// Selected a suitable supported depth format starting with 32 bit down to 16 bit
-		// Returns false if none of the depth formats in the list is supported by the device
+		// Returns false if none of the depth formats in the list is supported by the m_vkDevice
 		VkBool32 getSupportedDepthFormat(VkPhysicalDevice physicalDevice, VkFormat *depthFormat);
 		// Same as getSupportedDepthFormat but will only select formats that also have stencil
 		VkBool32 getSupportedDepthStencilFormat(VkPhysicalDevice physicalDevice, VkFormat* depthStencilFormat);
@@ -127,7 +127,7 @@ namespace vks
 
 		// Load a SPIR-V shader (binary)
 #if defined(__ANDROID__)
-		VkShaderModule loadShader(AAssetManager* assetManager, const char *fileName, VkDevice device);
+		VkShaderModule loadShader(AAssetManager* assetManager, const char *fileName, VkDevice m_vkDevice);
 #else
 		VkShaderModule loadShader(const char *fileName, VkDevice device);
 #endif

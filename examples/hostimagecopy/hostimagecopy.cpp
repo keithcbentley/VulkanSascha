@@ -72,16 +72,16 @@ public:
 
 	~VulkanExample() override
 	{
-		if (device) {
+		if (m_vkDevice) {
 			destroyTextureImage(texture);
-			vkDestroyPipeline(device, pipeline, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
 		}
 	}
 
-	// Enable physical device features required for this example
+	// Enable physical m_vkDevice features required for this example
 	void getEnabledFeatures() override
 	{
 		// Enable anisotropic filtering if supported
@@ -95,7 +95,7 @@ public:
 
 		Unlike the texture(3d/array/etc) samples, this one uses the VK_EXT_host_image_copy to drasticly simplify the process 
 		of uploading an image from the host to the GPU. This new extension adds a way of directly uploading image data from
-		host memory to an optimal tiled image on the device (GPU). This no longer requires a staging buffer in between, as we can
+		host memory to an optimal tiled image on the m_vkDevice (GPU). This no longer requires a staging buffer in between, as we can
 		now directly copy data stored in host memory to the image. The extension also adds new functionality to simplfy image barriers
 	*/
 	void loadTexture()
@@ -153,7 +153,7 @@ public:
 			vks::tools::exitFatal("The selected image format does not support the required host transfer bit.", -1);
 		}
 
-		// Create optimal tiled target image on the device
+		// Create optimal tiled target image on the m_vkDevice
 		VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageCreateInfo.format = imageFormat;
@@ -166,19 +166,19 @@ public:
 		imageCreateInfo.extent = { texture.width, texture.height, 1 };
 		// For images that use host image copy we need to specify the VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT usage flag
 		imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT;
-		VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &texture.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &texture.image));
 
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs = {};
-		vkGetImageMemoryRequirements(device, texture.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, texture.image, &memReqs);
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAllocInfo, nullptr, &texture.deviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(device, texture.image, texture.deviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &texture.deviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, texture.image, texture.deviceMemory, 0));
 
-		// With host image copy we can directly copy from the KTX image in host memory to the device
+		// With host image copy we can directly copy from the KTX image in host memory to the m_vkDevice
 		// This is pretty straight forward, as the KTX image is already tightly packed, doesn't need and swizzle and as such matches
-		// what the device expects 
+		// what the m_vkDevice expects 
 
 		// Set up copy information for all mip levels stored in the image
 		std::vector<VkMemoryToImageCopyEXT> memoryToImageCopies{};
@@ -220,7 +220,7 @@ public:
 		hostImageLayoutTransitionInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		hostImageLayoutTransitionInfo.subresourceRange = subresourceRange;
 
-		vkTransitionImageLayoutEXT(device, 1, &hostImageLayoutTransitionInfo);
+		vkTransitionImageLayoutEXT(m_vkDevice, 1, &hostImageLayoutTransitionInfo);
 
 		// With the image in the correct layout and copy information for all mip levels setup, we can now issue the copy to our taget image from the host
 		// The implementation will then convert this to an implementation specific optimal tiling layout
@@ -231,7 +231,7 @@ public:
 		copyMemoryInfo.regionCount = static_cast<uint32_t>(memoryToImageCopies.size());
 		copyMemoryInfo.pRegions = memoryToImageCopies.data();
 
-		vkCopyMemoryToImageEXT(device, &copyMemoryInfo);
+		vkCopyMemoryToImageEXT(m_vkDevice, &copyMemoryInfo);
 
 		ktxTexture_Destroy(ktxTexture);
 
@@ -250,7 +250,7 @@ public:
 		sampler.maxAnisotropy = vulkanDevice->properties.limits.maxSamplerAnisotropy;
 		sampler.anisotropyEnable = VK_TRUE;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(device, &sampler, nullptr, &texture.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &texture.sampler));
 
 		// Create image view
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
@@ -258,16 +258,16 @@ public:
 		view.format = imageFormat;
 		view.subresourceRange = subresourceRange;
 		view.image = texture.image;
-		VK_CHECK_RESULT(vkCreateImageView(device, &view, nullptr, &texture.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &view, nullptr, &texture.view));
 	}
 
 	// Free all Vulkan resources used by a texture object
 	void destroyTextureImage(Texture texture)
 	{
-		vkDestroyImageView(device, texture.view, nullptr);
-		vkDestroyImage(device, texture.image, nullptr);
-		vkDestroySampler(device, texture.sampler, nullptr);
-		vkFreeMemory(device, texture.deviceMemory, nullptr);
+		vkDestroyImageView(m_vkDevice, texture.view, nullptr);
+		vkDestroyImage(m_vkDevice, texture.image, nullptr);
+		vkDestroySampler(m_vkDevice, texture.sampler, nullptr);
+		vkFreeMemory(m_vkDevice, texture.deviceMemory, nullptr);
 	}
 
 	void buildCommandBuffers() override
@@ -323,7 +323,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -333,11 +333,11 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 
 		// Setup a descriptor image info for the current texture to be used as a combined image sampler
 		VkDescriptorImageInfo textureDescriptor;
@@ -351,14 +351,14 @@ public:
 			// Binding 1 : Fragment shader texture sampler
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -387,7 +387,7 @@ public:
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
 		pipelineCreateInfo.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Normal });
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -417,8 +417,8 @@ public:
 		VulkanExampleBase::prepare();
 
 		// Get the function pointers required host image copies
-		vkCopyMemoryToImageEXT = reinterpret_cast<PFN_vkCopyMemoryToImageEXT>(vkGetDeviceProcAddr(device, "vkCopyMemoryToImageEXT"));
-		vkTransitionImageLayoutEXT = reinterpret_cast<PFN_vkTransitionImageLayoutEXT>(vkGetDeviceProcAddr(device, "vkTransitionImageLayoutEXT"));
+		vkCopyMemoryToImageEXT = reinterpret_cast<PFN_vkCopyMemoryToImageEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkCopyMemoryToImageEXT"));
+		vkTransitionImageLayoutEXT = reinterpret_cast<PFN_vkTransitionImageLayoutEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkTransitionImageLayoutEXT"));
 		vkGetPhysicalDeviceFormatProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceFormatProperties2>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2KHR"));
 
 		loadAssets();

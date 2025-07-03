@@ -48,7 +48,7 @@ public:
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -10.0f));
 		camera.setRotation(glm::vec3(-7.5f, 72.0f, 0.0f));
 		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
-		settings.overlay = false;
+                m_exampleSettings.m_showOverlayUI = false;
 
 		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
@@ -59,7 +59,7 @@ public:
 		enabledDeviceExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
 		enabledDeviceExtensions.push_back(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME);
 
-		// in addition to the extension, the feature needs to be explicitly enabled too by chaining the extension structure into device creation
+		// in addition to the extension, the feature needs to be explicitly enabled too by chaining the extension structure into m_vkDevice creation
 		enabledDynamicRenderingFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
 		enabledDynamicRenderingFeaturesKHR.dynamicRendering = VK_TRUE;
 
@@ -68,14 +68,14 @@ public:
 
 	~VulkanExample() override
 	{
-		if (device) {
-			vkDestroyPipeline(device, pipeline, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+		if (m_vkDevice) {
+			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
-			vkDestroyImage(device, renderImage.image, nullptr);
-			vkDestroyImageView(device, renderImage.view, nullptr);
-			vkFreeMemory(device, renderImage.memory, nullptr);
+			vkDestroyImage(m_vkDevice, renderImage.image, nullptr);
+			vkDestroyImageView(m_vkDevice, renderImage.view, nullptr);
+			vkFreeMemory(m_vkDevice, renderImage.memory, nullptr);
 		}
 	}
 
@@ -89,9 +89,9 @@ public:
 	{
 		// With VK_KHR_dynamic_rendering we no longer need a frame buffer, so we can so skip the sample base framebuffer setup
 		// For multi sampling we need intermediate images that are then resolved to the final presentation image 
-		vkDestroyImage(device, renderImage.image, nullptr);
-		vkDestroyImageView(device, renderImage.view, nullptr);
-		vkFreeMemory(device, renderImage.memory, nullptr);
+		vkDestroyImage(m_vkDevice, renderImage.image, nullptr);
+		vkDestroyImageView(m_vkDevice, renderImage.view, nullptr);
+		vkFreeMemory(m_vkDevice, renderImage.memory, nullptr);
 		VkImageCreateInfo renderImageCI = vks::initializers::imageCreateInfo();
 		renderImageCI.imageType = VK_IMAGE_TYPE_2D;
 		renderImageCI.format = swapChain.colorFormat;
@@ -102,21 +102,21 @@ public:
 		renderImageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 		renderImageCI.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		renderImageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_CHECK_RESULT(vkCreateImage(device, &renderImageCI, nullptr, &renderImage.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &renderImageCI, nullptr, &renderImage.image));
 		VkMemoryRequirements memReqs{};
-		vkGetImageMemoryRequirements(device, renderImage.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, renderImage.image, &memReqs);
 		VkMemoryAllocateInfo memAllloc{};
 		memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memAllloc.allocationSize = memReqs.size;
 		memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAllloc, nullptr, &renderImage.memory));
-		VK_CHECK_RESULT(vkBindImageMemory(device, renderImage.image, renderImage.memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllloc, nullptr, &renderImage.memory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, renderImage.image, renderImage.memory, 0));
 		VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
 		imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		imageViewCI.image = renderImage.image;
 		imageViewCI.format = swapChain.colorFormat;
 		imageViewCI.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-		VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCI, nullptr, &renderImage.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewCI, nullptr, &renderImage.view));
 	}
 
 	// We need to override the default depth/stencil setup to create a depth image that supports multi sampling
@@ -132,15 +132,15 @@ public:
 		imageCI.samples = multiSampleCount;
 		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &depthStencil.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &depthStencil.image));
 		VkMemoryRequirements memReqs{};
-		vkGetImageMemoryRequirements(device, depthStencil.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, depthStencil.image, &memReqs);
 		VkMemoryAllocateInfo memAllloc{};
 		memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memAllloc.allocationSize = memReqs.size;
 		memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAllloc, nullptr, &depthStencil.memory));
-		VK_CHECK_RESULT(vkBindImageMemory(device, depthStencil.image, depthStencil.memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllloc, nullptr, &depthStencil.memory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, depthStencil.image, depthStencil.memory, 0));
 		VkImageViewCreateInfo depthImageViewCI{};
 		depthImageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		depthImageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -155,10 +155,10 @@ public:
 		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
 			depthImageViewCI.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
-		VK_CHECK_RESULT(vkCreateImageView(device, &depthImageViewCI, nullptr, &depthStencil.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &depthImageViewCI, nullptr, &depthStencil.view));
 	}
 
-	// Enable physical device features required for this example
+	// Enable physical m_vkDevice features required for this example
 	void getEnabledFeatures() override
 	{
 		// Enable anisotropic filtering if supported
@@ -278,22 +278,22 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 		// Layout
 		const std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0 : Vertex shader uniform buffer
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
@@ -305,7 +305,7 @@ public:
 			vkglTF::descriptorSetLayoutImage,
 		};
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), 2);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -345,7 +345,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "dynamicrendering/texture.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "dynamicrendering/texture.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -369,8 +369,8 @@ public:
 		VulkanExampleBase::prepare();
 
 		// Since we use an extension, we need to expliclity load the function pointers for extension related Vulkan commands
-		vkCmdBeginRenderingKHR = reinterpret_cast<PFN_vkCmdBeginRenderingKHR>(vkGetDeviceProcAddr(device, "vkCmdBeginRenderingKHR"));
-		vkCmdEndRenderingKHR = reinterpret_cast<PFN_vkCmdEndRenderingKHR>(vkGetDeviceProcAddr(device, "vkCmdEndRenderingKHR"));
+		vkCmdBeginRenderingKHR = reinterpret_cast<PFN_vkCmdBeginRenderingKHR>(vkGetDeviceProcAddr(m_vkDevice, "vkCmdBeginRenderingKHR"));
+		vkCmdEndRenderingKHR = reinterpret_cast<PFN_vkCmdEndRenderingKHR>(vkGetDeviceProcAddr(m_vkDevice, "vkCmdEndRenderingKHR"));
 
 		loadAssets();
 		prepareUniformBuffers();

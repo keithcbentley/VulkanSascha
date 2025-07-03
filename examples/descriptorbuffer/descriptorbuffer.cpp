@@ -93,10 +93,10 @@ public:
 
 	~VulkanExample()
 	{
-		vkDestroyDescriptorSetLayout(device, uniformDescriptor.setLayout, nullptr);
-		vkDestroyDescriptorSetLayout(device, combinedImageDescriptor.setLayout, nullptr);
-		vkDestroyPipeline(device, pipeline, nullptr);
-		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_vkDevice, uniformDescriptor.setLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_vkDevice, combinedImageDescriptor.setLayout, nullptr);
+		vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
 		for (auto& cube : cubes) {
 			cube.uniformBuffer.destroy();
 			cube.texture.destroy();
@@ -128,7 +128,7 @@ public:
 		setLayoutBinding.descriptorCount = 1;
 
 		descriptorLayoutCI.pBindings = &setLayoutBinding;
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayoutCI, nullptr, &uniformDescriptor.setLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &uniformDescriptor.setLayout));
 
 		setLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		setLayoutBinding.binding = 0;
@@ -136,7 +136,7 @@ public:
 		setLayoutBinding.descriptorCount = 1;
 
 		descriptorLayoutCI.pBindings = &setLayoutBinding;
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayoutCI, nullptr, &combinedImageDescriptor.setLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &combinedImageDescriptor.setLayout));
 	}
 
 	void preparePipelines()
@@ -151,7 +151,7 @@ public:
 		// The pipeline layout is based on the descriptor set layout we created above
 		pipelineLayoutCI.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
 		pipelineLayoutCI.pSetLayouts = setLayouts.data();
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
 
 		const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
@@ -180,7 +180,7 @@ public:
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color });
 		pipelineCI.flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	void prepareDescriptorBuffer()
@@ -198,14 +198,14 @@ public:
 
 		// Some devices have very low limits for the no. of max descriptor buffer bindings, so we need to check
 		if (descriptorBufferProperties.maxResourceDescriptorBufferBindings < 2) {
-			vks::tools::exitFatal("This sample requires at least 2 descriptor bindings to run, the selected device only supports " + std::to_string(descriptorBufferProperties.maxResourceDescriptorBufferBindings), - 1);
+			vks::tools::exitFatal("This sample requires at least 2 descriptor bindings to run, the selected m_vkDevice only supports " + std::to_string(descriptorBufferProperties.maxResourceDescriptorBufferBindings), - 1);
 		}
 
-		vkGetDescriptorSetLayoutSizeEXT(device, uniformDescriptor.setLayout, &uniformDescriptor.layoutSize);
-		vkGetDescriptorSetLayoutSizeEXT(device, combinedImageDescriptor.setLayout, &combinedImageDescriptor.layoutSize);
+		vkGetDescriptorSetLayoutSizeEXT(m_vkDevice, uniformDescriptor.setLayout, &uniformDescriptor.layoutSize);
+		vkGetDescriptorSetLayoutSizeEXT(m_vkDevice, combinedImageDescriptor.setLayout, &combinedImageDescriptor.layoutSize);
 
-		vkGetDescriptorSetLayoutBindingOffsetEXT(device, uniformDescriptor.setLayout, 0, &uniformDescriptor.layoutOffset);
-		vkGetDescriptorSetLayoutBindingOffsetEXT(device, combinedImageDescriptor.setLayout, 0, &combinedImageDescriptor.layoutOffset);
+		vkGetDescriptorSetLayoutBindingOffsetEXT(m_vkDevice, uniformDescriptor.setLayout, 0, &uniformDescriptor.layoutOffset);
+		vkGetDescriptorSetLayoutBindingOffsetEXT(m_vkDevice, combinedImageDescriptor.setLayout, 0, &combinedImageDescriptor.layoutOffset);
 
 		// In order to copy resource descriptors to the correct place, we need to calculate aligned sizes
 		uniformDescriptor.layoutSize = vks::tools::alignedVkSize(uniformDescriptor.layoutSize, descriptorBufferProperties.descriptorBufferOffsetAlignment);
@@ -238,10 +238,10 @@ public:
 		descriptorInfo.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		for (uint32_t i = 0; i < static_cast<uint32_t>(cubes.size()); i++) {
 			descriptorInfo.data.pCombinedImageSampler = &cubes[i].texture.descriptor;
-			vkGetDescriptorEXT(device, &descriptorInfo, descriptorBufferProperties.combinedImageSamplerDescriptorSize, imageDescriptorBufPtr + i * combinedImageDescriptor.layoutSize + combinedImageDescriptor.layoutOffset);
+			vkGetDescriptorEXT(m_vkDevice, &descriptorInfo, descriptorBufferProperties.combinedImageSamplerDescriptorSize, imageDescriptorBufPtr + i * combinedImageDescriptor.layoutSize + combinedImageDescriptor.layoutOffset);
 		}
 
-		// For uniform buffers we only need buffer device addresses
+		// For uniform buffers we only need buffer m_vkDevice addresses
 		// Global uniform buffer
 		char* uniformDescriptorBufPtr = (char*)uniformDescriptor.buffer.mapped;
 
@@ -253,7 +253,7 @@ public:
 		descriptorInfo.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		descriptorInfo.data.pCombinedImageSampler = nullptr;
 		descriptorInfo.data.pUniformBuffer = &descriptorAddressInfo;
-		vkGetDescriptorEXT(device, &descriptorInfo, descriptorBufferProperties.uniformBufferDescriptorSize, uniformDescriptorBufPtr);
+		vkGetDescriptorEXT(m_vkDevice, &descriptorInfo, descriptorBufferProperties.uniformBufferDescriptorSize, uniformDescriptorBufPtr);
 
 		// Per-model uniform buffers
 		for (uint32_t i = 0; i < static_cast<uint32_t>(cubes.size()); i++) {
@@ -265,7 +265,7 @@ public:
 			descriptorInfo.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorInfo.data.pCombinedImageSampler = nullptr;
 			descriptorInfo.data.pUniformBuffer = &addr_info;
-			vkGetDescriptorEXT(device, &descriptorInfo, descriptorBufferProperties.uniformBufferDescriptorSize, uniformDescriptorBufPtr + (i + 1) * uniformDescriptor.layoutSize + uniformDescriptor.layoutOffset);
+			vkGetDescriptorEXT(m_vkDevice, &descriptorInfo, descriptorBufferProperties.uniformBufferDescriptorSize, uniformDescriptorBufPtr + (i + 1) * uniformDescriptor.layoutSize + uniformDescriptor.layoutOffset);
 		}
 	}
 
@@ -405,14 +405,14 @@ public:
 	{
 		VulkanExampleBase::prepare();
 
-		vkGetBufferDeviceAddressKHR = reinterpret_cast<PFN_vkGetBufferDeviceAddressKHR>(vkGetDeviceProcAddr(device, "vkGetBufferDeviceAddressKHR"));
+		vkGetBufferDeviceAddressKHR = reinterpret_cast<PFN_vkGetBufferDeviceAddressKHR>(vkGetDeviceProcAddr(m_vkDevice, "vkGetBufferDeviceAddressKHR"));
 
-		vkGetDescriptorSetLayoutSizeEXT = reinterpret_cast<PFN_vkGetDescriptorSetLayoutSizeEXT>(vkGetDeviceProcAddr(device, "vkGetDescriptorSetLayoutSizeEXT"));
-		vkGetDescriptorSetLayoutBindingOffsetEXT = reinterpret_cast<PFN_vkGetDescriptorSetLayoutBindingOffsetEXT>(vkGetDeviceProcAddr(device, "vkGetDescriptorSetLayoutBindingOffsetEXT"));
-		vkCmdBindDescriptorBuffersEXT = reinterpret_cast<PFN_vkCmdBindDescriptorBuffersEXT>(vkGetDeviceProcAddr(device, "vkCmdBindDescriptorBuffersEXT"));
-		vkGetDescriptorEXT = reinterpret_cast<PFN_vkGetDescriptorEXT>(vkGetDeviceProcAddr(device, "vkGetDescriptorEXT"));
-		vkCmdBindDescriptorBufferEmbeddedSamplersEXT = reinterpret_cast<PFN_vkCmdBindDescriptorBufferEmbeddedSamplersEXT>(vkGetDeviceProcAddr(device, "vkCmdBindDescriptorBufferEmbeddedSamplersEXT"));
-		vkCmdSetDescriptorBufferOffsetsEXT = reinterpret_cast<PFN_vkCmdSetDescriptorBufferOffsetsEXT>(vkGetDeviceProcAddr(device, "vkCmdSetDescriptorBufferOffsetsEXT"));
+		vkGetDescriptorSetLayoutSizeEXT = reinterpret_cast<PFN_vkGetDescriptorSetLayoutSizeEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkGetDescriptorSetLayoutSizeEXT"));
+		vkGetDescriptorSetLayoutBindingOffsetEXT = reinterpret_cast<PFN_vkGetDescriptorSetLayoutBindingOffsetEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkGetDescriptorSetLayoutBindingOffsetEXT"));
+		vkCmdBindDescriptorBuffersEXT = reinterpret_cast<PFN_vkCmdBindDescriptorBuffersEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkCmdBindDescriptorBuffersEXT"));
+		vkGetDescriptorEXT = reinterpret_cast<PFN_vkGetDescriptorEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkGetDescriptorEXT"));
+		vkCmdBindDescriptorBufferEmbeddedSamplersEXT = reinterpret_cast<PFN_vkCmdBindDescriptorBufferEmbeddedSamplersEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkCmdBindDescriptorBufferEmbeddedSamplersEXT"));
+		vkCmdSetDescriptorBufferOffsetsEXT = reinterpret_cast<PFN_vkCmdSetDescriptorBufferOffsetsEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkCmdSetDescriptorBufferOffsetsEXT"));
 
 		loadAssets();
 		prepareUniformBuffers();

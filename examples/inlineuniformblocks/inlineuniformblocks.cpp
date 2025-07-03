@@ -1,7 +1,7 @@
 /*
 * Vulkan Example - Using inline uniform blocks for passing data to shader stages at descriptor setup
 
-* Note: Requires a device that supports the VK_EXT_inline_uniform_block extension
+* Note: Requires a m_vkDevice that supports the VK_EXT_inline_uniform_block extension
 *
 * Relevant code parts are marked with [POI]
 *
@@ -77,7 +77,7 @@ public:
 		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 		/*
-			[POI] We also need to enable the inline uniform block feature (using the dedicated physical device structure)
+			[POI] We also need to enable the inline uniform block feature (using the dedicated physical m_vkDevice structure)
 		*/
 		enabledInlineUniformBlockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT;
 		enabledInlineUniformBlockFeatures.inlineUniformBlock = VK_TRUE;
@@ -86,11 +86,11 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
-			vkDestroyPipeline(device, pipeline, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.scene, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.object, nullptr);
+		if (m_vkDevice) {
+			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.scene, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.object, nullptr);
 			uniformBuffer.destroy();
 		}
 	}
@@ -182,7 +182,7 @@ public:
 		descriptorPoolInlineUniformBlockCreateInfo.maxInlineUniformBlockBindings = static_cast<uint32_t>(objects.size());
 		descriptorPoolCI.pNext = &descriptorPoolInlineUniformBlockCreateInfo;
 
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCI, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCI, nullptr, &descriptorPool));
 
 		// Layouts
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings{};
@@ -192,7 +192,7 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0),
 		};
 		descriptorLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.scene));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.scene));
 		setLayoutBindings = {
 			/*
 				[POI] Setup inline uniform block for set 1 at binding 0 (see fragment shader)
@@ -201,20 +201,20 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Object::Material)),
 		};
 		descriptorLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.object));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.object));
 
 		// Sets
 		// Scene
 		VkDescriptorSetAllocateInfo descriptorAllocateInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.scene, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorAllocateInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &descriptorAllocateInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 		// Objects
 		for (auto& object : objects) {
 			VkDescriptorSetAllocateInfo descriptorAllocateInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.object, 1);
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorAllocateInfo, &object.descriptorSet));
+			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &descriptorAllocateInfo, &object.descriptorSet));
 
 			/*
 				[POI] New structure that defines size and data of the inline uniform block needs to be chained into the write descriptor set
@@ -239,7 +239,7 @@ public:
 			// Chain inline uniform block structure
 			writeDescriptorSet.pNext = &writeDescriptorSetInlineUniformBlock;
 
-			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
 		}
 	}
 
@@ -261,7 +261,7 @@ public:
 		pipelineLayoutCI.pushConstantRangeCount = 1;
 		pipelineLayoutCI.pPushConstantRanges = pushConstantRanges.data();
 
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -289,7 +289,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "inlineuniformblocks/pbr.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inlineuniformblocks/pbr.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	void prepareUniformBuffers()
@@ -367,7 +367,7 @@ public:
 			writeDescriptorSet.descriptorCount = sizeof(Object::Material);
 			writeDescriptorSet.pNext = &writeDescriptorSetInlineUniformBlock;
 
-			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+			vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
 		}
 	}
 

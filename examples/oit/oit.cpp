@@ -83,13 +83,13 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
-			vkDestroyPipeline(device, pipelines.geometry, nullptr);
-			vkDestroyPipeline(device, pipelines.color, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayouts.geometry, nullptr);
-			vkDestroyPipelineLayout(device, pipelineLayouts.color, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.geometry, nullptr);
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.color, nullptr);
+		if (m_vkDevice) {
+			vkDestroyPipeline(m_vkDevice, pipelines.geometry, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.color, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.geometry, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.color, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.geometry, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.color, nullptr);
 			destroyGeometryPass();
 			renderPassUniformBuffer.destroy();
 		}
@@ -130,7 +130,7 @@ public:
 		renderPassInfo.subpassCount = 1;
 		renderPassInfo.pSubpasses = &subpassDescription;
 
-		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &geometryPass.renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfo, nullptr, &geometryPass.renderPass));
 
 		// Geometry frame buffer doesn't need any output attachment.
 		VkFramebufferCreateInfo fbufCreateInfo = vks::initializers::framebufferCreateInfo();
@@ -140,7 +140,7 @@ public:
 		fbufCreateInfo.height = height;
 		fbufCreateInfo.layers = 1;
 
-		VK_CHECK_RESULT(vkCreateFramebuffer(device, &fbufCreateInfo, nullptr, &geometryPass.framebuffer));
+		VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &fbufCreateInfo, nullptr, &geometryPass.framebuffer));
 
 		// Create a buffer for GeometrySBO
 		vks::Buffer stagingBuffer;
@@ -163,7 +163,7 @@ public:
 		geometrySBO.maxNodeCount = NODE_COUNT * width * height;
 		memcpy(stagingBuffer.mapped, &geometrySBO, sizeof(geometrySBO));
 
-		// Copy data to device
+		// Copy data to m_vkDevice
 		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = {};
 		copyRegion.size = sizeof(geometrySBO);
@@ -193,19 +193,19 @@ public:
 #endif
 		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
 
-		VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &geometryPass.headIndex.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageInfo, nullptr, &geometryPass.headIndex.image));
 
 		geometryPass.headIndex.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(device, geometryPass.headIndex.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, geometryPass.headIndex.image, &memReqs);
 
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &geometryPass.headIndex.deviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(device, geometryPass.headIndex.image, geometryPass.headIndex.deviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &geometryPass.headIndex.deviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, geometryPass.headIndex.image, geometryPass.headIndex.deviceMemory, 0));
 
 		VkImageViewCreateInfo imageViewInfo = vks::initializers::imageViewCreateInfo();
 		imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -218,7 +218,7 @@ public:
 		imageViewInfo.subresourceRange.baseArrayLayer = 0;
 		imageViewInfo.subresourceRange.layerCount = 1;
 
-		VK_CHECK_RESULT(vkCreateImageView(device, &imageViewInfo, nullptr, &geometryPass.headIndex.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewInfo, nullptr, &geometryPass.headIndex.view));
 
 		geometryPass.headIndex.width = width;
 		geometryPass.headIndex.height = height;
@@ -239,7 +239,7 @@ public:
 		VkCommandBufferAllocateInfo cmdBufAllocInfo = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 
 		VkCommandBuffer cmdBuf;
-		VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocInfo, &cmdBuf));
+		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocInfo, &cmdBuf));
 
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 		VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuf, &cmdBufInfo));
@@ -275,7 +275,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Layouts
 
@@ -291,7 +291,7 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 3),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.geometry));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.geometry));
 
 		// Create a color descriptor set layout
 		setLayoutBindings = {
@@ -301,7 +301,7 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
 		};
 		descriptorLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.color));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.color));
 
 		updateDescriptors();
 	}
@@ -313,7 +313,7 @@ public:
 
 		// Update a geometry descriptor set
 
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.geometry));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.geometry));
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0: renderPassUniformData
@@ -325,11 +325,11 @@ public:
 			// Binding 4: LinkedListSBO
 			vks::initializers::writeDescriptorSet(descriptorSets.geometry, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, &geometryPass.linkedList.descriptor)
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 
 		// Update a color descriptor set
 		allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.color, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.color));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.color));
 
 		writeDescriptorSets = {
 			// Binding 0: headIndexImage
@@ -337,7 +337,7 @@ public:
 			// Binding 1: LinkedListSBO
 			vks::initializers::writeDescriptorSet(descriptorSets.color, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, &geometryPass.linkedList.descriptor)
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
@@ -350,11 +350,11 @@ public:
 		VkPushConstantRange pushConstantRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(ObjectData), 0);
 		pipelineLayoutCI.pushConstantRangeCount = 1;
 		pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayouts.geometry));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayouts.geometry));
 
 		// Create a color pipeline layout
 		pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.color, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayouts.color));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayouts.color));
 
 		// Pipelines
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -383,7 +383,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "oit/geometry.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "oit/geometry.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.geometry));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.geometry));
 
 		// Create a color pipeline
 		VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
@@ -409,7 +409,7 @@ public:
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
 		rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.color));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.color));
 	}
 
 	void buildCommandBuffers() override
@@ -573,7 +573,7 @@ public:
 	{
 		destroyGeometryPass();
 		prepareGeometryPass();
-		vkResetDescriptorPool(device, descriptorPool, 0);
+		vkResetDescriptorPool(m_vkDevice, descriptorPool, 0);
 		updateDescriptors();
 		resized = false;
 		buildCommandBuffers();
@@ -581,8 +581,8 @@ public:
 
 	void destroyGeometryPass()
 	{
-		vkDestroyRenderPass(device, geometryPass.renderPass, nullptr);
-		vkDestroyFramebuffer(device, geometryPass.framebuffer, nullptr);
+		vkDestroyRenderPass(m_vkDevice, geometryPass.renderPass, nullptr);
+		vkDestroyFramebuffer(m_vkDevice, geometryPass.framebuffer, nullptr);
 		geometryPass.geometry.destroy();
 		geometryPass.headIndex.destroy();
 		geometryPass.linkedList.destroy();

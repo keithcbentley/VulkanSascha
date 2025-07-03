@@ -113,54 +113,54 @@ public:
 
 	~VulkanExample()
 	{
-		if (device) {
-			vkDestroySampler(device, colorSampler, nullptr);
+		if (m_vkDevice) {
+			vkDestroySampler(m_vkDevice, colorSampler, nullptr);
 
 			// Frame buffer
 
 			// Color attachments
-			vkDestroyImageView(device, offScreenFrameBuf.position.view, nullptr);
-			vkDestroyImage(device, offScreenFrameBuf.position.image, nullptr);
-			vkFreeMemory(device, offScreenFrameBuf.position.mem, nullptr);
+			vkDestroyImageView(m_vkDevice, offScreenFrameBuf.position.view, nullptr);
+			vkDestroyImage(m_vkDevice, offScreenFrameBuf.position.image, nullptr);
+			vkFreeMemory(m_vkDevice, offScreenFrameBuf.position.mem, nullptr);
 
-			vkDestroyImageView(device, offScreenFrameBuf.normal.view, nullptr);
-			vkDestroyImage(device, offScreenFrameBuf.normal.image, nullptr);
-			vkFreeMemory(device, offScreenFrameBuf.normal.mem, nullptr);
+			vkDestroyImageView(m_vkDevice, offScreenFrameBuf.normal.view, nullptr);
+			vkDestroyImage(m_vkDevice, offScreenFrameBuf.normal.image, nullptr);
+			vkFreeMemory(m_vkDevice, offScreenFrameBuf.normal.mem, nullptr);
 
-			vkDestroyImageView(device, offScreenFrameBuf.albedo.view, nullptr);
-			vkDestroyImage(device, offScreenFrameBuf.albedo.image, nullptr);
-			vkFreeMemory(device, offScreenFrameBuf.albedo.mem, nullptr);
+			vkDestroyImageView(m_vkDevice, offScreenFrameBuf.albedo.view, nullptr);
+			vkDestroyImage(m_vkDevice, offScreenFrameBuf.albedo.image, nullptr);
+			vkFreeMemory(m_vkDevice, offScreenFrameBuf.albedo.mem, nullptr);
 
 			// Depth attachment
-			vkDestroyImageView(device, offScreenFrameBuf.depth.view, nullptr);
-			vkDestroyImage(device, offScreenFrameBuf.depth.image, nullptr);
-			vkFreeMemory(device, offScreenFrameBuf.depth.mem, nullptr);
+			vkDestroyImageView(m_vkDevice, offScreenFrameBuf.depth.view, nullptr);
+			vkDestroyImage(m_vkDevice, offScreenFrameBuf.depth.image, nullptr);
+			vkFreeMemory(m_vkDevice, offScreenFrameBuf.depth.mem, nullptr);
 
-			vkDestroyFramebuffer(device, offScreenFrameBuf.frameBuffer, nullptr);
+			vkDestroyFramebuffer(m_vkDevice, offScreenFrameBuf.frameBuffer, nullptr);
 
-			vkDestroyPipeline(device, pipelines.composition, nullptr);
-			vkDestroyPipeline(device, pipelines.offscreen, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.composition, nullptr);
+			vkDestroyPipeline(m_vkDevice, pipelines.offscreen, nullptr);
 
-			vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
 
-			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 
 			// Uniform buffers
 			uniformBuffers.offscreen.destroy();
 			uniformBuffers.composition.destroy();
 
-			vkDestroyRenderPass(device, offScreenFrameBuf.renderPass, nullptr);
+			vkDestroyRenderPass(m_vkDevice, offScreenFrameBuf.renderPass, nullptr);
 
 			textures.model.colorMap.destroy();
 			textures.model.normalMap.destroy();
 			textures.floor.colorMap.destroy();
 			textures.floor.normalMap.destroy();
 
-			vkDestroySemaphore(device, offscreenSemaphore, nullptr);
+			vkDestroySemaphore(m_vkDevice, offscreenSemaphore, nullptr);
 		}
 	}
 
-	// Enable physical device features required for this example
+	// Enable physical m_vkDevice features required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported
@@ -210,12 +210,12 @@ public:
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs;
 
-		VK_CHECK_RESULT(vkCreateImage(device, &image, nullptr, &attachment->image));
-		vkGetImageMemoryRequirements(device, attachment->image, &memReqs);
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &image, nullptr, &attachment->image));
+		vkGetImageMemoryRequirements(m_vkDevice, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &attachment->mem));
-		VK_CHECK_RESULT(vkBindImageMemory(device, attachment->image, attachment->mem, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &attachment->mem));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, attachment->image, attachment->mem, 0));
 
 		VkImageViewCreateInfo imageView = vks::initializers::imageViewCreateInfo();
 		imageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -227,7 +227,7 @@ public:
 		imageView.subresourceRange.baseArrayLayer = 0;
 		imageView.subresourceRange.layerCount = 1;
 		imageView.image = attachment->image;
-		VK_CHECK_RESULT(vkCreateImageView(device, &imageView, nullptr, &attachment->view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageView, nullptr, &attachment->view));
 	}
 
 	// Prepare a new framebuffer and attachments for offscreen rendering (G-Buffer)
@@ -341,7 +341,7 @@ public:
 		renderPassInfo.dependencyCount = 2;
 		renderPassInfo.pDependencies = dependencies.data();
 
-		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &offScreenFrameBuf.renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfo, nullptr, &offScreenFrameBuf.renderPass));
 
 		std::array<VkImageView,4> attachments;
 		attachments[0] = offScreenFrameBuf.position.view;
@@ -358,7 +358,7 @@ public:
 		fbufCreateInfo.width = offScreenFrameBuf.width;
 		fbufCreateInfo.height = offScreenFrameBuf.height;
 		fbufCreateInfo.layers = 1;
-		VK_CHECK_RESULT(vkCreateFramebuffer(device, &fbufCreateInfo, nullptr, &offScreenFrameBuf.frameBuffer));
+		VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &fbufCreateInfo, nullptr, &offScreenFrameBuf.frameBuffer));
 
 		// Create sampler to sample from the color attachments
 		VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
@@ -373,7 +373,7 @@ public:
 		sampler.minLod = 0.0f;
 		sampler.maxLod = 1.0f;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(device, &sampler, nullptr, &colorSampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &colorSampler));
 	}
 
 	// Build command buffer for rendering the scene to the offscreen frame buffer attachments
@@ -385,7 +385,7 @@ public:
 
 		// Create a semaphore used to synchronize offscreen rendering and usage
 		VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
-		VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &offscreenSemaphore));
+		VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCreateInfo, nullptr, &offscreenSemaphore));
 
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -498,7 +498,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 3);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Layouts
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -514,7 +514,7 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 4),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 		
 		// Sets
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets;
@@ -540,7 +540,7 @@ public:
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		// Deferred composition
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.composition));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.composition));
 		writeDescriptorSets = {
 			// Binding 1 : Position texture target
 			vks::initializers::writeDescriptorSet(descriptorSets.composition, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texDescriptorPosition),
@@ -551,12 +551,12 @@ public:
 			// Binding 4 : Fragment shader uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSets.composition, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4, &uniformBuffers.composition.descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 
 		// Offscreen (scene)
 
 		// Model
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.model));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.model));
 		writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSets.model, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.offscreen.descriptor),
@@ -565,10 +565,10 @@ public:
 			// Binding 2: Normal map
 			vks::initializers::writeDescriptorSet(descriptorSets.model, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &textures.model.normalMap.descriptor)
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 
 		// Background
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.floor));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.floor));
 		writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSets.floor, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.offscreen.descriptor),
@@ -577,14 +577,14 @@ public:
 			// Binding 2: Normal map
 			vks::initializers::writeDescriptorSet(descriptorSets.floor, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &textures.floor.normalMap.descriptor)
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
 	{
 		// Pipeline layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
 		// Pipelines
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -616,7 +616,7 @@ public:
 		// Empty vertex input state, vertices are generated by the vertex shader
 		VkPipelineVertexInputStateCreateInfo emptyInputState = vks::initializers::pipelineVertexInputStateCreateInfo();
 		pipelineCI.pVertexInputState = &emptyInputState;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.composition));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.composition));
 
 		// Vertex input state from glTF model for pipeline rendering models
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Tangent});
@@ -641,7 +641,7 @@ public:
 		colorBlendState.attachmentCount = static_cast<uint32_t>(blendAttachmentStates.size());
 		colorBlendState.pAttachments = blendAttachmentStates.data();
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.offscreen));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.offscreen));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms

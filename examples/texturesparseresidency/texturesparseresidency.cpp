@@ -161,10 +161,10 @@ VulkanExample::~VulkanExample()
 	// Clean up used Vulkan resources
 	// Note : Inherited destructor cleans up resources stored in base class
 	destroyTextureImage(texture);
-	vkDestroySemaphore(device, bindSparseSemaphore, nullptr);
-	vkDestroyPipeline(device, pipeline, nullptr);
-	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+	vkDestroySemaphore(m_vkDevice, bindSparseSemaphore, nullptr);
+	vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+	vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+	vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 	uniformBuffer.destroy();
 }
 
@@ -199,7 +199,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	texture.format = format;
 
 	texture.subRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, texture.mipLevels, 0, 1 };
-	// Get device properties for the requested texture format
+	// Get m_vkDevice properties for the requested texture format
 	VkFormatProperties formatProperties;
 	vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
 
@@ -245,7 +245,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	sparseImageCreateInfo.extent = { texture.width, texture.height, 1 };
 	sparseImageCreateInfo.usage = imageUsage;
 	sparseImageCreateInfo.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
-	VK_CHECK_RESULT(vkCreateImage(device, &sparseImageCreateInfo, nullptr, &texture.image));
+	VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &sparseImageCreateInfo, nullptr, &texture.image));
 
 	VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	vks::tools::setImageLayout(copyCmd, texture.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, texture.subRange);
@@ -254,7 +254,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	// Get memory requirements
 	VkMemoryRequirements sparseImageMemoryReqs;
 	// Sparse image memory requirement counts
-	vkGetImageMemoryRequirements(device, texture.image, &sparseImageMemoryReqs);
+	vkGetImageMemoryRequirements(m_vkDevice, texture.image, &sparseImageMemoryReqs);
 
 	std::cout << "Image memory requirements:" << std::endl;
 	std::cout << "\t Size: " << sparseImageMemoryReqs.size << std::endl;
@@ -271,7 +271,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	// Count
 	uint32_t sparseMemoryReqsCount = 32;
 	std::vector<VkSparseImageMemoryRequirements> sparseMemoryReqs(sparseMemoryReqsCount);
-	vkGetImageSparseMemoryRequirements(device, texture.image, &sparseMemoryReqsCount, sparseMemoryReqs.data());
+	vkGetImageSparseMemoryRequirements(m_vkDevice, texture.image, &sparseMemoryReqsCount, sparseMemoryReqs.data());
 	if (sparseMemoryReqsCount == 0)
 	{
 		std::cout << "Error: No memory requirements for the sparse image!" << std::endl;
@@ -279,7 +279,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	}
 	sparseMemoryReqs.resize(sparseMemoryReqsCount);
 	// Get actual requirements
-	vkGetImageSparseMemoryRequirements(device, texture.image, &sparseMemoryReqsCount, sparseMemoryReqs.data());
+	vkGetImageSparseMemoryRequirements(m_vkDevice, texture.image, &sparseMemoryReqsCount, sparseMemoryReqs.data());
 
 	std::cout << "Sparse image memory requirements: " << sparseMemoryReqsCount << std::endl;
 	for (auto reqs : sparseMemoryReqs)
@@ -387,7 +387,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 			allocInfo.memoryTypeIndex = texture.memoryTypeIndex;
 
 			VkDeviceMemory deviceMemory;
-			VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &deviceMemory));
+			VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &deviceMemory));
 
 			// (Opaque) sparse memory binding
 			VkSparseMemoryBind sparseMemoryBind{};
@@ -412,7 +412,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 		allocInfo.memoryTypeIndex = texture.memoryTypeIndex;
 
 		VkDeviceMemory deviceMemory;
-		VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &deviceMemory));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &deviceMemory));
 
 		// (Opaque) sparse memory binding
 		VkSparseMemoryBind sparseMemoryBind{};
@@ -425,7 +425,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 
 	// Create signal semaphore for sparse binding
 	VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
-	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &bindSparseSemaphore));
+	VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCreateInfo, nullptr, &bindSparseSemaphore));
 
 	// Prepare bind sparse info for reuse in queue submission
 	texture.updateSparseBindInfo(texture.pages);
@@ -451,7 +451,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	sampler.maxAnisotropy = vulkanDevice->features.samplerAnisotropy ? vulkanDevice->properties.limits.maxSamplerAnisotropy : 1.0f;
 	sampler.anisotropyEnable = false;
 	sampler.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-	VK_CHECK_RESULT(vkCreateSampler(device, &sampler, nullptr, &texture.sampler));
+	VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &texture.sampler));
 
 	// Create image view
 	VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
@@ -464,7 +464,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	view.subresourceRange.layerCount = 1;
 	view.subresourceRange.levelCount = texture.mipLevels;
 	view.image = texture.image;
-	VK_CHECK_RESULT(vkCreateImageView(device, &view, nullptr, &texture.view));
+	VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &view, nullptr, &texture.view));
 
 	// Fill image descriptor image info that can be used during the descriptor set setup
 	texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -475,9 +475,9 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 // Free all Vulkan resources used a texture object
 void VulkanExample::destroyTextureImage(SparseTexture texture)
 {
-	vkDestroyImageView(device, texture.view, nullptr);
-	vkDestroyImage(device, texture.image, nullptr);
-	vkDestroySampler(device, texture.sampler, nullptr);
+	vkDestroyImageView(m_vkDevice, texture.view, nullptr);
+	vkDestroyImage(m_vkDevice, texture.image, nullptr);
+	vkDestroySampler(m_vkDevice, texture.sampler, nullptr);
 	texture.destroy();
 }
 
@@ -538,7 +538,7 @@ void VulkanExample::setupDescriptors()
 		vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 	};
 	VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-	VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
+	VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 	// Layout
 	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -554,11 +554,11 @@ void VulkanExample::setupDescriptors()
 			1)
 	};
 	VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 	// Sets
 	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+	VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 
 	std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 		// Binding 0 : Vertex shader uniform buffer
@@ -566,14 +566,14 @@ void VulkanExample::setupDescriptors()
 		// Binding 1 : Fragment shader texture sampler
 		vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texture.descriptor)
 	};
-	vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+	vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 }
 
 void VulkanExample::preparePipelines()
 {
 	// Layout
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-	VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
 	// Pipeline
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -601,7 +601,7 @@ void VulkanExample::preparePipelines()
 
 	shaderStages[0] = loadShader(getShadersPath() + "texturesparseresidency/sparseresidency.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 	shaderStages[1] = loadShader(getShadersPath() + "texturesparseresidency/sparseresidency.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
 }
 
 // Prepare and initialize uniform buffer containing shader uniforms
@@ -712,7 +712,7 @@ void VulkanExample::uploadContent(VirtualTexturePage page, VkImage image)
 
 void VulkanExample::fillRandomPages()
 {
-	vkDeviceWaitIdle(device);
+	vkDeviceWaitIdle(m_vkDevice);
 
 	std::default_random_engine rndEngine(benchmark.active ? 0 : std::random_device{}());
 	std::uniform_real_distribution<float> rndDist(0.0f, 1.0f);
@@ -723,7 +723,7 @@ void VulkanExample::fillRandomPages()
 		if (rndDist(rndEngine) < 0.5f) {
 			continue;
 		}
-		if (page.allocate(device, texture.memoryTypeIndex))
+		if (page.allocate(m_vkDevice, texture.memoryTypeIndex))
 		{
 			bindingChangedPages.push_back(page);
 		}
@@ -734,10 +734,10 @@ void VulkanExample::fillRandomPages()
 	texture.updateSparseBindInfo(bindingChangedPages);
 	VkFenceCreateInfo fenceInfo = vks::initializers::fenceCreateInfo(VK_FLAGS_NONE);
 	VkFence fence;
-	VK_CHECK_RESULT(vkCreateFence(device, &fenceInfo, nullptr, &fence));
+	VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceInfo, nullptr, &fence));
 	vkQueueBindSparse(queue, 1, &texture.bindSparseInfo, fence);
-	vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(device, fence, nullptr);
+	vkWaitForFences(m_vkDevice, 1, &fence, VK_TRUE, UINT64_MAX);
+	vkDestroyFence(m_vkDevice, fence, nullptr);
 
 	for (auto &page: updatedPages) {
 		uploadContent(page, texture.image);
@@ -748,7 +748,7 @@ void VulkanExample::fillMipTail()
 {
 	// Clean up previous mip tail memory allocation
 	if (texture.mipTailimageMemoryBind.memory != VK_NULL_HANDLE) {
-		vkFreeMemory(device, texture.mipTailimageMemoryBind.memory, nullptr);
+		vkFreeMemory(m_vkDevice, texture.mipTailimageMemoryBind.memory, nullptr);
 	}
 
 	//@todo: WIP
@@ -760,7 +760,7 @@ void VulkanExample::fillMipTail()
 	VkMemoryAllocateInfo allocInfo = vks::initializers::memoryAllocateInfo();
 	allocInfo.allocationSize = imageMipTailSize;
 	allocInfo.memoryTypeIndex = texture.memoryTypeIndex;
-	VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &texture.mipTailimageMemoryBind.memory));
+	VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &texture.mipTailimageMemoryBind.memory));
 
 	uint32_t mipLevel = texture.sparseImageMemoryRequirements.imageMipTailFirstLod;
 	uint32_t width = std::max(texture.width >> texture.sparseImageMemoryRequirements.imageMipTailFirstLod, 1u);
@@ -808,7 +808,7 @@ void VulkanExample::fillMipTail()
 
 void VulkanExample::flushRandomPages()
 {
-	vkDeviceWaitIdle(device);
+	vkDeviceWaitIdle(m_vkDevice);
 
 	std::default_random_engine rndEngine(benchmark.active ? 0 : std::random_device{}());
 	std::uniform_real_distribution<float> rndDist(0.0f, 1.0f);
@@ -830,15 +830,15 @@ void VulkanExample::flushRandomPages()
 	texture.updateSparseBindInfo(bindingChangedPages, true);
 	VkFenceCreateInfo fenceInfo = vks::initializers::fenceCreateInfo(VK_FLAGS_NONE);
 	VkFence fence;
-	VK_CHECK_RESULT(vkCreateFence(device, &fenceInfo, nullptr, &fence));
+	VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceInfo, nullptr, &fence));
 	vkQueueBindSparse(queue, 1, &texture.bindSparseInfo, fence);
-	vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(device, fence, nullptr);
+	vkWaitForFences(m_vkDevice, 1, &fence, VK_TRUE, UINT64_MAX);
+	vkDestroyFence(m_vkDevice, fence, nullptr);
 	for (auto& page : texture.pages)
 	{
 		if (page.del)
 		{
-			page.release(device);
+			page.release(m_vkDevice);
 		}
 	}
 }
