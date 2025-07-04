@@ -800,7 +800,7 @@ public:
         commandBuffer.cmdInsertImageMemoryBarrier(
             swapChain.images[imageIndex],
             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_ACCESS_NONE,
+            VK_ACCESS_NONE,
             VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -811,22 +811,18 @@ public:
         // Submit the command buffer to the graphics m_vkQueue
 
         // Pipeline stage at which the m_vkQueue submission will wait (via pWaitSemaphores)
-        VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        //        VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         // The submit info structure specifies a command buffer m_vkQueue submission batch
         vkcpp::SubmitInfo submitInfo;
-        submitInfo.pWaitDstStageMask = &waitStageMask; // Pointer to the list of m_vkPipeline stages that the semaphore waits will occur at
-        submitInfo.pCommandBuffers = &vkCommandBuffer; // Command buffers(s) to execute in this batch (submission)
-        submitInfo.commandBufferCount = 1; // We submit a single command buffer
-
-        // Semaphore to wait upon before the submitted command buffer starts executing
-        submitInfo.pWaitSemaphores = &presentCompleteSemaphores[currentFrame];
-        submitInfo.waitSemaphoreCount = 1;
-        // Semaphore to be signaled when command buffers have completed
-        submitInfo.pSignalSemaphores = &renderCompleteSemaphores[imageIndex];
-        submitInfo.signalSemaphoreCount = 1;
+        //	We wait until any previous present is done, before submitting.
+        //	When the render is complete, we signal render complete to allow the present to proceed.
+        submitInfo.addWaitSemaphore(presentCompleteSemaphores[currentFrame], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        submitInfo.addCommandBuffer(commandBuffer);
+        submitInfo.addSignalSemaphore(renderCompleteSemaphores[imageIndex]);
 
         // Submit to the graphics m_vkQueue passing a wait fence
-        VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, waitFences[currentFrame]));
+        vkcpp::Queue queue = vkcpp::Queue::makeCopy(m_vkQueue);
+        queue.submit(submitInfo, waitFences[currentFrame]);
 
         // Present the current frame buffer to the swap chain
         // Pass the semaphore signaled by the command buffer submission from the submit info as the wait semaphore for swap chain presentation

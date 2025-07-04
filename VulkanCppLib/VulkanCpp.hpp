@@ -2483,11 +2483,46 @@ public:
 
 class SubmitInfo : public VkSubmitInfo {
 
+    std::vector<VkSemaphore> m_vkWaitSemaphores;
+    std::vector<VkPipelineStageFlags> m_vkPipelineStateFlags;
+    std::vector<VkCommandBuffer> m_vkCommandBuffers;
+    std::vector<VkSemaphore> m_vkSignalSemaphores;
+
 public:
     SubmitInfo()
         : VkSubmitInfo {}
     {
         sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    }
+    ~SubmitInfo() = default;
+    SubmitInfo(const SubmitInfo&) = delete;
+    SubmitInfo& operator=(const SubmitInfo&) = delete;
+    SubmitInfo(SubmitInfo&&) noexcept = delete;
+    SubmitInfo& operator=(SubmitInfo&&) = delete;
+
+    void addCommandBuffer(VkCommandBuffer vkCommandBuffer)
+    {
+        m_vkCommandBuffers.emplace_back(vkCommandBuffer);
+        commandBufferCount = static_cast<uint32_t>(m_vkCommandBuffers.size());
+        pCommandBuffers = m_vkCommandBuffers.data();
+    }
+
+    void addWaitSemaphore(
+        VkSemaphore vkSemaphore,
+        VkPipelineStageFlags vkPipelineStateFlags)
+    {
+        m_vkWaitSemaphores.emplace_back(vkSemaphore);
+        m_vkPipelineStateFlags.emplace_back(vkPipelineStateFlags);
+        waitSemaphoreCount = static_cast<uint32_t>(m_vkWaitSemaphores.size());
+        pWaitSemaphores = m_vkWaitSemaphores.data();
+        pWaitDstStageMask = m_vkPipelineStateFlags.data();
+    }
+
+    void addSignalSemaphore(VkSemaphore vkSemaphore)
+    {
+        m_vkSignalSemaphores.emplace_back(vkSemaphore);
+        signalSemaphoreCount = static_cast<uint32_t>(m_vkSignalSemaphores.size());
+        pSignalSemaphores = m_vkSignalSemaphores.data();
     }
 };
 
@@ -2503,60 +2538,43 @@ public:
     {
         sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     }
+    ~SubmitInfo2() = default;
+    SubmitInfo2(const SubmitInfo2&) = delete;
+    SubmitInfo2& operator=(const SubmitInfo2&) = delete;
+    SubmitInfo2(SubmitInfo2&&) noexcept = delete;
+    SubmitInfo2& operator=(SubmitInfo2&&) = delete;
 
-    SubmitInfo2* operator&() = delete;
-
-    void addCommandBuffer(CommandBuffer commandBuffer)
+    void addCommandBuffer(VkCommandBuffer vkCommandBuffer)
     {
         VkCommandBufferSubmitInfo vkCommandBufferSubmitInfo {};
         vkCommandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        vkCommandBufferSubmitInfo.commandBuffer = commandBuffer;
-        m_commandBufferInfos.push_back(vkCommandBufferSubmitInfo);
+        vkCommandBufferSubmitInfo.commandBuffer = vkCommandBuffer;
+        m_commandBufferInfos.emplace_back(vkCommandBufferSubmitInfo);
+        commandBufferInfoCount = static_cast<uint32_t>(m_commandBufferInfos.size());
+        pCommandBufferInfos = m_commandBufferInfos.data();
     }
 
     void addWaitSemaphore(
-        Semaphore semaphore,
-        PipelineStageFlags2 waitPipelineStateFlags2
-
-        //			VkPipelineStageFlags2 waitPipelineStateFlags2
-    )
+        VkSemaphore vkSemaphore,
+        PipelineStageFlags2 waitPipelineStateFlags2)
     {
         VkSemaphoreSubmitInfo vkSemaphoreSubmitInfo {};
         vkSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        vkSemaphoreSubmitInfo.semaphore = semaphore;
+        vkSemaphoreSubmitInfo.semaphore = vkSemaphore;
         vkSemaphoreSubmitInfo.stageMask = static_cast<VkPipelineStageFlagBits2>(waitPipelineStateFlags2);
-        m_waitSemaphoreInfos.push_back(vkSemaphoreSubmitInfo);
+        m_waitSemaphoreInfos.emplace_back(vkSemaphoreSubmitInfo);
+        waitSemaphoreInfoCount = static_cast<uint32_t>(m_waitSemaphoreInfos.size());
+        pWaitSemaphoreInfos = m_waitSemaphoreInfos.data();
     }
 
-    void addSignalSemaphore(Semaphore semaphore)
+    void addSignalSemaphore(VkSemaphore vkSemaphore)
     {
         VkSemaphoreSubmitInfo vkSemaphoreSubmitInfo {};
         vkSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        vkSemaphoreSubmitInfo.semaphore = semaphore;
-        m_signalSemaphoreInfos.push_back(vkSemaphoreSubmitInfo);
-    }
-
-    SubmitInfo2* assemble()
-    {
-        pWaitSemaphoreInfos = nullptr;
-        waitSemaphoreInfoCount = static_cast<uint32_t>(m_waitSemaphoreInfos.size());
-        if (waitSemaphoreInfoCount > 0) {
-            pWaitSemaphoreInfos = m_waitSemaphoreInfos.data();
-        }
-
-        pCommandBufferInfos = nullptr;
-        commandBufferInfoCount = static_cast<uint32_t>(m_commandBufferInfos.size());
-        if (commandBufferInfoCount > 0) {
-            pCommandBufferInfos = m_commandBufferInfos.data();
-        }
-
-        pSignalSemaphoreInfos = nullptr;
+        vkSemaphoreSubmitInfo.semaphore = vkSemaphore;
+        m_signalSemaphoreInfos.emplace_back(vkSemaphoreSubmitInfo);
         signalSemaphoreInfoCount = static_cast<uint32_t>(m_signalSemaphoreInfos.size());
-        if (signalSemaphoreInfoCount > 0) {
-            pSignalSemaphoreInfos = m_signalSemaphoreInfos.data();
-        }
-
-        return this;
+        pSignalSemaphoreInfos = m_signalSemaphoreInfos.data();
     }
 };
 
@@ -2591,7 +2609,6 @@ public:
         pSwapchains = &m_vkSwapChain;
         pImageIndices = &m_swapChainImageIndex;
     }
-
 };
 
 class Queue : public HandleWithOwner<VkQueue, Device> {
@@ -2614,34 +2631,47 @@ public:
     Queue(Queue&&) noexcept = default;
     Queue& operator=(Queue&&) noexcept = default;
 
+    static Queue makeCopy(VkQueue vkQueue)
+    {
+        return Queue(vkQueue, -1, Device());
+    }
+
     void waitIdle() const
     {
         vkQueueWaitIdle(*this);
+    }
+
+    void submit(const SubmitInfo& submitInfo, VkFence vkFence) const
+    {
+        VkResult vkResult = vkQueueSubmit(*this, 1, &submitInfo, vkFence);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
     }
 
     void submit2(const CommandBuffer& commandBuffer) const
     {
         SubmitInfo2 submitInfo2;
         submitInfo2.addCommandBuffer(commandBuffer);
-        VkResult vkResult = vkQueueSubmit2(*this, 1, submitInfo2.assemble(), VK_NULL_HANDLE);
+        VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, VK_NULL_HANDLE);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
     }
 
-    void submit2(const CommandBuffer& commandBuffer, Fence fence) const
+    void submit2(const CommandBuffer& commandBuffer, const Fence& fence) const
     {
         SubmitInfo2 submitInfo2;
         submitInfo2.addCommandBuffer(commandBuffer);
-        VkResult vkResult = vkQueueSubmit2(*this, 1, submitInfo2.assemble(), fence);
+        VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, fence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
     }
 
-    void submit2(SubmitInfo2& submitInfo2, const Fence& fence) const
+    void submit2(const SubmitInfo2& submitInfo2, const Fence& fence) const
     {
-        VkResult vkResult = vkQueueSubmit2(*this, 1, submitInfo2.assemble(), fence);
+        VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, fence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -2652,7 +2682,7 @@ public:
         SubmitInfo2 submitInfo2;
         submitInfo2.addCommandBuffer(commandBuffer);
         vkcpp::Fence completedFence(getVkDevice());
-        VkResult vkResult = vkQueueSubmit2(*this, 1, submitInfo2.assemble(), completedFence);
+        VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, completedFence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
