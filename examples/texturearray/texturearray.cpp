@@ -2,7 +2,7 @@
 * Vulkan Example - Texture arrays and instanced rendering
 * 
 * This sample shows how to load and render a texture array. This is a single layered texture where each layer contains different image data.
-* The different layers are displayed on cubes using instancing, where each instance selects a different layer from the texture
+* The different layers are displayed on cubes using instancing, where each m_vulkanInstance selects a different layer from the texture
 *
 * Copyright (C) 2016-2023 Sascha Willems - www.saschawillems.de
 *
@@ -25,19 +25,19 @@ class VulkanExample : public VulkanExampleBase
 {
 public:
 	// Number of array layers in texture array
-	// Also used as instance count
+	// Also used as m_vulkanInstance count
 	uint32_t layerCount{ 0 };
 	vks::Texture textureArray;
 
 	vks::Buffer vertexBuffer;
 	vks::Buffer indexBuffer;
-	uint32_t indexCount{ 0 };
+	uint32_t m_indexCount{ 0 };
 
-	// Values passed to the shader per drawn instance
+	// Values passed to the shader per drawn m_vulkanInstance
 	struct alignas(16) PerInstanceData {
 		// Model matrix
 		glm::mat4 model;
-		// Layer index from which this instance will sample in the fragment shader
+		// Layer index from which this m_vulkanInstance will sample in the fragment shader
 		float arrayIndex{ 0 };
 	};
 
@@ -47,13 +47,13 @@ public:
 			glm::mat4 projection;
 			glm::mat4 view;
 		} matrices;
-		// Separate data for each instance
+		// Separate data for each m_vulkanInstance
 		PerInstanceData* instance{ nullptr };
 	} uniformData;
 	vks::Buffer uniformBuffer;
 
-	VkPipeline pipeline{ VK_NULL_HANDLE };
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
@@ -73,8 +73,8 @@ public:
 			vkDestroyImage(m_vkDevice, textureArray.image, nullptr);
 			vkDestroySampler(m_vkDevice, textureArray.sampler, nullptr);
 			vkFreeMemory(m_vkDevice, textureArray.deviceMemory, nullptr);
-			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			vertexBuffer.destroy();
 			indexBuffer.destroy();
@@ -111,7 +111,7 @@ public:
 #endif
 		assert(result == KTX_SUCCESS);
 
-		// Get properties required for using and upload texture data from the ktx texture object
+		// Get m_vkPhysicalDeviceProperties required for using and upload texture data from the ktx texture object
 		textureArray.width = ktxTexture->baseWidth;
 		textureArray.height = ktxTexture->baseHeight;
 		layerCount = ktxTexture->numLayers;
@@ -302,14 +302,14 @@ public:
 			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			VkDeviceSize offsets[1] = { 0 };
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.buffer, offsets);
 			vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-			vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, layerCount, 0, 0, 0);
+			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, layerCount, 0, 0, 0);
 
 			drawUI(drawCmdBuffers[i]);
 
@@ -358,7 +358,7 @@ public:
 			0,1,2, 0,2,3, 4,5,6,  4,6,7, 8,9,10, 8,10,11, 12,13,14, 12,14,15, 16,17,18, 16,18,19, 20,21,22, 20,22,23
 		};
 
-		indexCount = static_cast<uint32_t>(indices.size());
+		m_indexCount = static_cast<uint32_t>(indices.size());
 
 		// Create buffers and upload data to the GPU
 		struct StagingBuffers {
@@ -427,7 +427,7 @@ public:
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -452,13 +452,13 @@ public:
 		vertexInputStateCI.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributes.size());
 		vertexInputStateCI.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
-		// Instancing pipeline
+		// Instancing m_vkPipeline
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
 		shaderStages[0] = loadShader(getShadersPath() + "texturearray/instancing.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "texturearray/instancing.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		pipelineCI.pVertexInputState = &vertexInputStateCI;
 		pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 		pipelineCI.pRasterizationState = &rasterizationStateCI;
@@ -469,7 +469,7 @@ public:
 		pipelineCI.pDynamicState = &dynamicStateCI;
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	void prepareUniformBuffers()

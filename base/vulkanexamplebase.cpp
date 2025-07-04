@@ -27,7 +27,7 @@ VkResult VulkanExampleBase::createInstance()
 {
 	std::vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME };
 
-	// Enable surface extensions depending on os
+	// Enable m_vkSurface extensions depending on os
 #if defined(_WIN32)
 	instanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -52,7 +52,7 @@ VkResult VulkanExampleBase::createInstance()
 	instanceExtensions.push_back(VK_QNX_SCREEN_SURFACE_EXTENSION_NAME);
 #endif
 
-	// Get extensions supported by the instance and store for later use
+	// Get extensions supported by the m_vulkanInstance and store for later use
 	uint32_t extCount = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extCount, nullptr);
 	if (extCount > 0)
@@ -75,7 +75,7 @@ VkResult VulkanExampleBase::createInstance()
 	}
 #endif
 
-	// Enabled requested instance extensions
+	// Enabled requested m_vulkanInstance extensions
 	if (!enabledInstanceExtensions.empty())
 	{
 		for (const char * enabledExtension : enabledInstanceExtensions)
@@ -83,7 +83,7 @@ VkResult VulkanExampleBase::createInstance()
 			// Output message if requested extension is not available
 			if (std::find(supportedInstanceExtensions.begin(), supportedInstanceExtensions.end(), enabledExtension) == supportedInstanceExtensions.end())
 			{
-				std::cerr << "Enabled instance extension \"" << enabledExtension << "\" is not present at instance level\n";
+				std::cerr << "Enabled m_vulkanInstance extension \"" << enabledExtension << "\" is not present at m_vulkanInstance level\n";
 			}
 			instanceExtensions.push_back(enabledExtension);
 		}
@@ -116,7 +116,7 @@ VkResult VulkanExampleBase::createInstance()
 	}
 
 #if (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT)) && defined(VK_KHR_portability_enumeration)
-	// SRS - When running on iOS/macOS with MoltenVK and VK_KHR_portability_enumeration is defined and supported by the instance, enable the extension and the flag
+	// SRS - When running on iOS/macOS with MoltenVK and VK_KHR_portability_enumeration is defined and supported by the m_vulkanInstance, enable the extension and the flag
 	if (std::find(supportedInstanceExtensions.begin(), supportedInstanceExtensions.end(), VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) != supportedInstanceExtensions.end())
 	{
 		instanceExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
@@ -138,7 +138,7 @@ VkResult VulkanExampleBase::createInstance()
 	// Note that on Android this layer requires at least NDK r20
 	const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
         if (m_exampleSettings.m_useValidationLayers) {
-		// Check if this layer is available at instance level
+		// Check if this layer is available at m_vulkanInstance level
 		uint32_t instanceLayerCount;
 		vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr);
 		std::vector<VkLayerProperties> instanceLayerProperties(instanceLayerCount);
@@ -158,8 +158,8 @@ VkResult VulkanExampleBase::createInstance()
 		}
 	}
 
-	// If layer settings are defined, then activate the sample's required layer settings during instance creation.
-	// Layer settings are typically used to activate specific features of a layer, such as the Validation Layer's
+	// If layer settings are defined, then activate the sample's required layer settings during m_vulkanInstance creation.
+	// Layer settings are typically used to activate specific m_vkPhysicalDeviceFeatures of a layer, such as the Validation Layer's
 	// printf feature, or to configure specific capabilities of drivers such as MoltenVK on macOS and/or iOS.
 	VkLayerSettingsCreateInfoEXT layerSettingsCreateInfo{VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT};
 	if (enabledLayerSettings.size() > 0) {
@@ -169,11 +169,11 @@ VkResult VulkanExampleBase::createInstance()
 		instanceCreateInfo.pNext = &layerSettingsCreateInfo;
 	}
 
-	VkResult result = vkCreateInstance(&instanceCreateInfo, nullptr, &instance);
+	VkResult result = vkCreateInstance(&instanceCreateInfo, nullptr, &m_vulkanInstance);
 
 	// If the debug utils extension is present we set up debug functions, so samples can label objects for debugging
 	if (std::find(supportedInstanceExtensions.begin(), supportedInstanceExtensions.end(), VK_EXT_DEBUG_UTILS_EXTENSION_NAME) != supportedInstanceExtensions.end()) {
-		vks::debugutils::setup(instance);
+		vks::debugutils::setup(m_vulkanInstance);
 	}
 
 	return result;
@@ -190,7 +190,7 @@ void VulkanExampleBase::renderFrame()
 
 std::string VulkanExampleBase::getWindowTitle() const
 {
-	std::string windowTitle{ title + " - " + deviceProperties.deviceName };
+	std::string windowTitle{ title + " - " + m_vkPhysicalDeviceProperties.deviceName };
     if (!m_exampleSettings.m_showOverlayUI) {
 		windowTitle += " - " + std::to_string(frameCounter) + " fps";
 	}
@@ -335,7 +335,7 @@ void VulkanExampleBase::renderLoop()
 			return;
 #endif
 
-		benchmark.run([=] { render(); }, vulkanDevice->properties);
+		benchmark.run([=] { render(); }, vulkanDevice->m_vkPhysicalDeviceProperties);
                 vkDeviceWaitIdle(m_vkDevice);
 		if (!benchmark.filename.empty()) {
 			benchmark.saveResults();
@@ -723,7 +723,7 @@ void VulkanExampleBase::updateOverlay()
 	ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiSetCond_FirstUseEver);
 	ImGui::Begin("Vulkan Example", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
 	ImGui::TextUnformatted(title.c_str());
-	ImGui::TextUnformatted(deviceProperties.deviceName);
+	ImGui::TextUnformatted(m_vkPhysicalDeviceProperties.deviceName);
 	ImGui::Text("%.2f ms/frame (%.1d fps)", (1000.0f / lastFPS), lastFPS);
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -768,7 +768,7 @@ void VulkanExampleBase::prepareFrame()
 {
 	// Acquire the next image from the swap chain
 	VkResult result = swapChain.acquireNextImage(semaphores.presentComplete, currentBuffer);
-	// Recreate the swapchain if it's no longer compatible with the surface (OUT_OF_DATE)
+	// Recreate the swapchain if it's no longer compatible with the m_vkSurface (OUT_OF_DATE)
 	// SRS - If no longer optimal (VK_SUBOPTIMAL_KHR), wait until submitFrame() in case number of swapchain images will change on resize
 	if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -784,7 +784,7 @@ void VulkanExampleBase::prepareFrame()
 void VulkanExampleBase::submitFrame()
 {
 	VkResult result = swapChain.queuePresent(queue, currentBuffer, semaphores.renderComplete);
-	// Recreate the swapchain if it's no longer compatible with the surface (OUT_OF_DATE) or no longer optimal for presentation (SUBOPTIMAL)
+	// Recreate the swapchain if it's no longer compatible with the m_vkSurface (OUT_OF_DATE) or no longer optimal for presentation (SUBOPTIMAL)
 	if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
 		windowResize();
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -987,18 +987,18 @@ VulkanExampleBase::~VulkanExampleBase()
 
 	if (m_exampleSettings.m_useValidationLayers)
 	{
-		vks::debug::freeDebugCallback(instance);
+		vks::debug::freeDebugCallback(m_vulkanInstance);
 	}
 
-	vkDestroyInstance(instance, nullptr);
+	vkDestroyInstance(m_vulkanInstance, nullptr);
 
 #if defined(_DIRECT2DISPLAY)
 
 #elif defined(VK_USE_PLATFORM_DIRECTFB_EXT)
 	if (event_buffer)
 		event_buffer->Release(event_buffer);
-	if (surface)
-		surface->Release(surface);
+	if (m_vkSurface)
+		m_vkSurface->Release(m_vkSurface);
 	if (window)
 		window->Release(window);
 	if (layer)
@@ -1008,7 +1008,7 @@ VulkanExampleBase::~VulkanExampleBase()
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 	xdg_toplevel_destroy(xdg_toplevel);
 	xdg_surface_destroy(xdg_surface);
-	wl_surface_destroy(surface);
+	wl_surface_destroy(m_vkSurface);
 	if (keyboard)
 		wl_keyboard_destroy(keyboard);
 	if (pointer)
@@ -1041,34 +1041,34 @@ bool VulkanExampleBase::initVulkan()
 		vks::debug::log("Sample: " + title);
 	}
 
-	// Create the instance
+	// Create the m_vulkanInstance
 	VkResult result = createInstance();
 	if (result != VK_SUCCESS) {
-		vks::tools::exitFatal("Could not create Vulkan instance : \n" + vks::tools::errorString(result), result);
+		vks::tools::exitFatal("Could not create Vulkan m_vulkanInstance : \n" + vks::tools::errorString(result), result);
 		return false;
 	}
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	vks::android::loadVulkanFunctions(instance);
+	vks::android::loadVulkanFunctions(m_vulkanInstance);
 #endif
 
 	// If requested, we enable the default validation layers for debugging
         if (m_exampleSettings.m_useValidationLayers)
 	{
-		vks::debug::setupDebugging(instance);
+		vks::debug::setupDebugging(m_vulkanInstance);
 	}
 
 	// Physical m_vkDevice
 	uint32_t gpuCount = 0;
 	// Get number of available physical devices
-	VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr));
+	VK_CHECK_RESULT(vkEnumeratePhysicalDevices(m_vulkanInstance, &gpuCount, nullptr));
 	if (gpuCount == 0) {
 		vks::tools::exitFatal("No m_vkDevice with Vulkan support found", -1);
 		return false;
 	}
 	// Enumerate devices
 	std::vector<VkPhysicalDevice> physicalDevices(gpuCount);
-	result = vkEnumeratePhysicalDevices(instance, &gpuCount, physicalDevices.data());
+	result = vkEnumeratePhysicalDevices(m_vulkanInstance, &gpuCount, physicalDevices.data());
 	if (result != VK_SUCCESS) {
 		vks::tools::exitFatal("Could not enumerate physical devices : \n" + vks::tools::errorString(result), result);
 		return false;
@@ -1102,20 +1102,20 @@ bool VulkanExampleBase::initVulkan()
 	}
 #endif
 
-	physicalDevice = physicalDevices[selectedDevice];
+	m_vkPhysicalDevice = physicalDevices[selectedDevice];
 
-	// Store properties (including limits), features and memory properties of the physical m_vkDevice (so that examples can check against them)
-	vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-	vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
-	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
+	// Store m_vkPhysicalDeviceProperties (including limits), m_vkPhysicalDeviceFeatures and memory m_vkPhysicalDeviceProperties of the physical m_vkDevice (so that examples can check against them)
+	vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, &m_vkPhysicalDeviceProperties);
+	vkGetPhysicalDeviceFeatures(m_vkPhysicalDevice, &deviceFeatures);
+	vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice, &deviceMemoryProperties);
 
-	// Derived examples can override this to set actual features (based on above readings) to enable for logical m_vkDevice creation
+	// Derived examples can override this to set actual m_vkPhysicalDeviceFeatures (based on above readings) to enable for logical m_vkDevice creation
 	getEnabledFeatures();
 
 	// Vulkan m_vkDevice creation
 	// This is handled by a separate class that gets a logical m_vkDevice representation
 	// and encapsulates functions related to a m_vkDevice
-	vulkanDevice = new vks::VulkanDevice(physicalDevice);
+	vulkanDevice = new vks::VulkanDevice(m_vkPhysicalDevice);
 
 	// Derived examples can enable extensions based on the list of supported extensions read from the physical m_vkDevice
 	getEnabledExtensions();
@@ -1125,7 +1125,7 @@ bool VulkanExampleBase::initVulkan()
 		vks::tools::exitFatal("Could not create Vulkan m_vkDevice: \n" + vks::tools::errorString(result), result);
 		return false;
 	}
-        m_vkDevice = vulkanDevice->logicalDevice;
+        m_vkDevice = vulkanDevice->m_vkDevice;
 
 	// Get a graphics queue from the m_vkDevice
         vkGetDeviceQueue(m_vkDevice, vulkanDevice->queueFamilyIndices.graphics, 0, &queue);
@@ -1134,13 +1134,13 @@ bool VulkanExampleBase::initVulkan()
 	VkBool32 validFormat{ false };
 	// Samples that make use of stencil will require a depth + stencil format, so we select from a different list
 	if (requiresStencil) {
-		validFormat = vks::tools::getSupportedDepthStencilFormat(physicalDevice, &depthFormat);
+		validFormat = vks::tools::getSupportedDepthStencilFormat(m_vkPhysicalDevice, &depthFormat);
 	} else {
-		validFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &depthFormat);
+		validFormat = vks::tools::getSupportedDepthFormat(m_vkPhysicalDevice, &depthFormat);
 	}
 	assert(validFormat);
 
-	swapChain.setContext(instance, physicalDevice, m_vkDevice);
+	swapChain.setContext(m_vulkanInstance, m_vkPhysicalDevice, m_vkDevice);
 
 	// Create synchronization objects
 	VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
@@ -1694,7 +1694,7 @@ dispatch_group_t concurrentGroup;
 {
 	vulkanExample->quit = YES;
 	dispatch_group_wait(concurrentGroup, DISPATCH_TIME_FOREVER);
-	vkDeviceWaitIdle(vulkanExample->vulkanDevice->logicalDevice);
+	vkDeviceWaitIdle(vulkanExample->vulkanDevice->m_vkDevice);
 	delete(vulkanExample);
 }
 
@@ -1988,7 +1988,7 @@ void VulkanExampleBase::displayLinkOutputCb()
 {
 #if defined(VK_EXAMPLE_XCODE_GENERATED)
 	if (benchmark.active) {
-		benchmark.run([=] { render(); }, vulkanDevice->properties);
+		benchmark.run([=] { render(); }, vulkanDevice->m_vkPhysicalDeviceProperties);
 		if (benchmark.filename != "") {
 			benchmark.saveResults();
 		}
@@ -2088,10 +2088,10 @@ IDirectFBSurface *VulkanExampleBase::setupWindow()
 		exit(1);
 	}
 
-	ret = window->GetSurface(window, &surface);
+	ret = window->GetSurface(window, &m_vkSurface);
 	if (ret)
 	{
-		std::cout << "Could not get DirectFB surface interface!\n";
+		std::cout << "Could not get DirectFB m_vkSurface interface!\n";
 		fflush(stdout);
 		exit(1);
 	}
@@ -2112,7 +2112,7 @@ IDirectFBSurface *VulkanExampleBase::setupWindow()
 		exit(1);
 	}
 
-	return surface;
+	return m_vkSurface;
 }
 
 void VulkanExampleBase::handleEvent(const DFBWindowEvent *event)
@@ -2232,13 +2232,13 @@ void VulkanExampleBase::handleEvent(const DFBWindowEvent *event)
 }
 
 /*static*/void VulkanExampleBase::pointerEnterCb(void *data,
-		wl_pointer *pointer, uint32_t serial, wl_surface *surface,
+		wl_pointer *pointer, uint32_t serial, wl_surface *m_vkSurface,
 		wl_fixed_t sx, wl_fixed_t sy)
 {
 }
 
 /*static*/void VulkanExampleBase::pointerLeaveCb(void *data,
-		wl_pointer *pointer, uint32_t serial, wl_surface *surface)
+		wl_pointer *pointer, uint32_t serial, wl_surface *m_vkSurface)
 {
 }
 
@@ -2310,13 +2310,13 @@ void VulkanExampleBase::pointerAxis(wl_pointer *pointer, uint32_t time,
 
 /*static*/void VulkanExampleBase::keyboardEnterCb(void *data,
 		struct wl_keyboard *keyboard, uint32_t serial,
-		struct wl_surface *surface, struct wl_array *keys)
+		struct wl_surface *m_vkSurface, struct wl_array *keys)
 {
 }
 
 /*static*/void VulkanExampleBase::keyboardLeaveCb(void *data,
 		struct wl_keyboard *keyboard, uint32_t serial,
-		struct wl_surface *surface)
+		struct wl_surface *m_vkSurface)
 {
 }
 
@@ -2488,12 +2488,12 @@ void VulkanExampleBase::setSize(int width, int height)
 }
 
 static void
-xdg_surface_handle_configure(void *data, struct xdg_surface *surface,
+xdg_surface_handle_configure(void *data, struct xdg_surface *m_vkSurface,
 			     uint32_t serial)
 {
 	VulkanExampleBase *base = (VulkanExampleBase *) data;
 
-	xdg_surface_ack_configure(surface, serial);
+	xdg_surface_ack_configure(m_vkSurface, serial);
 	base->configured = true;
 }
 
@@ -2529,8 +2529,8 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
 
 struct xdg_surface *VulkanExampleBase::setupWindow()
 {
-	surface = wl_compositor_create_surface(compositor);
-	xdg_surface = xdg_wm_base_get_xdg_surface(shell, surface);
+	m_vkSurface = wl_compositor_create_surface(compositor);
+	xdg_surface = xdg_wm_base_get_xdg_surface(shell, m_vkSurface);
 
 	xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, this);
 	xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
@@ -2542,7 +2542,7 @@ struct xdg_surface *VulkanExampleBase::setupWindow()
 	{
 		xdg_toplevel_set_fullscreen(xdg_toplevel, NULL);
 	}	
-	wl_surface_commit(surface);
+	wl_surface_commit(m_vkSurface);
 	wl_display_flush(display);
 
 	return xdg_surface;
@@ -3236,9 +3236,9 @@ void VulkanExampleBase::windowResize()
 	createSwapChain();
 
 	// Recreate the frame buffers
-        vkDestroyImageView(m_vkDevice, depthStencil.view, nullptr);
-        vkDestroyImage(m_vkDevice, depthStencil.image, nullptr);
-        vkFreeMemory(m_vkDevice, depthStencil.memory, nullptr);
+    vkDestroyImageView(m_vkDevice, depthStencil.view, nullptr);
+    vkDestroyImage(m_vkDevice, depthStencil.image, nullptr);
+    vkFreeMemory(m_vkDevice, depthStencil.memory, nullptr);
 	setupDepthStencil();
 	for (auto& frameBuffer : frameBuffers) {
             vkDestroyFramebuffer(m_vkDevice, frameBuffer, nullptr);
@@ -3321,9 +3321,9 @@ void VulkanExampleBase::createSurface()
 #elif defined(VK_USE_PLATFORM_METAL_EXT)
 	swapChain.initSurface(metalLayer);
 #elif defined(VK_USE_PLATFORM_DIRECTFB_EXT)
-	swapChain.initSurface(dfb, surface);
+	swapChain.initSurface(dfb, m_vkSurface);
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-	swapChain.initSurface(display, surface);
+	swapChain.initSurface(display, m_vkSurface);
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
 	swapChain.initSurface(connection, window);
 #elif (defined(_DIRECT2DISPLAY) || defined(VK_USE_PLATFORM_HEADLESS_EXT))

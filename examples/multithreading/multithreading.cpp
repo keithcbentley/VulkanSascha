@@ -33,7 +33,7 @@ public:
 		VkPipeline phong{ VK_NULL_HANDLE };
 		VkPipeline starsphere{ VK_NULL_HANDLE };
 	} pipelines;
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkCommandBuffer primaryCommandBuffer{ VK_NULL_HANDLE };
 
 	// Secondary scene command buffers used to store backdrop and user interface
@@ -117,7 +117,7 @@ public:
 		if (m_vkDevice) {
 			vkDestroyPipeline(m_vkDevice, pipelines.phong, nullptr);
 			vkDestroyPipeline(m_vkDevice, pipelines.starsphere, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			for (auto& thread : threadData) {
 				vkFreeCommandBuffers(m_vkDevice, thread.commandPool, static_cast<uint32_t>(thread.commandBuffer.size()), thread.commandBuffer.data());
 				vkDestroyCommandPool(m_vkDevice, thread.commandPool, nullptr);
@@ -249,7 +249,7 @@ public:
 		// Contains model view matrix
 		vkCmdPushConstants(
 			cmdBuffer,
-			pipelineLayout,
+			m_vkPipelineLayout,
 			VK_SHADER_STAGE_VERTEX_BIT,
 			0,
 			sizeof(ThreadPushConstantBlock),
@@ -290,7 +290,7 @@ public:
 
 		vkCmdPushConstants(
 			secondaryCommandBuffers.background,
-			pipelineLayout,
+			m_vkPipelineLayout,
 			VK_SHADER_STAGE_VERTEX_BIT,
 			0,
 			sizeof(mvp),
@@ -416,7 +416,7 @@ public:
 		// Push constant ranges are part of the pipeline layout
 		pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 		pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipelines
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -430,7 +430,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;

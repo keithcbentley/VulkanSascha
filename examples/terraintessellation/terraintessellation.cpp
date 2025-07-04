@@ -144,7 +144,7 @@ public:
 		}
 	}
 
-	// Enable physical m_vkDevice features required for this example
+	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Tessellation shader support is required for this example

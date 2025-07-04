@@ -86,7 +86,7 @@ public:
 		// Enable extension required for conservative rasterization
 		enabledDeviceExtensions.push_back(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
 
-		// Reading m_vkDevice properties of conservative rasterization requires VK_KHR_get_physical_device_properties2 to be enabled
+		// Reading m_vkDevice m_vkPhysicalDeviceProperties of conservative rasterization requires VK_KHR_get_physical_device_properties2 to be enabled
 		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 	}
 
@@ -142,7 +142,7 @@ public:
 
 		// Find a suitable depth format
 		VkFormat fbDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &fbDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(m_vkPhysicalDevice, &fbDepthFormat);
 		assert(validDepthFormat);
 
 		// Color attachment
@@ -530,16 +530,16 @@ public:
 		*/
 
 		/*
-			Get m_vkDevice properties for conservative rasterization
+			Get m_vkDevice m_vkPhysicalDeviceProperties for conservative rasterization
 			Requires VK_KHR_get_physical_device_properties2 and manual function pointer creation
 		*/
-		PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR"));
+		PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(vkGetInstanceProcAddr(m_vulkanInstance, "vkGetPhysicalDeviceProperties2KHR"));
 		assert(vkGetPhysicalDeviceProperties2KHR);
 		VkPhysicalDeviceProperties2KHR deviceProps2{};
 		conservativeRasterProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONSERVATIVE_RASTERIZATION_PROPERTIES_EXT;
 		deviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
 		deviceProps2.pNext = &conservativeRasterProps;
-		vkGetPhysicalDeviceProperties2KHR(physicalDevice, &deviceProps2);
+		vkGetPhysicalDeviceProperties2KHR(m_vkPhysicalDevice, &deviceProps2);
 
 		// Vertex bindings and attributes
 		std::vector<VkVertexInputBindingDescription> vertexInputBindings = {
@@ -669,7 +669,7 @@ public:
 				buildCommandBuffers();
 			}
 		}
-		if (overlay->header("Device properties")) {
+		if (overlay->header("Device m_vkPhysicalDeviceProperties")) {
 			overlay->text("maxExtraPrimitiveOverestimationSize: %f", conservativeRasterProps.maxExtraPrimitiveOverestimationSize);
 			overlay->text("extraPrimitiveOverestimationSizeGranularity: %f", conservativeRasterProps.extraPrimitiveOverestimationSizeGranularity);
 			overlay->text("primitiveUnderestimation:  %s", conservativeRasterProps.primitiveUnderestimation ? "yes" : "no");

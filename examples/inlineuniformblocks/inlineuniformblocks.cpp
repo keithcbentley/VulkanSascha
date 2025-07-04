@@ -50,8 +50,8 @@ public:
 	} uniformData;
 	vks::Buffer uniformBuffer;
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
-	VkPipeline pipeline{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
+	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 
 	struct DescriptorSetLaysts {
@@ -87,8 +87,8 @@ public:
 	~VulkanExample()
 	{
 		if (m_vkDevice) {
-			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.scene, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.object, nullptr);
 			uniformBuffer.destroy();
@@ -127,7 +127,7 @@ public:
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			// Render objects
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			uint32_t objcount = static_cast<uint32_t>(objects.size());
 			for (uint32_t x = 0; x < objcount; x++) {
@@ -140,11 +140,11 @@ public:
 					descriptorSet,
 					objects[x].descriptorSet
 				};
-				vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 2, descriptorSets.data(), 0, nullptr);
+				vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 2, descriptorSets.data(), 0, nullptr);
 
 				glm::vec3 pos = glm::vec3(sin(glm::radians(x * (360.0f / objcount))), cos(glm::radians(x * (360.0f / objcount))), 0.0f) * 3.5f;
 
-				vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3), &pos);
+				vkCmdPushConstants(drawCmdBuffers[i], m_vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3), &pos);
 				model.draw(drawCmdBuffers[i]);
 			}
 			drawUI(drawCmdBuffers[i]);
@@ -261,7 +261,7 @@ public:
 		pipelineLayoutCI.pushConstantRangeCount = 1;
 		pipelineLayoutCI.pPushConstantRanges = pushConstantRanges.data();
 
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -275,7 +275,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
 		pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 		pipelineCI.pRasterizationState = &rasterizationStateCI;
 		pipelineCI.pColorBlendState = &colorBlendStateCI;
@@ -289,7 +289,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "inlineuniformblocks/pbr.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inlineuniformblocks/pbr.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	void prepareUniformBuffers()

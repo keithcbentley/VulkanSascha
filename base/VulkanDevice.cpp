@@ -25,21 +25,21 @@ namespace vks
 	VulkanDevice::VulkanDevice(VkPhysicalDevice physicalDevice)
 	{
 		assert(physicalDevice);
-		this->physicalDevice = physicalDevice;
+		this->m_vkPhysicalDevice = physicalDevice;
 
-		// Store Properties features, limits and properties of the physical device for later use
-		// Device properties also contain limits and sparse properties
-		vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+		// Store Properties m_vkPhysicalDeviceFeatures, limits and m_vkPhysicalDeviceProperties of the physical device for later use
+		// Device m_vkPhysicalDeviceProperties also contain limits and sparse m_vkPhysicalDeviceProperties
+		vkGetPhysicalDeviceProperties(physicalDevice, &m_vkPhysicalDeviceProperties);
 		// Features should be checked by the examples before using them
-		vkGetPhysicalDeviceFeatures(physicalDevice, &features);
-		// Memory properties are used regularly for creating all kinds of buffers
-		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
-		// Queue family properties, used for setting up requested queues upon device creation
+		vkGetPhysicalDeviceFeatures(physicalDevice, &m_vkPhysicalDeviceFeatures);
+		// Memory m_vkPhysicalDeviceProperties are used regularly for creating all kinds of buffers
+		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &m_vkPhysicalDeviceMemoryProperties);
+		// Queue family m_vkPhysicalDeviceProperties, used for setting up requested queues upon device creation
 		uint32_t queueFamilyCount;
 		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
 		assert(queueFamilyCount > 0);
-		queueFamilyProperties.resize(queueFamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilyProperties.data());
+		m_vkQueueFamilyProperties.resize(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, m_vkQueueFamilyProperties.data());
 
 		// Get list of supported extensions
 		uint32_t extCount = 0;
@@ -51,7 +51,7 @@ namespace vks
 			{
 				for (auto& ext : extensions)
 				{
-					supportedExtensions.push_back(ext.extensionName);
+					m_supportedExtensions.push_back(ext.extensionName);
 				}
 			}
 		}
@@ -64,13 +64,13 @@ namespace vks
 	*/
 	VulkanDevice::~VulkanDevice()
 	{
-		if (commandPool)
+		if (m_vkCommandPool)
 		{
-			vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
+			vkDestroyCommandPool(m_vkDevice, m_vkCommandPool, nullptr);
 		}
-		if (logicalDevice)
+		if (m_vkDevice)
 		{
-			vkDestroyDevice(logicalDevice, nullptr);
+			vkDestroyDevice(m_vkDevice, nullptr);
 		}
 	}
 
@@ -87,11 +87,11 @@ namespace vks
 	*/
 	uint32_t VulkanDevice::getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32 *memTypeFound) const
 	{
-		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+		for (uint32_t i = 0; i < m_vkPhysicalDeviceMemoryProperties.memoryTypeCount; i++)
 		{
 			if ((typeBits & 1) == 1)
 			{
-				if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				if ((m_vkPhysicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
 				{
 					if (memTypeFound)
 					{
@@ -130,9 +130,9 @@ namespace vks
 		// Try to find a queue family index that supports compute but not graphics
 		if ((queueFlags & VK_QUEUE_COMPUTE_BIT) == queueFlags)
 		{
-			for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilyProperties.size()); i++)
+			for (uint32_t i = 0; i < static_cast<uint32_t>(m_vkQueueFamilyProperties.size()); i++)
 			{
-				if ((queueFamilyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) && ((queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0))
+				if ((m_vkQueueFamilyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) && ((m_vkQueueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0))
 				{
 					return i;
 				}
@@ -143,9 +143,9 @@ namespace vks
 		// Try to find a queue family index that supports transfer but not graphics and compute
 		if ((queueFlags & VK_QUEUE_TRANSFER_BIT) == queueFlags)
 		{
-			for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilyProperties.size()); i++)
+			for (uint32_t i = 0; i < static_cast<uint32_t>(m_vkQueueFamilyProperties.size()); i++)
 			{
-				if ((queueFamilyProperties[i].queueFlags & VK_QUEUE_TRANSFER_BIT) && ((queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) && ((queueFamilyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) == 0))
+				if ((m_vkQueueFamilyProperties[i].queueFlags & VK_QUEUE_TRANSFER_BIT) && ((m_vkQueueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) && ((m_vkQueueFamilyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) == 0))
 				{
 					return i;
 				}
@@ -153,9 +153,9 @@ namespace vks
 		}
 
 		// For other queue types or if no separate compute queue is present, return the first one to support the requested flags
-		for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilyProperties.size()); i++)
+		for (uint32_t i = 0; i < static_cast<uint32_t>(m_vkQueueFamilyProperties.size()); i++)
 		{
-			if ((queueFamilyProperties[i].queueFlags & queueFlags) == queueFlags)
+			if ((m_vkQueueFamilyProperties[i].queueFlags & queueFlags) == queueFlags)
 			{
 				return i;
 			}
@@ -290,16 +290,16 @@ namespace vks
 			deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 		}
 
-		this->enabledFeatures = enabledFeatures;
+		this->m_vkPhysicalDeviceFeaturesEnabled = enabledFeatures;
 
-		VkResult result = vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &logicalDevice);
+		VkResult result = vkCreateDevice(m_vkPhysicalDevice, &deviceCreateInfo, nullptr, &m_vkDevice);
 		if (result != VK_SUCCESS) 
 		{
 			return result;
 		}
 
 		// Create a default command pool for graphics command buffers
-		commandPool = createCommandPool(queueFamilyIndices.graphics);
+		m_vkCommandPool = createCommandPool(queueFamilyIndices.graphics);
 
 		return result;
 	}
@@ -321,14 +321,14 @@ namespace vks
 		// Create the buffer handle
 		VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo(usageFlags, size);
 		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		VK_CHECK_RESULT(vkCreateBuffer(logicalDevice, &bufferCreateInfo, nullptr, buffer));
+		VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, buffer));
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements memReqs;
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
-		vkGetBufferMemoryRequirements(logicalDevice, *buffer, &memReqs);
+		vkGetBufferMemoryRequirements(m_vkDevice, *buffer, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		// Find a memory type index that fits the properties of the buffer
+		// Find a memory type index that fits the m_vkPhysicalDeviceProperties of the buffer
 		memAlloc.memoryTypeIndex = getMemoryType(memReqs.memoryTypeBits, memoryPropertyFlags);
 		// If the buffer has VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT set we also need to enable the appropriate flag during allocation
 		VkMemoryAllocateFlagsInfoKHR allocFlagsInfo{};
@@ -337,13 +337,13 @@ namespace vks
 			allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
 			memAlloc.pNext = &allocFlagsInfo;
 		}
-		VK_CHECK_RESULT(vkAllocateMemory(logicalDevice, &memAlloc, nullptr, memory));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, memory));
 			
 		// If a pointer to the buffer data has been passed, map the buffer and copy over the data
 		if (data != nullptr)
 		{
 			void *mapped;
-			VK_CHECK_RESULT(vkMapMemory(logicalDevice, *memory, 0, size, 0, &mapped));
+			VK_CHECK_RESULT(vkMapMemory(m_vkDevice, *memory, 0, size, 0, &mapped));
 			memcpy(mapped, data, size);
 			// If host coherency hasn't been requested, do a manual flush to make writes visible
 			if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
@@ -352,13 +352,13 @@ namespace vks
 				mappedRange.memory = *memory;
 				mappedRange.offset = 0;
 				mappedRange.size = size;
-				vkFlushMappedMemoryRanges(logicalDevice, 1, &mappedRange);
+				vkFlushMappedMemoryRanges(m_vkDevice, 1, &mappedRange);
 			}
-			vkUnmapMemory(logicalDevice, *memory);
+			vkUnmapMemory(m_vkDevice, *memory);
 		}
 
 		// Attach the memory to the buffer object
-		VK_CHECK_RESULT(vkBindBufferMemory(logicalDevice, *buffer, *memory, 0));
+		VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, *buffer, *memory, 0));
 
 		return VK_SUCCESS;
 	}
@@ -376,18 +376,18 @@ namespace vks
 	*/
 	VkResult VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, vks::Buffer *buffer, VkDeviceSize size, void *data)
 	{
-		buffer->device = logicalDevice;
+		buffer->device = m_vkDevice;
 
 		// Create the buffer handle
 		VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo(usageFlags, size);
-		VK_CHECK_RESULT(vkCreateBuffer(logicalDevice, &bufferCreateInfo, nullptr, &buffer->buffer));
+		VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, &buffer->buffer));
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements memReqs;
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
-		vkGetBufferMemoryRequirements(logicalDevice, buffer->buffer, &memReqs);
+		vkGetBufferMemoryRequirements(m_vkDevice, buffer->buffer, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		// Find a memory type index that fits the properties of the buffer
+		// Find a memory type index that fits the m_vkPhysicalDeviceProperties of the buffer
 		memAlloc.memoryTypeIndex = getMemoryType(memReqs.memoryTypeBits, memoryPropertyFlags);
 		// If the buffer has VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT set we also need to enable the appropriate flag during allocation
 		VkMemoryAllocateFlagsInfoKHR allocFlagsInfo{};
@@ -396,7 +396,7 @@ namespace vks
 			allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
 			memAlloc.pNext = &allocFlagsInfo;
 		}
-		VK_CHECK_RESULT(vkAllocateMemory(logicalDevice, &memAlloc, nullptr, &buffer->memory));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &buffer->memory));
 
 		buffer->alignment = memReqs.alignment;
 		buffer->size = size;
@@ -468,7 +468,7 @@ namespace vks
 		cmdPoolInfo.queueFamilyIndex = queueFamilyIndex;
 		cmdPoolInfo.flags = createFlags;
 		VkCommandPool cmdPool;
-		VK_CHECK_RESULT(vkCreateCommandPool(logicalDevice, &cmdPoolInfo, nullptr, &cmdPool));
+		VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &cmdPoolInfo, nullptr, &cmdPool));
 		return cmdPool;
 	}
 
@@ -485,7 +485,7 @@ namespace vks
 	{
 		VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(pool, level, 1);
 		VkCommandBuffer cmdBuffer;
-		VK_CHECK_RESULT(vkAllocateCommandBuffers(logicalDevice, &cmdBufAllocateInfo, &cmdBuffer));
+		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, &cmdBuffer));
 		// If requested, also start recording for the new command buffer
 		if (begin)
 		{
@@ -497,7 +497,7 @@ namespace vks
 			
 	VkCommandBuffer VulkanDevice::createCommandBuffer(VkCommandBufferLevel level, bool begin)
 	{
-		return createCommandBuffer(level, commandPool, begin);
+		return createCommandBuffer(level, m_vkCommandPool, begin);
 	}
 
 	/**
@@ -526,21 +526,21 @@ namespace vks
 		// Create fence to ensure that the command buffer has finished executing
 		VkFenceCreateInfo fenceInfo = vks::initializers::fenceCreateInfo(VK_FLAGS_NONE);
 		VkFence fence;
-		VK_CHECK_RESULT(vkCreateFence(logicalDevice, &fenceInfo, nullptr, &fence));
+		VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceInfo, nullptr, &fence));
 		// Submit to the queue
 		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
 		// Wait for the fence to signal that command buffer has finished executing
-		VK_CHECK_RESULT(vkWaitForFences(logicalDevice, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
-		vkDestroyFence(logicalDevice, fence, nullptr);
+		VK_CHECK_RESULT(vkWaitForFences(m_vkDevice, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
+		vkDestroyFence(m_vkDevice, fence, nullptr);
 		if (free)
 		{
-			vkFreeCommandBuffers(logicalDevice, pool, 1, &commandBuffer);
+			vkFreeCommandBuffers(m_vkDevice, pool, 1, &commandBuffer);
 		}
 	}
 
 	void VulkanDevice::flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, bool free)
 	{
-		return flushCommandBuffer(commandBuffer, queue, commandPool, free);
+		return flushCommandBuffer(commandBuffer, queue, m_vkCommandPool, free);
 	}
 
 	/**
@@ -552,7 +552,7 @@ namespace vks
 	*/
 	bool VulkanDevice::extensionSupported(std::string extension)
 	{
-		return (std::find(supportedExtensions.begin(), supportedExtensions.end(), extension) != supportedExtensions.end());
+		return (std::find(m_supportedExtensions.begin(), m_supportedExtensions.end(), extension) != m_supportedExtensions.end());
 	}
 
 	/**
@@ -571,7 +571,7 @@ namespace vks
 		for (auto& format : depthFormats)
 		{
 			VkFormatProperties formatProperties;
-			vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
+			vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, format, &formatProperties);
 			// Format must support depth stencil attachment for optimal tiling
 			if (formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
 			{

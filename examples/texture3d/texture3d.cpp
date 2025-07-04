@@ -141,7 +141,7 @@ public:
 
 	vks::Buffer vertexBuffer;
 	vks::Buffer indexBuffer;
-	uint32_t indexCount{ 0 };
+	uint32_t m_indexCount{ 0 };
 
 	struct UniformData {
 		glm::mat4 projection;
@@ -153,8 +153,8 @@ public:
 	} uniformData;
 	vks::Buffer uniformBuffer;
 
-	VkPipeline pipeline{ VK_NULL_HANDLE };
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
@@ -172,8 +172,8 @@ public:
 	{
             if (m_vkDevice) {
 			destroyTextureImage(texture);
-                vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-                        vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+                vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+                        vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
                 vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			vertexBuffer.destroy();
 			indexBuffer.destroy();
@@ -195,7 +195,7 @@ public:
 		// Format support check
 		// 3D texture support in Vulkan is mandatory (in contrast to OpenGL) so no need to check if it's supported
 		VkFormatProperties formatProperties;
-		vkGetPhysicalDeviceFormatProperties(physicalDevice, texture.format, &formatProperties);
+		vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, texture.format, &formatProperties);
 		// Check if format supports transfer
 		if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT))
 		{
@@ -203,7 +203,7 @@ public:
 			return;
 		}
 		// Check if GPU supports requested 3D texture dimensions
-		uint32_t maxImageDimension3D(vulkanDevice->properties.limits.maxImageDimension3D);
+		uint32_t maxImageDimension3D(vulkanDevice->m_vkPhysicalDeviceProperties.limits.maxImageDimension3D);
 		if (width > maxImageDimension3D || height > maxImageDimension3D || depth > maxImageDimension3D)
 		{
 			std::cout << "Error: Requested texture dimensions is greater than supported 3D texture dimension!" << std::endl;
@@ -439,13 +439,13 @@ public:
 			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			VkDeviceSize offsets[1] = { 0 };
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.buffer, offsets);
 			vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, 1, 0, 0, 0);
 
 			drawUI(drawCmdBuffers[i]);
 
@@ -470,7 +470,7 @@ public:
 
 		// Setup indices
 		std::vector<uint32_t> indices = { 0,1,2, 2,3,0 };
-		indexCount = static_cast<uint32_t>(indices.size());
+		m_indexCount = static_cast<uint32_t>(indices.size());
 
 		// Create buffers and upload data to the GPU
 		struct StagingBuffers {
@@ -539,7 +539,7 @@ public:
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -572,7 +572,7 @@ public:
 		vertexInputState.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributes.size());
 		vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		pipelineCreateInfo.pVertexInputState = &vertexInputState;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;
@@ -583,7 +583,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms

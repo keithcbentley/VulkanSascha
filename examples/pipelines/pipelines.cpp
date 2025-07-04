@@ -23,7 +23,7 @@ public:
 	} uniformData;
 	vks::Buffer uniformBuffer;
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
@@ -53,14 +53,14 @@ public:
 			}
 			vkDestroyPipeline(m_vkDevice, pipelines.toon, nullptr);
 
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 
 			uniformBuffer.destroy();
 		}
 	}
 
-	// Enable physical m_vkDevice features required for this example
+	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Fill mode non solid is required for wireframe display
@@ -105,7 +105,7 @@ public:
 			VkRect2D scissor = vks::initializers::rect2D(width, height,	0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			scene.bindBuffers(drawCmdBuffers[i]);
 
 			// Left : Render the scene using the solid colored pipeline with phong shading
@@ -179,7 +179,7 @@ public:
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipelines
 		
@@ -195,7 +195,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;

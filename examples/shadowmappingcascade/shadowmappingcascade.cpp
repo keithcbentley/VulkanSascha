@@ -66,7 +66,7 @@ public:
 		int32_t colorCascades;
 	} uboFS;
 
-	VkPipelineLayout pipelineLayout;
+	VkPipelineLayout m_vkPipelineLayout;
 	struct Pipelines {
 		VkPipeline debugShadowMap;
 		VkPipeline sceneShadow;
@@ -144,7 +144,7 @@ public:
 		vkDestroyPipeline(m_vkDevice, pipelines.sceneShadow, nullptr);
 		vkDestroyPipeline(m_vkDevice, pipelines.sceneShadowPCF, nullptr);
 
-		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 		vkDestroyPipelineLayout(m_vkDevice, depthPass.pipelineLayout, nullptr);
 
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
@@ -407,17 +407,17 @@ public:
 
 				// Visualize shadow map cascade
 				if (displayDepthMap) {
-					vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+					vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 					vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.debugShadowMap);
 					PushConstBlock pushConstBlock = {};
 					pushConstBlock.cascadeIndex = displayDepthMapCascadeIndex;
-					vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
+					vkCmdPushConstants(drawCmdBuffers[i], m_vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
 					vkCmdDraw(drawCmdBuffers[i], 3, 1, 0, 0);
 				}
 
 				// Render shadowed scene
 				vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, (filterPCF) ? pipelines.sceneShadowPCF : pipelines.sceneShadow);
-				renderScene(drawCmdBuffers[i], pipelineLayout);
+				renderScene(drawCmdBuffers[i], m_vkPipelineLayout);
 
 				drawUI(drawCmdBuffers[i]);
 
@@ -493,7 +493,7 @@ public:
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 		}
 
 		// Depth pass pipeline layout
@@ -520,7 +520,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;

@@ -57,7 +57,7 @@ public:
 	} indices;
 
 	// The following structures roughly represent the glTF scene structure
-	// To keep things simple, they only contain those properties that are required for this sample
+	// To keep things simple, they only contain those m_vkPhysicalDeviceProperties that are required for this sample
 	struct Node;
 
 	// A primitive contains the data for a single draw call
@@ -146,7 +146,7 @@ public:
 		} values;
 	} shaderData;
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 
 	struct DescriptorSetLayouts {

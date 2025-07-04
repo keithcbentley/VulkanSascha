@@ -1,5 +1,5 @@
 /*
-* Vulkan Example - Retrieving pipeline statistics
+* Vulkan Example - Retrieving m_vkPipeline statistics
 *
 * Copyright (C) 2017-2024 by Sascha Willems - www.saschawillems.de
 *
@@ -34,14 +34,14 @@ public:
 	bool wireframe{ false };
 	bool tessellation{ false };
 
-	VkPipeline pipeline{ VK_NULL_HANDLE };
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
 	VkQueryPool queryPool{ VK_NULL_HANDLE };
 
-	// Vector for storing pipeline statistics results
+	// Vector for storing m_vkPipeline statistics results
 	std::vector<uint64_t> pipelineStats{};
 	std::vector<std::string> pipelineStatNames{};
 
@@ -59,8 +59,8 @@ public:
 	~VulkanExample()
 	{
 		if (m_vkDevice) {
-			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			vkDestroyQueryPool(m_vkDevice, queryPool, nullptr);
 			uniformBuffer.destroy();
@@ -69,12 +69,12 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		// Support for pipeline statistics is optional
+		// Support for m_vkPipeline statistics is optional
 		if (deviceFeatures.pipelineStatisticsQuery) {
 			enabledFeatures.pipelineStatisticsQuery = VK_TRUE;
 		}
 		else {
-			vks::tools::exitFatal("Selected GPU does not support pipeline statistics!", VK_ERROR_FEATURE_NOT_PRESENT);
+			vks::tools::exitFatal("Selected GPU does not support m_vkPipeline statistics!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
 		if (deviceFeatures.fillModeNonSolid) {
 			enabledFeatures.fillModeNonSolid = VK_TRUE;
@@ -84,7 +84,7 @@ public:
 		}
 	}
 
-	// Setup a query pool for storing pipeline statistics
+	// Setup a query pool for storing m_vkPipeline statistics
 	void setupQueryPool()
 	{
 		pipelineStatNames = {
@@ -103,7 +103,7 @@ public:
 
 		VkQueryPoolCreateInfo queryPoolInfo = {};
 		queryPoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-		// This query pool will store pipeline statistics
+		// This query pool will store m_vkPipeline statistics
 		queryPoolInfo.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS;
 		// Pipeline counters to be returned for this pool
 		queryPoolInfo.pipelineStatistics =
@@ -122,7 +122,7 @@ public:
 		VK_CHECK_RESULT(vkCreateQueryPool(m_vkDevice, &queryPoolInfo, NULL, &queryPool));
 	}
 
-	// Retrieves the results of the pipeline statistics query submitted to the command buffer
+	// Retrieves the results of the m_vkPipeline statistics query submitted to the command buffer
 	void getQueryResults()
 	{
 		// The size of the data we want to fetch ist based on the count of statistics values
@@ -176,23 +176,23 @@ public:
 
 			VkDeviceSize offsets[1] = { 0 };
 
-			// Start capture of pipeline statistics
+			// Start capture of m_vkPipeline statistics
 			vkCmdBeginQuery(drawCmdBuffers[i], queryPool, 0, 0);
 
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &models.objects[models.objectIndex].vertices.buffer, offsets);
 			vkCmdBindIndexBuffer(drawCmdBuffers[i], models.objects[models.objectIndex].indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
 			for (int32_t y = 0; y < gridSize; y++) {
 				for (int32_t x = 0; x < gridSize; x++) {
 					glm::vec3 pos = glm::vec3(float(x - (gridSize / 2.0f)) * 2.5f, 0.0f, float(y - (gridSize / 2.0f)) * 2.5f);
-					vkCmdPushConstants(drawCmdBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3), &pos);
+					vkCmdPushConstants(drawCmdBuffers[i], m_vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::vec3), &pos);
 					models.objects[models.objectIndex].draw(drawCmdBuffers[i]);
 				}
 			}
 
-			// End capture of pipeline statistics
+			// End capture of m_vkPipeline statistics
 			vkCmdEndQuery(drawCmdBuffers[i], queryPool, 0);
 
 			drawUI(drawCmdBuffers[i]);
@@ -242,18 +242,18 @@ public:
 	void preparePipelines()
 	{
 		// Layout
-		if (pipelineLayout == VK_NULL_HANDLE) {
+		if (m_vkPipelineLayout == VK_NULL_HANDLE) {
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
 			VkPushConstantRange pushConstantRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::vec3), 0);
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 		}
 
 		// Pipeline
-		if (pipeline != VK_NULL_HANDLE) {
-			// Destroy old pipeline if we're going to recreate it
-			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+		if (m_vkPipeline != VK_NULL_HANDLE) {
+			// Destroy old m_vkPipeline if we're going to recreate it
+			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
 		}
 
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -267,7 +267,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), static_cast<uint32_t>(dynamicStateEnables.size()), 0);
 		VkPipelineTessellationStateCreateInfo tessellationState = vks::initializers::pipelineTessellationStateCreateInfo(3);
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -300,7 +300,7 @@ public:
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages{};
 		shaderStages.push_back(loadShader(getShadersPath() + "pipelinestatistics/scene.vert.spv", VK_SHADER_STAGE_VERTEX_BIT));
 		if (!discard) {
-			// When discard is enabled a pipeline must not contain a fragment shader
+			// When discard is enabled a m_vkPipeline must not contain a fragment shader
 			shaderStages.push_back(loadShader(getShadersPath() + "pipelinestatistics/scene.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT));
 		}
 
@@ -313,7 +313,7 @@ public:
 
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -380,7 +380,7 @@ public:
 			recreatePipeline |= overlay->comboBox("Cull mode", &cullMode, cullModeNames);
 			recreatePipeline |= overlay->checkBox("Blending", &blending);
 			recreatePipeline |= overlay->checkBox("Discard", &discard);
-			// These features may not be supported by all implementations
+			// These m_vkPhysicalDeviceFeatures may not be supported by all implementations
 			if (deviceFeatures.fillModeNonSolid) {
 				recreatePipeline |= overlay->checkBox("Wireframe", &wireframe);
 			}

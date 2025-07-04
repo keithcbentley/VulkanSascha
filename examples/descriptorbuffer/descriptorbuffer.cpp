@@ -27,8 +27,8 @@ public:
 
 	vkglTF::Model model;
 
-	VkPipeline pipeline;
-	VkPipelineLayout pipelineLayout;
+	VkPipeline m_vkPipeline;
+	VkPipelineLayout m_vkPipelineLayout;
 
 	PFN_vkGetBufferDeviceAddressKHR vkGetBufferDeviceAddressKHR;
 
@@ -59,7 +59,7 @@ public:
 		VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
 		bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
 		bufferDeviceAI.buffer = buffer;
-		return vkGetBufferDeviceAddressKHR(vulkanDevice->logicalDevice, &bufferDeviceAI);
+		return vkGetBufferDeviceAddressKHR(vulkanDevice->m_vkDevice, &bufferDeviceAI);
 	}
 
 	VulkanExample() : VulkanExampleBase()
@@ -95,8 +95,8 @@ public:
 	{
 		vkDestroyDescriptorSetLayout(m_vkDevice, uniformDescriptor.setLayout, nullptr);
 		vkDestroyDescriptorSetLayout(m_vkDevice, combinedImageDescriptor.setLayout, nullptr);
-		vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 		for (auto& cube : cubes) {
 			cube.uniformBuffer.destroy();
 			cube.texture.destroy();
@@ -148,10 +148,10 @@ public:
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCI{};
 		pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		// The pipeline layout is based on the descriptor set layout we created above
+		// The m_vkPipeline layout is based on the descriptor set layout we created above
 		pipelineLayoutCI.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
 		pipelineLayoutCI.pSetLayouts = setLayouts.data();
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 		const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
@@ -168,7 +168,7 @@ public:
 			loadShader(getShadersPath() + "descriptorbuffer/cube.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
 		};
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 		pipelineCI.pRasterizationState = &rasterizationStateCI;
 		pipelineCI.pColorBlendState = &colorBlendStateCI;
@@ -180,21 +180,21 @@ public:
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color });
 		pipelineCI.flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	void prepareDescriptorBuffer()
 	{
 		// We need to get sizes and offsets for the descriptor layouts
 
-		// This is done using a new extension structures and features
-		PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR"));
+		// This is done using a new extension structures and m_vkPhysicalDeviceFeatures
+		PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(vkGetInstanceProcAddr(m_vulkanInstance, "vkGetPhysicalDeviceProperties2KHR"));
 		assert(vkGetPhysicalDeviceProperties2KHR);
 		VkPhysicalDeviceProperties2KHR deviceProps2{};
 		descriptorBufferProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT;
 		deviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
 		deviceProps2.pNext = &descriptorBufferProperties;
-		vkGetPhysicalDeviceProperties2KHR(physicalDevice, &deviceProps2);
+		vkGetPhysicalDeviceProperties2KHR(m_vkPhysicalDevice, &deviceProps2);
 
 		// Some devices have very low limits for the no. of max descriptor buffer bindings, so we need to check
 		if (descriptorBufferProperties.maxResourceDescriptorBufferBindings < 2) {
@@ -293,7 +293,7 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
@@ -322,18 +322,18 @@ public:
 
 			// Global Matrices (set 0)
 			bufferOffset = 0;
-			vkCmdSetDescriptorBufferOffsetsEXT(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &bufferIndexUbo, &bufferOffset);
+			vkCmdSetDescriptorBufferOffsetsEXT(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &bufferIndexUbo, &bufferOffset);
 
 			// Set and offset into descriptor for each model
 			for (uint32_t j = 0; j < static_cast<uint32_t>(cubes.size()); j++) {
 				// Uniform buffer (set 1)
 				// Model ubos start at offset * 1 (slot 0 is global matrices)
 				bufferOffset = (j + 1) * uniformDescriptor.layoutSize;
-				vkCmdSetDescriptorBufferOffsetsEXT(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &bufferIndexUbo, &bufferOffset);
+				vkCmdSetDescriptorBufferOffsetsEXT(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 1, 1, &bufferIndexUbo, &bufferOffset);
 				// Image (set 2)
 				uint32_t bufferIndexImage = 1;
 				bufferOffset = j * combinedImageDescriptor.layoutSize;
-				vkCmdSetDescriptorBufferOffsetsEXT(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2, 1, &bufferIndexImage, &bufferOffset);
+				vkCmdSetDescriptorBufferOffsetsEXT(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 2, 1, &bufferIndexImage, &bufferOffset);
 				model.draw(drawCmdBuffers[i]);
 			}
 

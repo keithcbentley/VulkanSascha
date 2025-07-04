@@ -27,7 +27,7 @@ VulkanExample::~VulkanExample()
 {
 	vkDestroyPipeline(m_vkDevice, pipelines.masked, nullptr);
 	vkDestroyPipeline(m_vkDevice, pipelines.opaque, nullptr);
-	vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+	vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 	vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 	vkDestroyImageView(m_vkDevice, shadingRateImage.view, nullptr);
 	vkDestroyImage(m_vkDevice, shadingRateImage.image, nullptr);
@@ -100,9 +100,9 @@ void VulkanExample::setupFrameBuffer()
 
 void VulkanExample::setupRenderPass()
 {
-	// Note that we need to use ...2KHR types in here, as fragment shading rate requires additional properties and structs to be passed at renderpass creation
+	// Note that we need to use ...2KHR types in here, as fragment shading rate requires additional m_vkPhysicalDeviceProperties and structs to be passed at renderpass creation
 	if (!vkCreateRenderPass2KHR) {
-		vkCreateRenderPass2KHR = reinterpret_cast<PFN_vkCreateRenderPass2KHR>(vkGetInstanceProcAddr(instance, "vkCreateRenderPass2KHR"));
+		vkCreateRenderPass2KHR = reinterpret_cast<PFN_vkCreateRenderPass2KHR>(vkGetInstanceProcAddr(m_vulkanInstance, "vkCreateRenderPass2KHR"));
 	}
 
 	if (shadingRateImage.image == VK_NULL_HANDLE) {
@@ -245,7 +245,7 @@ void VulkanExample::buildCommandBuffers()
 		vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 		vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
-		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 		// Set the fragment shading rate state for the current pipeline
 		VkExtent2D fragmentSize = { 1, 1 };
@@ -269,9 +269,9 @@ void VulkanExample::buildCommandBuffers()
 
 		// Render the scene
 		vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.opaque);
-		scene.draw(drawCmdBuffers[i], vkglTF::RenderFlags::BindImages | vkglTF::RenderFlags::RenderOpaqueNodes, pipelineLayout);
+		scene.draw(drawCmdBuffers[i], vkglTF::RenderFlags::BindImages | vkglTF::RenderFlags::RenderOpaqueNodes, m_vkPipelineLayout);
 		vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.masked);
-		scene.draw(drawCmdBuffers[i], vkglTF::RenderFlags::BindImages | vkglTF::RenderFlags::RenderAlphaMaskedNodes, pipelineLayout);
+		scene.draw(drawCmdBuffers[i], vkglTF::RenderFlags::BindImages | vkglTF::RenderFlags::RenderAlphaMaskedNodes, m_vkPipelineLayout);
 
 		drawUI(drawCmdBuffers[i]);
 		vkCmdEndRenderPass(drawCmdBuffers[i]);
@@ -307,7 +307,7 @@ void VulkanExample::setupDescriptors()
 		vkglTF::descriptorSetLayoutImage,
 	};
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), 2);
-	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 	// Descriptor set
 	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
@@ -323,20 +323,20 @@ void VulkanExample::prepareShadingRateImage()
 {
 	// As this is an extension, we need to manually load the extension pointers
 	if (!vkGetPhysicalDeviceFragmentShadingRatesKHR) {
-		vkGetPhysicalDeviceFragmentShadingRatesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceFragmentShadingRatesKHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFragmentShadingRatesKHR"));
+		vkGetPhysicalDeviceFragmentShadingRatesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceFragmentShadingRatesKHR>(vkGetInstanceProcAddr(m_vulkanInstance, "vkGetPhysicalDeviceFragmentShadingRatesKHR"));
 	}
 
-	// Get properties of this extensions, which also contains texel sizes required to setup the image
+	// Get m_vkPhysicalDeviceProperties of this extensions, which also contains texel sizes required to setup the image
 	physicalDeviceShadingRateImageProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_PROPERTIES_KHR;
 	VkPhysicalDeviceProperties2 deviceProperties2{};
 	deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 	deviceProperties2.pNext = &physicalDeviceShadingRateImageProperties;
-	vkGetPhysicalDeviceProperties2(physicalDevice, &deviceProperties2);
+	vkGetPhysicalDeviceProperties2(m_vkPhysicalDevice, &deviceProperties2);
 
 	// We need to check if the requested format for the shading rate attachment supports the required flag
 	const VkFormat imageFormat = VK_FORMAT_R8_UINT;
 	VkFormatProperties formatProperties;
-	vkGetPhysicalDeviceFormatProperties(physicalDevice, imageFormat, &formatProperties);
+	vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, imageFormat, &formatProperties);
 	if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR))
 	{
 		throw std::runtime_error("Selected shading rate attachment image format does not fragment shading rate");
@@ -399,14 +399,14 @@ void VulkanExample::prepareShadingRateImage()
 	// Get a list of available shading rate patterns
 	std::vector<VkPhysicalDeviceFragmentShadingRateKHR> fragmentShadingRates{};
 	uint32_t fragmentShadingRatesCount = 0;
-	vkGetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice, &fragmentShadingRatesCount, nullptr);
+	vkGetPhysicalDeviceFragmentShadingRatesKHR(m_vkPhysicalDevice, &fragmentShadingRatesCount, nullptr);
 	if (fragmentShadingRatesCount > 0) {
 		fragmentShadingRates.resize(fragmentShadingRatesCount);
 		for (VkPhysicalDeviceFragmentShadingRateKHR& fragmentShadingRate : fragmentShadingRates) {
 			// In addition to the value, we also need to set the sType for each rate to comply with the spec or else the call to vkGetPhysicalDeviceFragmentShadingRatesKHR will result in undefined behaviour
 			fragmentShadingRate.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR;
 		}
-		vkGetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice, &fragmentShadingRatesCount, fragmentShadingRates.data());
+		vkGetPhysicalDeviceFragmentShadingRatesKHR(m_vkPhysicalDevice, &fragmentShadingRatesCount, fragmentShadingRates.data());
 	}
 	// Create a circular pattern from the available list of fragment shading rates with decreasing sampling rates outwards (max. range, pattern)
 	// Shading rates returned by vkGetPhysicalDeviceFragmentShadingRatesKHR are ordered from largest to smallest
@@ -517,7 +517,7 @@ void VulkanExample::preparePipelines()
 	VkPipelineDynamicStateCreateInfo dynamicStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), static_cast<uint32_t>(dynamicStateEnables.size()), 0);
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 	pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 	pipelineCI.pRasterizationState = &rasterizationStateCI;
 	pipelineCI.pColorBlendState = &colorBlendStateCI;

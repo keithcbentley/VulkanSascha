@@ -162,8 +162,8 @@ VulkanExample::~VulkanExample()
 	// Note : Inherited destructor cleans up resources stored in base class
 	destroyTextureImage(texture);
 	vkDestroySemaphore(m_vkDevice, bindSparseSemaphore, nullptr);
-	vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-	vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+	vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+	vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 	vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 	uniformBuffer.destroy();
 }
@@ -191,7 +191,7 @@ glm::uvec3 VulkanExample::alignedDivision(const VkExtent3D& extent, const VkExte
 
 void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32_t layerCount, VkFormat format)
 {
-	texture.device = vulkanDevice->logicalDevice;
+	texture.device = vulkanDevice->m_vkDevice;
 	texture.width = width;
 	texture.height = height;
 	texture.mipLevels = static_cast<uint32_t>(floor(log2(std::max(width, height))) + 1);
@@ -199,32 +199,32 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	texture.format = format;
 
 	texture.subRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, texture.mipLevels, 0, 1 };
-	// Get m_vkDevice properties for the requested texture format
+	// Get m_vkDevice m_vkPhysicalDeviceProperties for the requested texture format
 	VkFormatProperties formatProperties;
-	vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
+	vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, format, &formatProperties);
 
 	const VkImageType imageType = VK_IMAGE_TYPE_2D;
 	const VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
 	const VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	const VkImageTiling imageTiling = VK_IMAGE_TILING_OPTIMAL;
 
-	// Get sparse image properties
+	// Get sparse image m_vkPhysicalDeviceProperties
 	std::vector<VkSparseImageFormatProperties> sparseProperties;
-	// Sparse properties count for the desired format
+	// Sparse m_vkPhysicalDeviceProperties count for the desired format
 	uint32_t sparsePropertiesCount;
-	vkGetPhysicalDeviceSparseImageFormatProperties(physicalDevice, format, imageType, sampleCount, imageUsage, imageTiling, &sparsePropertiesCount, nullptr);
+	vkGetPhysicalDeviceSparseImageFormatProperties(m_vkPhysicalDevice, format, imageType, sampleCount, imageUsage, imageTiling, &sparsePropertiesCount, nullptr);
 	// Check if sparse is supported for this format
 	if (sparsePropertiesCount == 0)
 	{
-		std::cout << "Error: Requested format does not support sparse features!" << std::endl;
+		std::cout << "Error: Requested format does not support sparse m_vkPhysicalDeviceFeatures!" << std::endl;
 		return;
 	}
 
-	// Get actual image format properties
+	// Get actual image format m_vkPhysicalDeviceProperties
 	sparseProperties.resize(sparsePropertiesCount);
-	vkGetPhysicalDeviceSparseImageFormatProperties(physicalDevice, format, imageType, sampleCount, imageUsage, imageTiling, &sparsePropertiesCount, sparseProperties.data());
+	vkGetPhysicalDeviceSparseImageFormatProperties(m_vkPhysicalDevice, format, imageType, sampleCount, imageUsage, imageTiling, &sparsePropertiesCount, sparseProperties.data());
 
-	std::cout << "Sparse image format properties: " << sparsePropertiesCount << std::endl;
+	std::cout << "Sparse image format m_vkPhysicalDeviceProperties: " << sparsePropertiesCount << std::endl;
 	for (auto props : sparseProperties)
 	{
 		std::cout << "\t Image granularity: w = " << props.imageGranularity.width << " h = " << props.imageGranularity.height << " d = " << props.imageGranularity.depth << std::endl;
@@ -261,7 +261,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	std::cout << "\t Alignment: " << sparseImageMemoryReqs.alignment << std::endl;
 
 	// Check requested image size against hardware sparse limit
-	if (sparseImageMemoryReqs.size > vulkanDevice->properties.limits.sparseAddressSpaceSize)
+	if (sparseImageMemoryReqs.size > vulkanDevice->m_vkPhysicalDeviceProperties.limits.sparseAddressSpaceSize)
 	{
 		std::cout << "Error: Requested sparse image size exceeds supports sparse address space size!" << std::endl;
 		return;
@@ -448,7 +448,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	sampler.compareOp = VK_COMPARE_OP_NEVER;
 	sampler.minLod = 0.0f;
 	sampler.maxLod = static_cast<float>(texture.mipLevels);
-	sampler.maxAnisotropy = vulkanDevice->features.samplerAnisotropy ? vulkanDevice->properties.limits.maxSamplerAnisotropy : 1.0f;
+	sampler.maxAnisotropy = vulkanDevice->m_vkPhysicalDeviceFeatures.samplerAnisotropy ? vulkanDevice->m_vkPhysicalDeviceProperties.limits.maxSamplerAnisotropy : 1.0f;
 	sampler.anisotropyEnable = false;
 	sampler.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 	VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &texture.sampler));
@@ -512,8 +512,8 @@ void VulkanExample::buildCommandBuffers()
 		VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
 		vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-		vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+		vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 		plane.draw(drawCmdBuffers[i]);
 
 		drawUI(drawCmdBuffers[i]);
@@ -573,7 +573,7 @@ void VulkanExample::preparePipelines()
 {
 	// Layout
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 	// Pipeline
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -587,7 +587,7 @@ void VulkanExample::preparePipelines()
 	VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo( pipelineLayout, renderPass);
+	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo( m_vkPipelineLayout, renderPass);
 	pipelineCI.pInputAssemblyState = &inputAssemblyState;
 	pipelineCI.pRasterizationState = &rasterizationState;
 	pipelineCI.pColorBlendState = &colorBlendState;
@@ -601,7 +601,7 @@ void VulkanExample::preparePipelines()
 
 	shaderStages[0] = loadShader(getShadersPath() + "texturesparseresidency/sparseresidency.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 	shaderStages[1] = loadShader(getShadersPath() + "texturesparseresidency/sparseresidency.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 }
 
 // Prepare and initialize uniform buffer containing shader uniforms
@@ -627,7 +627,7 @@ void VulkanExample::prepare()
 {
 	VulkanExampleBase::prepare();
 	// Check if the GPU supports sparse residency for 2D images
-	if (!vulkanDevice->features.sparseResidencyImage2D) {
+	if (!vulkanDevice->m_vkPhysicalDeviceFeatures.sparseResidencyImage2D) {
 		vks::tools::exitFatal("Device does not support sparse residency for 2D images!", VK_ERROR_FEATURE_NOT_PRESENT);
 	}
 	loadAssets();

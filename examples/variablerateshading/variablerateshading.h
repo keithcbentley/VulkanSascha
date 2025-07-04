@@ -40,7 +40,7 @@ public:
 		VkPipeline masked;
 	} pipelines;
 
-	VkPipelineLayout pipelineLayout;
+	VkPipelineLayout m_vkPipelineLayout;
 	VkDescriptorSet descriptorSet;
 	VkDescriptorSetLayout descriptorSetLayout;
 

@@ -22,23 +22,23 @@ namespace vks
 struct VulkanDevice
 {
 	/** @brief Physical device representation */
-	VkPhysicalDevice physicalDevice;
+	VkPhysicalDevice m_vkPhysicalDevice;
 	/** @brief Logical device representation (application's view of the device) */
-	VkDevice logicalDevice;
+	VkDevice m_vkDevice;
 	/** @brief Properties of the physical device including limits that the application can check against */
-	VkPhysicalDeviceProperties properties;
+	VkPhysicalDeviceProperties m_vkPhysicalDeviceProperties;
 	/** @brief Features of the physical device that an application can use to check if a feature is supported */
-	VkPhysicalDeviceFeatures features;
+	VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures;
 	/** @brief Features that have been enabled for use on the physical device */
-	VkPhysicalDeviceFeatures enabledFeatures;
+	VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeaturesEnabled;
 	/** @brief Memory types and heaps of the physical device */
-	VkPhysicalDeviceMemoryProperties memoryProperties;
+	VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties;
 	/** @brief Queue family properties of the physical device */
-	std::vector<VkQueueFamilyProperties> queueFamilyProperties;
+	std::vector<VkQueueFamilyProperties> m_vkQueueFamilyProperties;
 	/** @brief List of extensions supported by the device */
-	std::vector<std::string> supportedExtensions;
+	std::vector<std::string> m_supportedExtensions;
 	/** @brief Default command pool for the graphics queue family index */
-	VkCommandPool commandPool = VK_NULL_HANDLE;
+	VkCommandPool m_vkCommandPool = VK_NULL_HANDLE;
 	/** @brief Contains queue family indices */
 	struct
 	{
@@ -46,12 +46,17 @@ struct VulkanDevice
 		uint32_t compute;
 		uint32_t transfer;
 	} queueFamilyIndices;
-	operator VkDevice() const
-	{
-		return logicalDevice;
-	};
+	operator VkDevice() const	{
+		return m_vkDevice;
+	}
 	explicit VulkanDevice(VkPhysicalDevice physicalDevice);
+
 	~VulkanDevice();
+	VulkanDevice(const VulkanDevice&) = delete;
+    VulkanDevice& operator=(const VulkanDevice&) = delete;
+    VulkanDevice(VulkanDevice&&) = delete;
+    VulkanDevice& operator=(VulkanDevice&&) = delete;
+
 	uint32_t        getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32 *memTypeFound = nullptr) const;
 	uint32_t        getQueueFamilyIndex(VkQueueFlags queueFlags) const;
 	VkResult        createLogicalDevice(VkPhysicalDeviceFeatures enabledFeatures, std::vector<const char *> enabledExtensions, void *pNextChain, bool useSwapChain = true, VkQueueFlags requestedQueueTypes = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);

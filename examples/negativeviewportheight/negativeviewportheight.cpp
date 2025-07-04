@@ -20,8 +20,8 @@ public:
 	int32_t cullMode = (int32_t)VK_CULL_MODE_BACK_BIT;
 	int32_t quadType = 0;
 
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipeline = VK_NULL_HANDLE;
+	VkPipelineLayout m_vkPipelineLayout;
+	VkPipeline m_vkPipeline = VK_NULL_HANDLE;
 	VkDescriptorSetLayout descriptorSetLayout;
 	struct DescriptorSets {
 		VkDescriptorSet CW;
@@ -57,8 +57,8 @@ public:
 
 	~VulkanExample()
 	{
-		vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 		textures.CW.destroy();
 		textures.CCW.destroy();
@@ -89,7 +89,7 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			// [POI] Viewport setup
 			VkViewport viewport{};
@@ -116,14 +116,14 @@ public:
 
 			VkDeviceSize offsets[1] = { 0 };
 
-			// Render the quad with clock wise and counter clock wise indices, visibility is determined by pipeline settings
+			// Render the quad with clock wise and counter clock wise indices, visibility is determined by m_vkPipeline settings
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets.CW, 0, nullptr);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSets.CW, 0, nullptr);
 			vkCmdBindIndexBuffer(drawCmdBuffers[i], quad.indicesCW.buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, quadType == 0 ? &quad.verticesYDown.buffer : &quad.verticesYUp.buffer, offsets);
 			vkCmdDrawIndexed(drawCmdBuffers[i], 6, 1, 0, 0, 0);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets.CCW, 0, nullptr);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSets.CCW, 0, nullptr);
 			vkCmdBindIndexBuffer(drawCmdBuffers[i], quad.indicesCCW.buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(drawCmdBuffers[i], 6, 1, 0, 0, 0);
 
@@ -185,7 +185,7 @@ public:
 		VkDescriptorSetLayoutCreateInfo descriptorLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayout));
 		VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 		VkDescriptorPoolSize poolSize = vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2);
 		VkDescriptorPoolCreateInfo descriptorPoolCI = vks::initializers::descriptorPoolCreateInfo(1, &poolSize, 2);
@@ -205,8 +205,8 @@ public:
 
 	void preparePipelines()
 	{
-		if (pipeline != VK_NULL_HANDLE) {
-			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+		if (m_vkPipeline != VK_NULL_HANDLE) {
+			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
 		}
 
 		const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
@@ -240,7 +240,7 @@ public:
 		vertexInputState.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributes.size());
 		vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfoCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfoCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		//pipelineCreateInfoCI.pVertexInputState = &emptyInputState;
 		pipelineCreateInfoCI.pVertexInputState = &vertexInputState;
 		pipelineCreateInfoCI.pInputAssemblyState = &inputAssemblyStateCI;
@@ -259,7 +259,7 @@ public:
 		pipelineCreateInfoCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfoCI.pStages = shaderStages.data();
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfoCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfoCI, nullptr, &m_vkPipeline));
 	}
 
 	void draw()

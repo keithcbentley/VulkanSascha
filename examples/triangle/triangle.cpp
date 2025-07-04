@@ -84,19 +84,19 @@ public:
 		glm::mat4 viewMatrix;
 	};
 
-	// The pipeline layout is used by a pipeline to access the descriptor sets
-	// It defines interface (without binding any actual data) between the shader stages used by the pipeline and the shader resources
-	// A pipeline layout can be shared among multiple pipelines as long as their interfaces match
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	// The m_vkPipeline layout is used by a m_vkPipeline to access the descriptor sets
+	// It defines interface (without binding any actual data) between the shader stages used by the m_vkPipeline and the shader resources
+	// A m_vkPipeline layout can be shared among multiple pipelines as long as their interfaces match
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 
-	// Pipelines (often called "pipeline state objects") are used to bake all states that affect a pipeline
-	// While in OpenGL every state can be changed at (almost) any time, Vulkan requires to layout the graphics (and compute) pipeline states upfront
-	// So for each combination of non-dynamic pipeline states you need a new pipeline (there are a few exceptions to this not discussed here)
+	// Pipelines (often called "m_vkPipeline state objects") are used to bake all states that affect a m_vkPipeline
+	// While in OpenGL every state can be changed at (almost) any time, Vulkan requires to layout the graphics (and compute) m_vkPipeline states upfront
+	// So for each combination of non-dynamic m_vkPipeline states you need a new m_vkPipeline (there are a few exceptions to this not discussed here)
 	// Even though this adds a new dimension of planning ahead, it's a great opportunity for performance optimizations by the driver
-	VkPipeline pipeline{ VK_NULL_HANDLE };
+	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
 
 	// The descriptor set layout describes the shader binding layout (without actually referencing descriptor)
-	// Like the pipeline layout it's pretty much a blueprint and can be used with different descriptor sets as long as their layout matches
+	// Like the m_vkPipeline layout it's pretty much a blueprint and can be used with different descriptor sets as long as their layout matches
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
 	// Synchronization primitives
@@ -131,8 +131,8 @@ public:
 		// Clean up used Vulkan resources
 		// Note: Inherited destructor cleans up resources stored in base class
 		if (m_vkDevice) {
-			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			vkDestroyBuffer(m_vkDevice, vertices.buffer, nullptr);
 			vkFreeMemory(m_vkDevice, vertices.memory, nullptr);
@@ -154,9 +154,9 @@ public:
 	}
 
 	// This function is used to request a m_vkDevice memory type that supports all the property flags we request (e.g. m_vkDevice local, host visible)
-	// Upon success it will return the index of the memory type that fits our requested memory properties
+	// Upon success it will return the index of the memory type that fits our requested memory m_vkPhysicalDeviceProperties
 	// This is necessary as implementations can offer an arbitrary number of memory types with different
-	// memory properties.
+	// memory m_vkPhysicalDeviceProperties.
 	// You can check https://vulkan.gpuinfo.org/ for details on different memory configurations
 	uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties)
 	{
@@ -658,7 +658,7 @@ public:
 #endif
 		if (shaderCode)
 		{
-			// Create a new shader module that will be used for pipeline creation
+			// Create a new shader module that will be used for m_vkPipeline creation
 			VkShaderModuleCreateInfo shaderModuleCI{};
 			shaderModuleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 			shaderModuleCI.codeSize = shaderSize;
@@ -680,31 +680,31 @@ public:
 
 	void createPipelines()
 	{
-		// Create the pipeline layout that is used to generate the rendering pipelines that are based on this descriptor set layout
-		// In a more complex scenario you would have different pipeline layouts for different descriptor set layouts that could be reused
+		// Create the m_vkPipeline layout that is used to generate the rendering pipelines that are based on this descriptor set layout
+		// In a more complex scenario you would have different m_vkPipeline layouts for different descriptor set layouts that could be reused
 		VkPipelineLayoutCreateInfo pipelineLayoutCI{};
 		pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutCI.pNext = nullptr;
 		pipelineLayoutCI.setLayoutCount = 1;
 		pipelineLayoutCI.pSetLayouts = &descriptorSetLayout;
-                VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
+                VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
-		// Create the graphics pipeline used in this example
+		// Create the graphics m_vkPipeline used in this example
 		// Vulkan uses the concept of rendering pipelines to encapsulate fixed states, replacing OpenGL's complex state machine
-		// A pipeline is then stored and hashed on the GPU making pipeline changes very fast
-		// Note: There are still a few dynamic states that are not directly part of the pipeline (but the info that they are used is)
+		// A m_vkPipeline is then stored and hashed on the GPU making m_vkPipeline changes very fast
+		// Note: There are still a few dynamic states that are not directly part of the m_vkPipeline (but the info that they are used is)
 
 		VkGraphicsPipelineCreateInfo pipelineCI{};
 		pipelineCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		// The layout used for this pipeline (can be shared among multiple pipelines using the same layout)
-		pipelineCI.layout = pipelineLayout;
-		// Renderpass this pipeline is attached to
+		// The layout used for this m_vkPipeline (can be shared among multiple pipelines using the same layout)
+		pipelineCI.layout = m_vkPipelineLayout;
+		// Renderpass this m_vkPipeline is attached to
 		pipelineCI.renderPass = renderPass;
 
-		// Construct the different states making up the pipeline
+		// Construct the different states making up the m_vkPipeline
 
 		// Input assembly state describes how primitives are assembled
-		// This pipeline will assemble vertex data as a triangle lists (though we only use one triangle)
+		// This m_vkPipeline will assemble vertex data as a triangle lists (though we only use one triangle)
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI{};
 		inputAssemblyStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 		inputAssemblyStateCI.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -730,7 +730,7 @@ public:
 		colorBlendStateCI.attachmentCount = 1;
 		colorBlendStateCI.pAttachments = &blendAttachmentState;
 
-		// Viewport state sets the number of viewports and scissor used in this pipeline
+		// Viewport state sets the number of viewports and scissor used in this m_vkPipeline
 		// Note: This is actually overridden by the dynamic states (see below)
 		VkPipelineViewportStateCreateInfo viewportStateCI{};
 		viewportStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -738,8 +738,8 @@ public:
 		viewportStateCI.scissorCount = 1;
 
 		// Enable dynamic states
-		// Most states are baked into the pipeline, but there are still a few dynamic states that can be changed within a command buffer
-		// To be able to change these we need do specify which dynamic states will be changed using this pipeline. Their actual states are set later on in the command buffer.
+		// Most states are baked into the m_vkPipeline, but there are still a few dynamic states that can be changed within a command buffer
+		// To be able to change these we need do specify which dynamic states will be changed using this m_vkPipeline. Their actual states are set later on in the command buffer.
 		// For this example we will set the viewport and scissor using dynamic states
 		std::vector<VkDynamicState> dynamicStateEnables;
 		dynamicStateEnables.push_back(VK_DYNAMIC_STATE_VIEWPORT);
@@ -764,14 +764,14 @@ public:
 		depthStencilStateCI.front = depthStencilStateCI.back;
 
 		// Multi sampling state
-		// This example does not make use of multi sampling (for anti-aliasing), the state must still be set and passed to the pipeline
+		// This example does not make use of multi sampling (for anti-aliasing), the state must still be set and passed to the m_vkPipeline
 		VkPipelineMultisampleStateCreateInfo multisampleStateCI{};
 		multisampleStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 		multisampleStateCI.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 		multisampleStateCI.pSampleMask = nullptr;
 
 		// Vertex input descriptions
-		// Specifies the vertex input parameters for a pipeline
+		// Specifies the vertex input parameters for a m_vkPipeline
 
 		// Vertex input binding
 		// This example uses a single vertex input binding at binding point 0 (see vkCmdBindVertexBuffers)
@@ -798,7 +798,7 @@ public:
 		vertexInputAttributs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		vertexInputAttributs[1].offset = offsetof(Vertex, color);
 
-		// Vertex input state used for pipeline creation
+		// Vertex input state used for m_vkPipeline creation
 		VkPipelineVertexInputStateCreateInfo vertexInputStateCI{};
 		vertexInputStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vertexInputStateCI.vertexBindingDescriptionCount = 1;
@@ -811,7 +811,7 @@ public:
 
 		// Vertex shader
 		shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		// Set pipeline stage for this shader
+		// Set m_vkPipeline stage for this shader
 		shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 		// Load binary SPIR-V shader
 		shaderStages[0].module = loadSPIRVShader(getShadersPath() + "triangle/triangle.vert.spv");
@@ -821,7 +821,7 @@ public:
 
 		// Fragment shader
 		shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		// Set pipeline stage for this shader
+		// Set m_vkPipeline stage for this shader
 		shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 		// Load binary SPIR-V shader
 		shaderStages[1].module = loadSPIRVShader(getShadersPath() + "triangle/triangle.frag.spv");
@@ -829,11 +829,11 @@ public:
 		shaderStages[1].pName = "main";
 		assert(shaderStages[1].module != VK_NULL_HANDLE);
 
-		// Set pipeline shader stage info
+		// Set m_vkPipeline shader stage info
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 
-		// Assign the pipeline states to the pipeline creation info structure
+		// Assign the m_vkPipeline states to the m_vkPipeline creation info structure
 		pipelineCI.pVertexInputState = &vertexInputStateCI;
 		pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 		pipelineCI.pRasterizationState = &rasterizationStateCI;
@@ -843,10 +843,10 @@ public:
 		pipelineCI.pDepthStencilState = &depthStencilStateCI;
 		pipelineCI.pDynamicState = &dynamicStateCI;
 
-		// Create rendering pipeline using the specified states
-                VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		// Create rendering m_vkPipeline using the specified states
+                VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 
-		// Shader modules are no longer needed once the graphics pipeline has been created
+		// Shader modules are no longer needed once the graphics m_vkPipeline has been created
                 vkDestroyShaderModule(m_vkDevice, shaderStages[0].module, nullptr);
                 vkDestroyShaderModule(m_vkDevice, shaderStages[1].module, nullptr);
 	}
@@ -985,10 +985,10 @@ public:
 		scissor.offset.y = 0;
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 		// Bind descriptor set for the current frame's uniform buffer, so the shader uses the data from that buffer for this draw
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &uniformBuffers[currentFrame].descriptorSet, 0, nullptr);
-		// Bind the rendering pipeline
-		// The pipeline (state object) contains all states of the rendering pipeline, binding it will set all the states specified at pipeline creation time
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &uniformBuffers[currentFrame].descriptorSet, 0, nullptr);
+		// Bind the rendering m_vkPipeline
+		// The m_vkPipeline (state object) contains all states of the rendering m_vkPipeline, binding it will set all the states specified at m_vkPipeline creation time
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 		// Bind triangle vertex buffer (contains position and colors)
 		VkDeviceSize offsets[1]{ 0 };
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertices.buffer, offsets);
@@ -1008,7 +1008,7 @@ public:
 		// The submit info structure specifies a command buffer queue submission batch
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.pWaitDstStageMask = &waitStageMask;      // Pointer to the list of pipeline stages that the semaphore waits will occur at
+		submitInfo.pWaitDstStageMask = &waitStageMask;      // Pointer to the list of m_vkPipeline stages that the semaphore waits will occur at
 		submitInfo.pCommandBuffers = &commandBuffer;		// Command buffers(s) to execute in this batch (submission)
 		submitInfo.commandBufferCount = 1;                  // We submit a single command buffer
 

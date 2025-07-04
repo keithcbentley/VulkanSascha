@@ -76,8 +76,8 @@ public:
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSet descriptorSet;
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipeline;
+	VkPipelineLayout m_vkPipelineLayout;
+	VkPipeline m_vkPipeline;
 	VkShaderModule shaderModule;
 
 	VkDebugReportCallbackEXT debugReportCallback{};
@@ -381,7 +381,7 @@ public:
 		}
 
 		/*
-			Prepare compute pipeline
+			Prepare compute m_vkPipeline
 		*/
 		{
 			std::vector<VkDescriptorPoolSize> poolSizes = {
@@ -401,7 +401,7 @@ public:
 
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
 				vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 			VkDescriptorSetAllocateInfo allocInfo =
 				vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
@@ -417,8 +417,8 @@ public:
 			pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 			VK_CHECK_RESULT(vkCreatePipelineCache(device, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
 
-			// Create pipeline
-			VkComputePipelineCreateInfo computePipelineCreateInfo = vks::initializers::computePipelineCreateInfo(pipelineLayout, 0);
+			// Create m_vkPipeline
+			VkComputePipelineCreateInfo computePipelineCreateInfo = vks::initializers::computePipelineCreateInfo(m_vkPipelineLayout, 0);
 
 			// Pass SSBO size via specialization constant
 			struct SpecializationData {
@@ -443,7 +443,7 @@ public:
 
 			assert(shaderStage.module != VK_NULL_HANDLE);
 			computePipelineCreateInfo.stage = shaderStage;
-			VK_CHECK_RESULT(vkCreateComputePipelines(device, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &pipeline));
+			VK_CHECK_RESULT(vkCreateComputePipelines(device, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &m_vkPipeline));
 
 			// Create a command buffer for compute operations
 			VkCommandBufferAllocateInfo cmdBufAllocateInfo =
@@ -481,8 +481,8 @@ public:
 				1, &bufferBarrier,
 				0, nullptr);
 
-			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, 0);
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_vkPipeline);
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, 0);
 
 			vkCmdDispatch(commandBuffer, BUFFER_ELEMENTS, 1, 1);
 
@@ -575,10 +575,10 @@ public:
 
 	~VulkanExample()
 	{
-		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(device, m_vkPipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-		vkDestroyPipeline(device, pipeline, nullptr);
+		vkDestroyPipeline(device, m_vkPipeline, nullptr);
 		vkDestroyPipelineCache(device, pipelineCache, nullptr);
 		vkDestroyFence(device, fence, nullptr);
 		vkDestroyCommandPool(device, commandPool, nullptr);

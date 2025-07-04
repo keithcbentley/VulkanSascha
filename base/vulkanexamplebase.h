@@ -59,7 +59,7 @@
 #include <numeric>
 #include <array>
 
-#include "vulkan/vulkan.h"
+#include <VulkanCpp.hpp>
 
 #include "CommandLineParser.hpp"
 #include "keycodes.hpp"
@@ -102,16 +102,16 @@ protected:
 	uint32_t frameCounter = 0;
 	uint32_t lastFPS = 0;
 	std::chrono::time_point<std::chrono::high_resolution_clock> lastTimestamp, tPrevEnd;
-	// Vulkan instance, stores all per-application states
-	VkInstance instance{ VK_NULL_HANDLE };
+	// Vulkan m_vulkanInstance, stores all per-application states
+	VkInstance m_vulkanInstance{ VK_NULL_HANDLE };
 	std::vector<std::string> supportedInstanceExtensions;
 	// Physical m_vkDevice (GPU) that Vulkan will use
-	VkPhysicalDevice physicalDevice{ VK_NULL_HANDLE };
-	// Stores physical m_vkDevice properties (for e.g. checking m_vkDevice limits)
-	VkPhysicalDeviceProperties deviceProperties{};
-	// Stores the features available on the selected physical m_vkDevice (for e.g. checking if a feature is available)
+	VkPhysicalDevice m_vkPhysicalDevice{ VK_NULL_HANDLE };
+	// Stores physical m_vkDevice m_vkPhysicalDeviceProperties (for e.g. checking m_vkDevice limits)
+	VkPhysicalDeviceProperties m_vkPhysicalDeviceProperties{};
+	// Stores the m_vkPhysicalDeviceFeatures available on the selected physical m_vkDevice (for e.g. checking if a feature is available)
 	VkPhysicalDeviceFeatures deviceFeatures{};
-	// Stores all available memory (type) properties for the physical m_vkDevice
+	// Stores all available m_vkDeviceMemory (type) m_vkPhysicalDeviceProperties for the physical m_vkDevice
 	VkPhysicalDeviceMemoryProperties deviceMemoryProperties{};
 	/** @brief Set of physical device features to be enabled for this example (must be set in the derived constructor) */
 	VkPhysicalDeviceFeatures enabledFeatures{};
@@ -259,7 +259,7 @@ public:
 	IDirectFB *dfb = nullptr;
 	IDirectFBDisplayLayer *layer = nullptr;
 	IDirectFBWindow *window = nullptr;
-	IDirectFBSurface *surface = nullptr;
+	IDirectFBSurface *m_vkSurface = nullptr;
 	IDirectFBEventBuffer *event_buffer = nullptr;
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 	wl_display *display = nullptr;
@@ -269,7 +269,7 @@ public:
 	wl_seat *seat = nullptr;
 	wl_pointer *pointer = nullptr;
 	wl_keyboard *keyboard = nullptr;
-	wl_surface *surface = nullptr;
+	wl_surface *m_vkSurface = nullptr;
 	struct xdg_surface *xdg_surface;
 	struct xdg_toplevel *xdg_toplevel;
 	bool quit = false;
@@ -329,10 +329,10 @@ public:
 	static void seatCapabilitiesCb(void *data, wl_seat *seat, uint32_t caps);
 	void seatCapabilities(wl_seat *seat, uint32_t caps);
 	static void pointerEnterCb(void *data, struct wl_pointer *pointer,
-			uint32_t serial, struct wl_surface *surface, wl_fixed_t sx,
+			uint32_t serial, struct wl_surface *m_vkSurface, wl_fixed_t sx,
 			wl_fixed_t sy);
 	static void pointerLeaveCb(void *data, struct wl_pointer *pointer,
-			uint32_t serial, struct wl_surface *surface);
+			uint32_t serial, struct wl_surface *m_vkSurface);
 	static void pointerMotionCb(void *data, struct wl_pointer *pointer,
 			uint32_t time, wl_fixed_t sx, wl_fixed_t sy);
 	void pointerMotion(struct wl_pointer *pointer,
@@ -348,9 +348,9 @@ public:
 	static void keyboardKeymapCb(void *data, struct wl_keyboard *keyboard,
 			uint32_t format, int fd, uint32_t size);
 	static void keyboardEnterCb(void *data, struct wl_keyboard *keyboard,
-			uint32_t serial, struct wl_surface *surface, struct wl_array *keys);
+			uint32_t serial, struct wl_surface *m_vkSurface, struct wl_array *keys);
 	static void keyboardLeaveCb(void *data, struct wl_keyboard *keyboard,
-			uint32_t serial, struct wl_surface *surface);
+			uint32_t serial, struct wl_surface *m_vkSurface);
 	static void keyboardKeyCb(void *data, struct wl_keyboard *keyboard,
 			uint32_t serial, uint32_t time, uint32_t key, uint32_t state);
 	void keyboardKey(struct wl_keyboard *keyboard,

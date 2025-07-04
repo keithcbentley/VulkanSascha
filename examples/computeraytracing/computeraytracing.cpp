@@ -30,7 +30,7 @@ public:
 
 	// Resources for the compute part of the example
 	struct Compute {
-		// Object properties for planes and spheres are passed via a shade storage buffer
+		// Object m_vkPhysicalDeviceProperties for planes and spheres are passed via a shade storage buffer
 		// There is no vertex data, the compute shader calculates the primitives on the fly
 		vks::Buffer objectStorageBuffer;
 		vks::Buffer uniformBuffer;										// Uniform buffer object containing scene parameters
@@ -59,7 +59,7 @@ public:
 	// The sample uses spheres and planes that are passed to the compute shader via a shader storage buffer
 	// The computer shader uses the object type to select different calculations
 	enum class SceneObjectType { Sphere = 0, Plane = 1 };
-	// Spheres and planes are described by different properties, we use a union for this
+	// Spheres and planes are described by different m_vkPhysicalDeviceProperties, we use a union for this
 	union SceneObjectProperty {
 		glm::vec4 positionAndRadius;
 		glm::vec4 normalAndDistance;
@@ -120,9 +120,9 @@ public:
 
 		const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 
-		// Get m_vkDevice properties for the requested texture format
+		// Get m_vkDevice m_vkPhysicalDeviceProperties for the requested texture format
 		VkFormatProperties formatProperties;
-		vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
+		vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, format, &formatProperties);
 		// Check if requested image format supports image storage operations required for storing pixel from the compute shader
 		assert(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT);
 

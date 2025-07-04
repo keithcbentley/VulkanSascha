@@ -24,18 +24,18 @@ VulkanglTFScene::~VulkanglTFScene()
 		delete node;
 	}
 	// Release all Vulkan resources allocated for the model
-	vkDestroyBuffer(vulkanDevice->logicalDevice, vertices.buffer, nullptr);
-	vkFreeMemory(vulkanDevice->logicalDevice, vertices.memory, nullptr);
-	vkDestroyBuffer(vulkanDevice->logicalDevice, indices.buffer, nullptr);
-	vkFreeMemory(vulkanDevice->logicalDevice, indices.memory, nullptr);
+	vkDestroyBuffer(vulkanDevice->m_vkDevice, vertices.buffer, nullptr);
+	vkFreeMemory(vulkanDevice->m_vkDevice, vertices.memory, nullptr);
+	vkDestroyBuffer(vulkanDevice->m_vkDevice, indices.buffer, nullptr);
+	vkFreeMemory(vulkanDevice->m_vkDevice, indices.memory, nullptr);
 	for (Image image : images) {
-		vkDestroyImageView(vulkanDevice->logicalDevice, image.texture.view, nullptr);
-		vkDestroyImage(vulkanDevice->logicalDevice, image.texture.image, nullptr);
-		vkDestroySampler(vulkanDevice->logicalDevice, image.texture.sampler, nullptr);
-		vkFreeMemory(vulkanDevice->logicalDevice, image.texture.deviceMemory, nullptr);
+		vkDestroyImageView(vulkanDevice->m_vkDevice, image.texture.view, nullptr);
+		vkDestroyImage(vulkanDevice->m_vkDevice, image.texture.image, nullptr);
+		vkDestroySampler(vulkanDevice->m_vkDevice, image.texture.sampler, nullptr);
+		vkFreeMemory(vulkanDevice->m_vkDevice, image.texture.deviceMemory, nullptr);
 	}
 	for (Material material : materials) {
-		vkDestroyPipeline(vulkanDevice->logicalDevice, material.pipeline, nullptr);
+		vkDestroyPipeline(vulkanDevice->m_vkDevice, material.pipeline, nullptr);
 	}
 }
 
@@ -67,7 +67,7 @@ void VulkanglTFScene::loadMaterials(tinygltf::Model& input)
 {
 	materials.resize(input.materials.size());
 	for (size_t i = 0; i < input.materials.size(); i++) {
-		// We only read the most basic properties required for our sample
+		// We only read the most basic m_vkPhysicalDeviceProperties required for our sample
 		tinygltf::Material glTFMaterial = input.materials[i];
 		// Get the base color factor
 		if (glTFMaterial.values.find("baseColorFactor") != glTFMaterial.values.end()) {
@@ -297,7 +297,7 @@ VulkanExample::VulkanExample() : VulkanExampleBase()
 VulkanExample::~VulkanExample()
 {
 	if (m_vkDevice) {
-		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.matrices, nullptr);
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.textures, nullptr);
 		shaderData.buffer.destroy();
@@ -338,10 +338,10 @@ void VulkanExample::buildCommandBuffers()
 		vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 		vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 		// Bind scene matrices descriptor to set 0
-		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 		// POI: Draw the glTF scene
-		glTFScene.draw(drawCmdBuffers[i], pipelineLayout);
+		glTFScene.draw(drawCmdBuffers[i], m_vkPipelineLayout);
 
 		drawUI(drawCmdBuffers[i]);
 		vkCmdEndRenderPass(drawCmdBuffers[i]);
@@ -534,7 +534,7 @@ void VulkanExample::preparePipelines()
 	// Push constant ranges are part of the pipeline layout
 	pipelineLayoutCI.pushConstantRangeCount = 1;
 	pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 	// Pipelines
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -560,7 +560,7 @@ void VulkanExample::preparePipelines()
 	};
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCI = vks::initializers::pipelineVertexInputStateCreateInfo(vertexInputBindings, vertexInputAttributes);
 
-	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 	pipelineCI.pVertexInputState = &vertexInputStateCI;
 	pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 	pipelineCI.pRasterizationState = &rasterizationStateCI;
@@ -575,7 +575,7 @@ void VulkanExample::preparePipelines()
 	shaderStages[0] = loadShader(getShadersPath() + "gltfscenerendering/scene.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 	shaderStages[1] = loadShader(getShadersPath() + "gltfscenerendering/scene.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-	// POI: Instead if using a few fixed pipelines, we create one pipeline for each material using the properties of that material
+	// POI: Instead if using a few fixed pipelines, we create one pipeline for each material using the m_vkPhysicalDeviceProperties of that material
 	for (auto &material : glTFScene.materials) {
 
 		struct MaterialSpecializationData {

@@ -9,7 +9,7 @@
 #include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
 
-// Offscreen frame buffer properties
+// Offscreen frame buffer m_vkPhysicalDeviceProperties
 #define FB_DIM 512
 #define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
 
@@ -136,7 +136,7 @@ public:
 
 		// Find a suitable depth format
 		VkFormat fbDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &fbDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(m_vkPhysicalDevice, &fbDepthFormat);
 		assert(validDepthFormat);
 
 		// Color attachment

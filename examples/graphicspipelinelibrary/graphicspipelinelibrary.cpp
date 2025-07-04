@@ -25,7 +25,7 @@ public:
 	} uniformData;
 	vks::Buffer uniformBuffer;
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
@@ -69,7 +69,7 @@ public:
 		enabledDeviceExtensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
 		enabledDeviceExtensions.push_back(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
 
-		// Enable required extension features
+		// Enable required extension m_vkPhysicalDeviceFeatures
 		graphicsPipelineLibraryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
 		graphicsPipelineLibraryFeatures.graphicsPipelineLibrary = VK_TRUE;
 		deviceCreatepNextChain = &graphicsPipelineLibraryFeatures;
@@ -88,7 +88,7 @@ public:
 			vkDestroyPipeline(m_vkDevice, pipelineLibrary.preRasterizationShaders, nullptr);
 			vkDestroyPipeline(m_vkDevice, pipelineLibrary.vertexInputInterface, nullptr);
 			vkDestroyPipelineCache(m_vkDevice, threadPipelineCache, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
 		}
@@ -119,7 +119,7 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			scene.bindBuffers(drawCmdBuffers[i]);
 
 			// Render a viewport for each pipeline
@@ -233,7 +233,7 @@ public:
 	{
 		// Shared layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Create a pipeline library for the vertex input interface
 		{
@@ -297,7 +297,7 @@ public:
 			pipelineLibraryCI.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
 			pipelineLibraryCI.stageCount = 1;
 			pipelineLibraryCI.pStages = &shaderStageCI;
-			pipelineLibraryCI.layout = pipelineLayout;
+			pipelineLibraryCI.layout = m_vkPipelineLayout;
 			pipelineLibraryCI.pDynamicState = &dynamicInfo;
 			pipelineLibraryCI.pViewportState = &viewportState;
 			pipelineLibraryCI.pRasterizationState = &rasterizationState;
@@ -319,7 +319,7 @@ public:
 			VkGraphicsPipelineCreateInfo pipelineLibraryCI{};
 			pipelineLibraryCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 			pipelineLibraryCI.pNext = &libraryInfo;
-			pipelineLibraryCI.layout = pipelineLayout;
+			pipelineLibraryCI.layout = m_vkPipelineLayout;
 			pipelineLibraryCI.renderPass = renderPass;
 			pipelineLibraryCI.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
 			pipelineLibraryCI.pColorBlendState = &colorBlendState;
@@ -397,7 +397,7 @@ public:
 		pipelineCI.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
 		pipelineCI.stageCount = 1;
 		pipelineCI.pStages = &shaderStageCI;
-		pipelineCI.layout = pipelineLayout;
+		pipelineCI.layout = m_vkPipelineLayout;
 		pipelineCI.renderPass = renderPass;
 		pipelineCI.pDepthStencilState = &depthStencilState;
 		pipelineCI.pMultisampleState = &multisampleState;
@@ -425,7 +425,7 @@ public:
 		VkGraphicsPipelineCreateInfo executablePipelineCI{};
 		executablePipelineCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		executablePipelineCI.pNext = &pipelineLibraryCI;
-		executablePipelineCI.layout = pipelineLayout;
+		executablePipelineCI.layout = m_vkPipelineLayout;
 		if (linkTimeOptimization)
 		{
 			// If link time optimization is activated in the UI, we set the VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT flag which will let the implementation do additional optimizations at link time

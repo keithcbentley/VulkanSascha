@@ -149,9 +149,9 @@ VulkanRaytracingSample::ScratchBuffer VulkanRaytracingSample::createScratchBuffe
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferCreateInfo.size = size;
 	bufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-	VK_CHECK_RESULT(vkCreateBuffer(vulkanDevice->logicalDevice, &bufferCreateInfo, nullptr, &scratchBuffer.handle));
+	VK_CHECK_RESULT(vkCreateBuffer(vulkanDevice->m_vkDevice, &bufferCreateInfo, nullptr, &scratchBuffer.handle));
 	VkMemoryRequirements memoryRequirements{};
-	vkGetBufferMemoryRequirements(vulkanDevice->logicalDevice, scratchBuffer.handle, &memoryRequirements);
+	vkGetBufferMemoryRequirements(vulkanDevice->m_vkDevice, scratchBuffer.handle, &memoryRequirements);
 	VkMemoryAllocateFlagsInfo memoryAllocateFlagsInfo{};
 	memoryAllocateFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
 	memoryAllocateFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
@@ -160,23 +160,23 @@ VulkanRaytracingSample::ScratchBuffer VulkanRaytracingSample::createScratchBuffe
 	memoryAllocateInfo.pNext = &memoryAllocateFlagsInfo;
 	memoryAllocateInfo.allocationSize = memoryRequirements.size;
 	memoryAllocateInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	VK_CHECK_RESULT(vkAllocateMemory(vulkanDevice->logicalDevice, &memoryAllocateInfo, nullptr, &scratchBuffer.memory));
-	VK_CHECK_RESULT(vkBindBufferMemory(vulkanDevice->logicalDevice, scratchBuffer.handle, scratchBuffer.memory, 0));
+	VK_CHECK_RESULT(vkAllocateMemory(vulkanDevice->m_vkDevice, &memoryAllocateInfo, nullptr, &scratchBuffer.memory));
+	VK_CHECK_RESULT(vkBindBufferMemory(vulkanDevice->m_vkDevice, scratchBuffer.handle, scratchBuffer.memory, 0));
 	// Buffer m_vkDevice address
 	VkBufferDeviceAddressInfoKHR bufferDeviceAddresInfo{};
 	bufferDeviceAddresInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
 	bufferDeviceAddresInfo.buffer = scratchBuffer.handle;
-	scratchBuffer.deviceAddress = vkGetBufferDeviceAddressKHR(vulkanDevice->logicalDevice, &bufferDeviceAddresInfo);
+	scratchBuffer.deviceAddress = vkGetBufferDeviceAddressKHR(vulkanDevice->m_vkDevice, &bufferDeviceAddresInfo);
 	return scratchBuffer;
 }
 
 void VulkanRaytracingSample::deleteScratchBuffer(ScratchBuffer& scratchBuffer)
 {
 	if (scratchBuffer.memory != VK_NULL_HANDLE) {
-		vkFreeMemory(vulkanDevice->logicalDevice, scratchBuffer.memory, nullptr);
+		vkFreeMemory(vulkanDevice->m_vkDevice, scratchBuffer.memory, nullptr);
 	}
 	if (scratchBuffer.handle != VK_NULL_HANDLE) {
-		vkDestroyBuffer(vulkanDevice->logicalDevice, scratchBuffer.handle, nullptr);
+		vkDestroyBuffer(vulkanDevice->m_vkDevice, scratchBuffer.handle, nullptr);
 	}
 }
 
@@ -187,9 +187,9 @@ void VulkanRaytracingSample::createAccelerationStructure(AccelerationStructure& 
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferCreateInfo.size = buildSizeInfo.accelerationStructureSize;
 	bufferCreateInfo.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-	VK_CHECK_RESULT(vkCreateBuffer(vulkanDevice->logicalDevice, &bufferCreateInfo, nullptr, &accelerationStructure.buffer));
+	VK_CHECK_RESULT(vkCreateBuffer(vulkanDevice->m_vkDevice, &bufferCreateInfo, nullptr, &accelerationStructure.buffer));
 	VkMemoryRequirements memoryRequirements{};
-	vkGetBufferMemoryRequirements(vulkanDevice->logicalDevice, accelerationStructure.buffer, &memoryRequirements);
+	vkGetBufferMemoryRequirements(vulkanDevice->m_vkDevice, accelerationStructure.buffer, &memoryRequirements);
 	VkMemoryAllocateFlagsInfo memoryAllocateFlagsInfo{};
 	memoryAllocateFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
 	memoryAllocateFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
@@ -198,20 +198,20 @@ void VulkanRaytracingSample::createAccelerationStructure(AccelerationStructure& 
 	memoryAllocateInfo.pNext = &memoryAllocateFlagsInfo;
 	memoryAllocateInfo.allocationSize = memoryRequirements.size;
 	memoryAllocateInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	VK_CHECK_RESULT(vkAllocateMemory(vulkanDevice->logicalDevice, &memoryAllocateInfo, nullptr, &accelerationStructure.memory));
-	VK_CHECK_RESULT(vkBindBufferMemory(vulkanDevice->logicalDevice, accelerationStructure.buffer, accelerationStructure.memory, 0));
+	VK_CHECK_RESULT(vkAllocateMemory(vulkanDevice->m_vkDevice, &memoryAllocateInfo, nullptr, &accelerationStructure.memory));
+	VK_CHECK_RESULT(vkBindBufferMemory(vulkanDevice->m_vkDevice, accelerationStructure.buffer, accelerationStructure.memory, 0));
 	// Acceleration structure
 	VkAccelerationStructureCreateInfoKHR accelerationStructureCreate_info{};
 	accelerationStructureCreate_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
 	accelerationStructureCreate_info.buffer = accelerationStructure.buffer;
 	accelerationStructureCreate_info.size = buildSizeInfo.accelerationStructureSize;
 	accelerationStructureCreate_info.type = type;
-	vkCreateAccelerationStructureKHR(vulkanDevice->logicalDevice, &accelerationStructureCreate_info, nullptr, &accelerationStructure.handle);
+	vkCreateAccelerationStructureKHR(vulkanDevice->m_vkDevice, &accelerationStructureCreate_info, nullptr, &accelerationStructure.handle);
 	// AS m_vkDevice address
 	VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
 	accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
 	accelerationDeviceAddressInfo.accelerationStructure = accelerationStructure.handle;
-	accelerationStructure.deviceAddress = vkGetAccelerationStructureDeviceAddressKHR(vulkanDevice->logicalDevice, &accelerationDeviceAddressInfo);
+	accelerationStructure.deviceAddress = vkGetAccelerationStructureDeviceAddressKHR(vulkanDevice->m_vkDevice, &accelerationDeviceAddressInfo);
 }
 
 void VulkanRaytracingSample::deleteAccelerationStructure(AccelerationStructure& accelerationStructure)
@@ -226,7 +226,7 @@ uint64_t VulkanRaytracingSample::getBufferDeviceAddress(VkBuffer buffer)
 	VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
 	bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
 	bufferDeviceAI.buffer = buffer;
-	return vkGetBufferDeviceAddressKHR(vulkanDevice->logicalDevice, &bufferDeviceAI);
+	return vkGetBufferDeviceAddressKHR(vulkanDevice->m_vkDevice, &bufferDeviceAI);
 }
 
 void VulkanRaytracingSample::createStorageImage(VkFormat format, VkExtent3D extent)
@@ -249,15 +249,15 @@ void VulkanRaytracingSample::createStorageImage(VkFormat format, VkExtent3D exte
 	image.tiling = VK_IMAGE_TILING_OPTIMAL;
 	image.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
 	image.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VK_CHECK_RESULT(vkCreateImage(vulkanDevice->logicalDevice, &image, nullptr, &storageImage.image));
+	VK_CHECK_RESULT(vkCreateImage(vulkanDevice->m_vkDevice, &image, nullptr, &storageImage.image));
 
 	VkMemoryRequirements memReqs;
-	vkGetImageMemoryRequirements(vulkanDevice->logicalDevice, storageImage.image, &memReqs);
+	vkGetImageMemoryRequirements(vulkanDevice->m_vkDevice, storageImage.image, &memReqs);
 	VkMemoryAllocateInfo memoryAllocateInfo = vks::initializers::memoryAllocateInfo();
 	memoryAllocateInfo.allocationSize = memReqs.size;
 	memoryAllocateInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	VK_CHECK_RESULT(vkAllocateMemory(vulkanDevice->logicalDevice, &memoryAllocateInfo, nullptr, &storageImage.memory));
-	VK_CHECK_RESULT(vkBindImageMemory(vulkanDevice->logicalDevice, storageImage.image, storageImage.memory, 0));
+	VK_CHECK_RESULT(vkAllocateMemory(vulkanDevice->m_vkDevice, &memoryAllocateInfo, nullptr, &storageImage.memory));
+	VK_CHECK_RESULT(vkBindImageMemory(vulkanDevice->m_vkDevice, storageImage.image, storageImage.memory, 0));
 
 	VkImageViewCreateInfo colorImageView = vks::initializers::imageViewCreateInfo();
 	colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -269,7 +269,7 @@ void VulkanRaytracingSample::createStorageImage(VkFormat format, VkExtent3D exte
 	colorImageView.subresourceRange.baseArrayLayer = 0;
 	colorImageView.subresourceRange.layerCount = 1;
 	colorImageView.image = storageImage.image;
-	VK_CHECK_RESULT(vkCreateImageView(vulkanDevice->logicalDevice, &colorImageView, nullptr, &storageImage.view));
+	VK_CHECK_RESULT(vkCreateImageView(vulkanDevice->m_vkDevice, &colorImageView, nullptr, &storageImage.view));
 
 	VkCommandBuffer cmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	vks::tools::setImageLayout(cmdBuffer, storageImage.image,
@@ -281,25 +281,25 @@ void VulkanRaytracingSample::createStorageImage(VkFormat format, VkExtent3D exte
 
 void VulkanRaytracingSample::deleteStorageImage()
 {
-	vkDestroyImageView(vulkanDevice->logicalDevice, storageImage.view, nullptr);
-	vkDestroyImage(vulkanDevice->logicalDevice, storageImage.image, nullptr);
-	vkFreeMemory(vulkanDevice->logicalDevice, storageImage.memory, nullptr);
+	vkDestroyImageView(vulkanDevice->m_vkDevice, storageImage.view, nullptr);
+	vkDestroyImage(vulkanDevice->m_vkDevice, storageImage.image, nullptr);
+	vkFreeMemory(vulkanDevice->m_vkDevice, storageImage.memory, nullptr);
 }
 
 void VulkanRaytracingSample::prepare()
 {
 	VulkanExampleBase::prepare();
-	// Get properties and features
+	// Get m_vkPhysicalDeviceProperties and m_vkPhysicalDeviceFeatures
 	rayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
 	VkPhysicalDeviceProperties2 deviceProperties2{};
 	deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 	deviceProperties2.pNext = &rayTracingPipelineProperties;
-	vkGetPhysicalDeviceProperties2(physicalDevice, &deviceProperties2);
+	vkGetPhysicalDeviceProperties2(m_vkPhysicalDevice, &deviceProperties2);
 	accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
 	VkPhysicalDeviceFeatures2 deviceFeatures2{};
 	deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 	deviceFeatures2.pNext = &accelerationStructureFeatures;
-	vkGetPhysicalDeviceFeatures2(physicalDevice, &deviceFeatures2);
+	vkGetPhysicalDeviceFeatures2(m_vkPhysicalDevice, &deviceFeatures2);
 	// Get the function pointers required for ray tracing
 	vkGetBufferDeviceAddressKHR
 		= reinterpret_cast<PFN_vkGetBufferDeviceAddressKHR>(vkGetDeviceProcAddr(m_vkDevice, "vkGetBufferDeviceAddressKHR"));

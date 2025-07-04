@@ -32,7 +32,7 @@ public:
 		VkPipeline MSAASampleShading{ VK_NULL_HANDLE };
 	} pipelines;
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 	VkExtent2D attachmentSize{};
@@ -66,7 +66,7 @@ public:
 			vkDestroyPipeline(m_vkDevice, pipelines.MSAA, nullptr);
 			vkDestroyPipeline(m_vkDevice, pipelines.MSAASampleShading, nullptr);
 
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 
 			// Destroy MSAA target
@@ -81,7 +81,7 @@ public:
 		}
 	}
 
-	// Enable physical m_vkDevice features required for this example
+	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Enable sample rate shading filtering if supported
@@ -99,7 +99,7 @@ public:
 	void setupMultisampleTarget()
 	{
 		// Check if m_vkDevice supports requested sample count for color and depth frame buffer
-		assert((deviceProperties.limits.framebufferColorSampleCounts & sampleCount) && (deviceProperties.limits.framebufferDepthSampleCounts & sampleCount));
+		assert((m_vkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & sampleCount) && (m_vkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts & sampleCount));
 
 		// Color target
 		VkImageCreateInfo info = vks::initializers::imageCreateInfo();
@@ -370,9 +370,9 @@ public:
 			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, useSampleShading ? pipelines.MSAASampleShading : pipelines.MSAA);
-			model.draw(drawCmdBuffers[i], vkglTF::RenderFlags::BindImages, pipelineLayout);
+			model.draw(drawCmdBuffers[i], vkglTF::RenderFlags::BindImages, m_vkPipelineLayout);
 
 			drawUI(drawCmdBuffers[i]);
 
@@ -423,7 +423,7 @@ public:
 			vkglTF::descriptorSetLayoutImage,
 		};
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), 2);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -442,7 +442,7 @@ public:
 		// Number of samples to use for rasterization
 		multisampleState.rasterizationSamples = sampleCount;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -459,7 +459,7 @@ public:
 		shaderStages[1] = loadShader(getShadersPath() + "multisampling/mesh.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.MSAA));
 
-		if (vulkanDevice->features.sampleRateShading)
+		if (vulkanDevice->m_vkPhysicalDeviceFeatures.sampleRateShading)
 		{
 			// MSAA with sample shading pipeline
 			// Sample shading enables per-sample shading to avoid shader aliasing and smooth out e.g. high frequency texture maps
@@ -493,7 +493,7 @@ public:
 	// In a realworld application, this would be a user setting instead
 	VkSampleCountFlagBits getMaxAvailableSampleCount()
 	{
-		VkSampleCountFlags supportedSampleCount = std::min(deviceProperties.limits.framebufferColorSampleCounts, deviceProperties.limits.framebufferDepthSampleCounts);
+		VkSampleCountFlags supportedSampleCount = std::min(m_vkPhysicalDeviceProperties.limits.framebufferColorSampleCounts, m_vkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts);
 		std::vector< VkSampleCountFlagBits> possibleSampleCounts {
 			VK_SAMPLE_COUNT_64_BIT, VK_SAMPLE_COUNT_32_BIT, VK_SAMPLE_COUNT_16_BIT, VK_SAMPLE_COUNT_8_BIT, VK_SAMPLE_COUNT_4_BIT, VK_SAMPLE_COUNT_2_BIT
 		};
@@ -537,7 +537,7 @@ public:
 
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay)
 	{
-		if (vulkanDevice->features.sampleRateShading) {
+		if (vulkanDevice->m_vkPhysicalDeviceFeatures.sampleRateShading) {
 			if (overlay->header("Settings")) {
 				if (overlay->checkBox("Sample rate shading", &useSampleShading)) {
 					buildCommandBuffers();

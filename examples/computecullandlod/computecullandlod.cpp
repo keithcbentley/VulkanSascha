@@ -29,7 +29,7 @@ public:
 	// The model contains multiple versions of a single object with different levels of detail
 	vkglTF::Model lodModel;
 
-	// Per-instance data block
+	// Per-m_vulkanInstance data block
 	struct InstanceData {
 		glm::vec3 pos{ 0.0f };
 		float scale{ 1.0f };
@@ -47,7 +47,7 @@ public:
 		uint32_t lodCount[MAX_LOD_LEVEL + 1];	// Statistics for number of draws per LOD level (written by compute shader)
 	} indirectStats;
 
-	// Store the indirect draw commands containing index offsets and instance count per object
+	// Store the indirect draw commands containing index offsets and m_vulkanInstance count per object
 	std::vector<VkDrawIndexedIndirectCommand> indirectCommands;
 
 	struct {
@@ -61,8 +61,8 @@ public:
 		vks::Buffer scene;
 	} uniformData;
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
-	VkPipeline pipeline{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
+	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 
@@ -76,8 +76,8 @@ public:
 		VkSemaphore semaphore;						// Used as a wait semaphore for graphics submission
 		VkDescriptorSetLayout descriptorSetLayout;	// Compute shader binding layout
 		VkDescriptorSet descriptorSet;				// Compute shader bindings
-		VkPipelineLayout pipelineLayout;			// Layout of the compute pipeline
-		VkPipeline pipeline;						// Compute pipeline for updating particle positions
+		VkPipelineLayout pipelineLayout;			// Layout of the compute m_vkPipeline
+		VkPipeline pipeline;						// Compute m_vkPipeline for updating particle positions
 	} compute{};
 
 	// View frustum for culling invisible objects
@@ -98,8 +98,8 @@ public:
 	~VulkanExample()
 	{
 		if (m_vkDevice) {
-			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			instanceBuffer.destroy();
 			indirectCommandsBuffer.destroy();
@@ -182,16 +182,16 @@ public:
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
 			// Mesh containing the LODs
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &lodModel.vertices.buffer, offsets);
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 1, 1, &instanceBuffer.buffer, offsets);
 
 			vkCmdBindIndexBuffer(drawCmdBuffers[i], lodModel.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-			if (vulkanDevice->features.multiDrawIndirect)
+			if (vulkanDevice->m_vkPhysicalDeviceFeatures.multiDrawIndirect)
 			{
 				vkCmdDrawIndexedIndirect(drawCmdBuffers[i], indirectCommandsBuffer.buffer, 0, static_cast<uint32_t>(indirectCommands.size()), sizeof(VkDrawIndexedIndirectCommand));
 			}
@@ -366,7 +366,7 @@ public:
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// This example uses two different input states, one for the instanced part and one for non-instanced rendering
 		VkPipelineVertexInputStateCreateInfo inputState = vks::initializers::pipelineVertexInputStateCreateInfo();
@@ -374,11 +374,11 @@ public:
 		std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
 		// Vertex input bindings
-		// The instancing pipeline uses a vertex input state with two bindings
+		// The instancing m_vkPipeline uses a vertex input state with two bindings
 		bindingDescriptions = {
 		    // Binding point 0: Mesh vertex layout description at per-vertex rate
 		    vks::initializers::vertexInputBindingDescription(0, sizeof(vkglTF::Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
-		    // Binding point 1: Instanced data at per-instance rate
+		    // Binding point 1: Instanced data at per-m_vulkanInstance rate
 		    vks::initializers::vertexInputBindingDescription(1, sizeof(InstanceData), VK_VERTEX_INPUT_RATE_INSTANCE)
 		};
 
@@ -390,7 +390,7 @@ public:
 		    vks::initializers::vertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vkglTF::Vertex, normal)),	// Location 1: Normal
 		    vks::initializers::vertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vkglTF::Vertex, color)),	// Location 2: Texture coordinates
 		    // Per-Instance attributes
-		    // These are fetched for each instance rendered
+		    // These are fetched for each m_vulkanInstance rendered
 		    vks::initializers::vertexInputAttributeDescription(1, 3, VK_FORMAT_R32G32B32_SFLOAT, offsetof(InstanceData, pos)),	// Location 4: Position
 		    vks::initializers::vertexInputAttributeDescription(1, 4, VK_FORMAT_R32_SFLOAT, offsetof(InstanceData, scale)),		// Location 5: Scale
 		};
@@ -399,7 +399,7 @@ public:
 		inputState.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
 		inputState.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
 
-		// Indirect (and instanced) pipeline
+		// Indirect (and instanced) m_vkPipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
 		VkPipelineRasterizationStateCreateInfo rasterizationState = vks::initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
 		VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
@@ -409,7 +409,7 @@ public:
 		VkPipelineMultisampleStateCreateInfo multisampleState = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
 		std::vector<VkDynamicState> dynamicStateEnables = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
 			loadShader(getShadersPath() + "computecullandlod/indirectdraw.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
 			loadShader(getShadersPath() + "computecullandlod/indirectdraw.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -424,7 +424,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 	}
 
 	void prepareBuffers()
@@ -506,7 +506,7 @@ public:
 			&instanceBuffer,
 			stagingBuffer.size));
 
-		// Copy from staging buffer to instance buffer
+		// Copy from staging buffer to m_vulkanInstance buffer
 		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = {};
 		copyRegion.size = stagingBuffer.size;
@@ -595,7 +595,7 @@ public:
 		// Get a compute capable m_vkDevice queue
 		vkGetDeviceQueue(m_vkDevice, vulkanDevice->queueFamilyIndices.compute, 0, &compute.queue);
 
-		// Create compute pipeline
+		// Create compute m_vkPipeline
 		// Compute pipelines are created separate from graphics pipelines even if they use the same queue (family index)
 
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -675,7 +675,7 @@ public:
 
 		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
 
-		// Create pipeline
+		// Create m_vkPipeline
 		VkComputePipelineCreateInfo computePipelineCreateInfo = vks::initializers::computePipelineCreateInfo(compute.pipelineLayout, 0);
 		computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computecullandlod/cull.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
 

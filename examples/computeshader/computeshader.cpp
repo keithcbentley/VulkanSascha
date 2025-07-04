@@ -55,7 +55,7 @@ public:
 
 	vks::Buffer vertexBuffer;
 	vks::Buffer indexBuffer;
-	uint32_t indexCount{ 0 };
+	uint32_t m_indexCount{ 0 };
 	uint32_t vertexBufferSize{ 0 };
 
 	std::vector<std::string> filterNames{};
@@ -103,8 +103,8 @@ public:
 		const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 
 		VkFormatProperties formatProperties;
-		// Get m_vkDevice properties for the requested texture format
-		vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
+		// Get m_vkDevice m_vkPhysicalDeviceProperties for the requested texture format
+		vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, format, &formatProperties);
 		// Check if requested image format supports image storage operations required for storing pixel from the compute shader
 		assert(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT);
 
@@ -248,7 +248,7 @@ public:
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSetPreCompute, 0, NULL);
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
-			vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, 1, 0, 0, 0);
 
 			// Right (post compute)
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSetPostCompute, 0, NULL);
@@ -256,7 +256,7 @@ public:
 
 			viewport.x = (float)width / 2.0f;
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-			vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, 1, 0, 0, 0);
 
 			drawUI(drawCmdBuffers[i]);
 
@@ -297,7 +297,7 @@ public:
 
 		// Setup indices
 		std::vector<uint32_t> indices = { 0,1,2, 2,3,0 };
-		indexCount = static_cast<uint32_t>(indices.size());
+		m_indexCount = static_cast<uint32_t>(indices.size());
 
 		// Create buffers and upload data to the GPU
 

@@ -17,7 +17,7 @@ class VulkanExample : public VulkanExampleBase
 {
 public:
 	uint32_t readSet{ 0 };
-	uint32_t indexCount{ 0 };
+	uint32_t m_indexCount{ 0 };
 	bool simulateWind{ false };
 	// This will be set to true, if the m_vkDevice has a dedicated queue from a compute only queue family
 	// With such a queue graphics and compute workloads can run in parallel, but this also requires additional barriers (often called "async compute")
@@ -141,7 +141,7 @@ public:
 		}
 	}
 
-	// Enable physical m_vkDevice features required for this example
+	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
 	virtual void getEnabledFeatures()
 	{
 		if (deviceFeatures.samplerAnisotropy) {
@@ -288,7 +288,7 @@ public:
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSet, 0, NULL);
 			vkCmdBindIndexBuffer(drawCmdBuffers[i], graphics.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &storageBuffers.output.buffer, offsets);
-			vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, 1, 0, 0, 0);
 
 			drawUI(drawCmdBuffers[i]);
 
@@ -418,7 +418,7 @@ public:
 			indices.push_back(0xFFFFFFFF);
 		}
 		uint32_t indexBufferSize = static_cast<uint32_t>(indices.size()) * sizeof(uint32_t);
-		indexCount = static_cast<uint32_t>(indices.size());
+		m_indexCount = static_cast<uint32_t>(indices.size());
 
 		vulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,

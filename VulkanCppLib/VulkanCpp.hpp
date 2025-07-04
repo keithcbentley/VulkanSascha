@@ -333,7 +333,7 @@ public:
 
     //  Handy interoperability type conversion.
     //  We can pass our objects to Vulkan functions
-    //  and have the Vulkan handle extracted automagically.
+    //  and have the Vulkan m_vkBuffer extracted automagically.
     //  Keeps the code tidier.
     operator Handle_t() const
     {
@@ -703,7 +703,7 @@ class PhysicalDevice {
 
 public:
     //  Vulkan physical devices aren't created or destroyed like other Vulkan
-    //  objects.  We just get it from the Vulkan instance and use it everywhere.
+    //  objects.  We just get it from the Vulkan m_vulkanInstance and use it everywhere.
     //  Since it's so simple, we just default the basic delete, copy, and assignment.
     //  Just spelling it out explicitly here so there's no confusion.
     PhysicalDevice() = default;
@@ -740,7 +740,7 @@ class VulkanInstanceCreateInfo : public VkInstanceCreateInfo {
     //  We use sets to collect the layer names and extension names
     //  in order to avoid duplicates.  The info from the sets
     //  will then be used to assemble the vectors (count, data)
-    //  used to call the create instance function.
+    //  used to call the create m_vulkanInstance function.
     std::unordered_set<std::string> m_layerNames {};
     std::unordered_set<std::string> m_extensionNames {};
 
@@ -761,7 +761,7 @@ public:
 
     //  Don't allow just grabbing a pointer since the data
     //  may not have been assembled into the vectors for the
-    //  create instance call.
+    //  create m_vulkanInstance call.
     const VkInstanceCreateInfo* operator&() = delete;
 
     VulkanInstanceCreateInfo(VersionNumber versionNumber)
@@ -924,7 +924,7 @@ public:
         }
         //	IMPORTANT: this is crazy.  If we don't call
         //	vkGetPhysicalDeviceQueueFamilyProperties to get the number
-        //	of queue families, we can't create device queues later without
+        //	of queue families, we can't create m_vkDevice queues later without
         //	the validation layer spitting out an error.  Just calling the function
         //	(and throwing away the value) seems to be sufficient.
         for (VkPhysicalDevice vkPhysicalDevice : vkPhysicalDevices) {
@@ -1055,7 +1055,7 @@ public:
 };
 
 class DeviceQueueCreateInfo : public VkDeviceQueueCreateInfo {
-    //  TODO: doesn't handle flags or priorities other than 1.0f.
+    //  TODO: doesn't m_vkBuffer flags or priorities other than 1.0f.
 
     static inline constexpr int MAX_DEVICE_QUEUES = 16;
 
@@ -1092,7 +1092,7 @@ class DeviceCreateInfo {
     std::vector<std::string> m_extensionNames {};
     std::vector<const char*> m_extensionStringPtrs {};
 
-    //  TODO: doesn't handle the full queue create options.
+    //  TODO: doesn't m_vkBuffer the full queue create options.
     //  Maybe make that info into a separate structure.
     // static constexpr int MAX_DEVICE_QUEUE_FAMILIES = 8;
     // std::array<int, MAX_DEVICE_QUEUE_FAMILIES> m_deviceQueueCounts {};
@@ -1250,7 +1250,7 @@ public:
 
     //	Kind of an exception to the argument ordering usually used.
     //	Flags are almost always 0, so make them optional.  Only
-    //	the device is required.
+    //	the m_vkDevice is required.
     Fence(VkDevice vkDevice, VkFenceCreateFlags vkFenceCreateFlags = 0)
     {
         VkFenceCreateInfo vkFenceCreateInfo {};
@@ -1524,6 +1524,32 @@ public:
     }
 };
 
+class RenderingAttachmentInfo : public VkRenderingAttachmentInfo {
+
+public:
+    RenderingAttachmentInfo()
+        : VkRenderingAttachmentInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    }
+
+    ~RenderingAttachmentInfo() = default;
+    RenderingAttachmentInfo(const RenderingAttachmentInfo&) = default;
+    RenderingAttachmentInfo& operator=(const RenderingAttachmentInfo&) = default;
+    RenderingAttachmentInfo(RenderingAttachmentInfo&&) noexcept = default;
+    RenderingAttachmentInfo& operator=(RenderingAttachmentInfo&&) noexcept = default;
+};
+
+class RenderingInfo : public VkRenderingInfo {
+
+public:
+    RenderingInfo()
+        : VkRenderingInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    }
+};
+
 class AttachmentDescription : public VkAttachmentDescription {
 
 public:
@@ -1677,7 +1703,6 @@ public:
     {
         return m_vkSubpassDescription;
     }
-
 };
 
 class SubpassDependency : public VkSubpassDependency {
@@ -1693,8 +1718,6 @@ public:
     SubpassDependency& operator=(const SubpassDependency&) = default;
     SubpassDependency(SubpassDependency&&) noexcept = default;
     SubpassDependency& operator=(SubpassDependency&&) noexcept = default;
-
-
 
     SubpassDependency& setDependency(
         uint32_t srcSubpassArg,
@@ -1742,8 +1765,6 @@ public:
     }
 };
 static_assert(sizeof(SubpassDependency) == sizeof(VkSubpassDependency));
-
-
 
 class RenderPassCreateInfo : public VkRenderPassCreateInfo {
 
@@ -1932,14 +1953,14 @@ public:
         new (this) Image(vkImage, device, &destroy);
     }
 
-    // static Image fromExisting(VkImage vkImage, Device device) {
-    //	return Image(vkImage, device, nullptr);
+    // static Image fromExisting(VkImage vkImage, Device m_vkDevice) {
+    //	return Image(vkImage, m_vkDevice, nullptr);
     // }
 
-    // static std::vector<Image> fromExisting(std::vector<VkImage>& vkImages, Device device) {
+    // static std::vector<Image> fromExisting(std::vector<VkImage>& vkImages, Device m_vkDevice) {
     //	std::vector<Image> images;
     //	for (VkImage vkImage : vkImages) {
-    //		images.push_back(fromExisting(vkImage, device));
+    //		images.push_back(fromExisting(vkImage, m_vkDevice));
     //	}
     //	return images;
     // }
@@ -2102,7 +2123,7 @@ public:
         subresourceRange.baseArrayLayer = 0;
         subresourceRange.layerCount = 1;
 
-        //	If the image memory barrier is to be used in a sequence
+        //	If the image m_vkDeviceMemory barrier is to be used in a sequence
         //	of command buffer commands, then the access masks will need
         //	to be set according to usage.  (To the best of my current knowledge.)
     }
@@ -2213,7 +2234,7 @@ class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
 
     CommandBuffer(
         VkCommandBuffer vkCommandBuffer,
-        CommandPool commandPool,
+        const CommandPool& commandPool,
         DestroyFunc_t pfnDestroy)
         : HandleWithOwner(vkCommandBuffer, commandPool, pfnDestroy)
     {
@@ -2222,7 +2243,7 @@ class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
 public:
     CommandBuffer() = default;
 
-    CommandBuffer(CommandPool commandPool)
+    CommandBuffer(const CommandPool& commandPool)
     {
         VkCommandBufferAllocateInfo allocInfo {};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -2232,6 +2253,11 @@ public:
         VkCommandBuffer vkCommandBuffer;
         vkAllocateCommandBuffers(commandPool.getVkDevice(), &allocInfo, &vkCommandBuffer);
         new (this) CommandBuffer(vkCommandBuffer, commandPool, &destroy);
+    }
+
+    static CommandBuffer makeCopy(VkCommandBuffer vkCommandBuffer)
+    {
+        return CommandBuffer(vkCommandBuffer, CommandPool(), nullptr);
     }
 
     void reset() const
@@ -2267,6 +2293,16 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
+    }
+
+    void cmdBeginRendering(const VkRenderingInfo& vkRenderingInfo) const
+    {
+        vkCmdBeginRendering(*this, &vkRenderingInfo);
+    }
+
+    void cmdEndRendering() const
+    {
+        vkCmdEndRendering(*this);
     }
 
     void cmdCopyBufferToImage(
@@ -2363,6 +2399,22 @@ public:
         vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
             vkPipelineLayout, 0, 1, &vkDescriptorSet, 0, nullptr);
     }
+
+    void cmdBindVertexBuffer(VkBuffer vkBuffer) const
+    {
+        VkDeviceSize offsets[1] { 0 };
+        vkCmdBindVertexBuffers(*this, 0, 1, &vkBuffer, offsets);
+    }
+
+    void cmdBindIndexBuffer(VkBuffer vkBuffer, VkIndexType vkIndexType) const
+    {
+        vkCmdBindIndexBuffer(*this, vkBuffer, 0, vkIndexType);
+    }
+
+    void cmdDrawIndexed(uint32_t indexCount) const
+    {
+        vkCmdDrawIndexed(*this, indexCount, 1, 0, 0, 0);
+    }
 };
 
 class SubmitInfo2 : public VkSubmitInfo2 {
@@ -2436,7 +2488,7 @@ public:
 
 class PresentInfo : public VkPresentInfoKHR {
 
-    //	TODO: modify to handle more semaphores?
+    //	TODO: modify to m_vkBuffer more semaphores?
     VkSemaphore m_vkSemaphoreWait = nullptr;
     VkSwapchainKHR m_vkSwapchain = nullptr;
     uint32_t m_swapchainImageIndex = 0;
@@ -2492,7 +2544,7 @@ public:
 
     Queue() = default;
 
-    //	Queues always come from the device and are never (explicitly) destroyed
+    //	Queues always come from the m_vkDevice and are never (explicitly) destroyed
     Queue(VkQueue vkQueue, uint32_t queueFamilyIndex, Device device)
         : HandleWithOwner(vkQueue, device, nullptr)
         , m_queueFamilyIndex(queueFamilyIndex)
@@ -3219,7 +3271,7 @@ public:
     {
         //	Take the binding and split it to the binding description
         //	and the corresponding attribute description since they are
-        //	passed separately when creating the pipeline.
+        //	passed separately when creating the m_vkPipeline.
         m_vertexInputBindingDescriptions.push_back(vertexBinding.m_vkVertexInputBindingDescription);
         for (const VkVertexInputAttributeDescription& vkVertexInputAttributeDescription : vertexBinding.m_vkVertexInputAttributeDescriptions) {
             m_vertexInputAttributeDescriptions.push_back(vkVertexInputAttributeDescription);
@@ -3254,13 +3306,13 @@ public:
     }
 
     //	A bit dodgy.  Returning pointer to internal member.
-    //	Should just be used to create pipeline.
+    //	Should just be used to create m_vkPipeline.
     VkGraphicsPipelineCreateInfo* assemble()
     {
 
         //	TODO: need to clear out create info in case we are called twice.
 
-        //	Assemble pipeline create info
+        //	Assemble m_vkPipeline create info
         m_vkGraphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
         //	Shaders
@@ -3591,7 +3643,7 @@ public:
     //	Just save the create info since we need parts of it later.
     SwapchainCreateInfo m_swapchainCreateInfo;
 
-    //	Save the "smart" surface since the create info only has the base handle.
+    //	Save the "smart" m_vkSurface since the create info only has the base m_vkBuffer.
     Surface m_surface;
 
     RenderPass m_renderPass;
@@ -3672,7 +3724,7 @@ private:
         if (surfaceExtent.width == 0 || surfaceExtent.height == 0) {
             return Swapchain {};
         }
-        //	TODO: should probably sanity check some other surface capabilities.
+        //	TODO: should probably sanity check some other m_vkSurface capabilities.
         swapChainCreateInfo.surface = surface;
         swapChainCreateInfo.imageExtent = surfaceExtent;
         swapChainCreateInfo.preTransform = vkSurfaceCapabilities.currentTransform;

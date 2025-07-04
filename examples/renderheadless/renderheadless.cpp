@@ -79,8 +79,8 @@ public:
 	VkCommandPool commandPool;
 	VkCommandBuffer commandBuffer;
 	VkDescriptorSetLayout descriptorSetLayout;
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipeline;
+	VkPipelineLayout m_vkPipelineLayout;
+	VkPipeline m_vkPipeline;
 	std::vector<VkShaderModule> shaderModules;
 	VkBuffer vertexBuffer, indexBuffer;
 	VkDeviceMemory vertexMemory, indexMemory;
@@ -574,7 +574,7 @@ public:
 		}
 
 		/*
-			Prepare graphics pipeline
+			Prepare graphics m_vkPipeline
 		*/
 		{
 			std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {};
@@ -590,13 +590,13 @@ public:
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 
-			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 			VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
 			pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 			VK_CHECK_RESULT(vkCreatePipelineCache(device, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
 
-			// Create pipeline
+			// Create m_vkPipeline
 			VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
 				vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
 
@@ -626,7 +626,7 @@ public:
 				vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 
 			VkGraphicsPipelineCreateInfo pipelineCreateInfo =
-				vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass);
+				vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
 
 			std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
 
@@ -679,7 +679,7 @@ public:
 			shaderStages[1].module = vks::tools::loadShader((shadersPath + "triangle.frag.spv").c_str(), device);
 #endif
 			shaderModules = { shaderStages[0].module, shaderStages[1].module };
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 		}
 
 		/*
@@ -724,7 +724,7 @@ public:
 			scissor.extent.height = height;
 			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			// Render scene
 			VkDeviceSize offsets[1] = { 0 };
@@ -739,7 +739,7 @@ public:
 
 			for (auto v : pos) {
 				glm::mat4 mvpMatrix = glm::perspective(glm::radians(60.0f), (float)width / (float)height, 0.1f, 256.0f) * glm::translate(glm::mat4(1.0f), v);
-				vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mvpMatrix), &mvpMatrix);
+				vkCmdPushConstants(commandBuffer, m_vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mvpMatrix), &mvpMatrix);
 				vkCmdDrawIndexed(commandBuffer, 3, 1, 0, 0, 0);
 			}
 
@@ -910,9 +910,9 @@ public:
 		vkFreeMemory(device, depthAttachment.memory, nullptr);
 		vkDestroyRenderPass(device, renderPass, nullptr);
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
-		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(device, m_vkPipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-		vkDestroyPipeline(device, pipeline, nullptr);
+		vkDestroyPipeline(device, m_vkPipeline, nullptr);
 		vkDestroyPipelineCache(device, pipelineCache, nullptr);
 		vkDestroyCommandPool(device, commandPool, nullptr);
 		for (auto shadermodule : shaderModules) {

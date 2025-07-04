@@ -2,8 +2,8 @@
 * Vulkan Example - Using dynamic state
 * 
 * This sample demonstrates the use of some of the VK_EXT_dynamic_state extensions
-* These allow an application to set some pipeline related state dynamically at drawtime
-* instead of having to pre-bake the state into a pipeline
+* These allow an application to set some m_vkPipeline related state dynamically at drawtime
+* instead of having to pre-bake the state into a m_vkPipeline
 * This can help reduce the number of pipelines required
 *
 * Copyright (C) 2022-2023 by Sascha Willems - www.saschawillems.de
@@ -28,8 +28,8 @@ public:
 
 	float clearColor[4] = { 0.0f, 0.0f, 0.2f, 1.0f };
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
-	VkPipeline pipeline{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
+	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
@@ -85,8 +85,8 @@ public:
 	~VulkanExample()
 	{
 		if (m_vkDevice) {
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
-			vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
+			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
 		}
@@ -94,7 +94,7 @@ public:
 
 	void getEnabledExtensions()
 	{
-		// Get the full list of extended dynamic state features supported by the m_vkDevice
+		// Get the full list of extended dynamic state m_vkPhysicalDeviceFeatures supported by the m_vkDevice
 		extendedDynamicStateFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
 		extendedDynamicStateFeaturesEXT.pNext = &extendedDynamicState2FeaturesEXT;
 		extendedDynamicState2FeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
@@ -105,10 +105,10 @@ public:
 		VkPhysicalDeviceFeatures2 physicalDeviceFeatures2;
 		physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		physicalDeviceFeatures2.pNext = &extendedDynamicStateFeaturesEXT;
-		vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalDeviceFeatures2);
+		vkGetPhysicalDeviceFeatures2(m_vkPhysicalDevice, &physicalDeviceFeatures2);
 
 		// Check what dynamic states are supported by the current implementation
-		// Checking for available features is probably sufficient, but retained redundant extension checks for clarity and consistency
+		// Checking for available m_vkPhysicalDeviceFeatures is probably sufficient, but retained redundant extension checks for clarity and consistency
 		hasDynamicState = vulkanDevice->extensionSupported(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) && extendedDynamicStateFeaturesEXT.extendedDynamicState;
 		hasDynamicState2 = vulkanDevice->extensionSupported(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME) && extendedDynamicState2FeaturesEXT.extendedDynamicState2;
 		hasDynamicState3 = vulkanDevice->extensionSupported(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME) && extendedDynamicState3FeaturesEXT.extendedDynamicState3ColorBlendEnable && extendedDynamicState3FeaturesEXT.extendedDynamicState3ColorBlendEquation;
@@ -214,10 +214,10 @@ public:
 				vkCmdSetColorBlendEquationEXT(drawCmdBuffers[i], 0, 1, &colorBlendEquation);
 			}
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			scene.bindBuffers(drawCmdBuffers[i]);
 
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 			scene.draw(drawCmdBuffers[i]);
 
 			drawUI(drawCmdBuffers[i]);
@@ -265,10 +265,10 @@ public:
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
-		// Instead of having to create a pipeline for each state combination, we only create one pipeline and toggle the new dynamic states during command buffer creation
+		// Instead of having to create a m_vkPipeline for each state combination, we only create one m_vkPipeline and toggle the new dynamic states during command buffer creation
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
 		VkPipelineRasterizationStateCreateInfo rasterizationState = vks::initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
 		VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
@@ -278,7 +278,7 @@ public:
 		VkPipelineMultisampleStateCreateInfo multisampleState = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		// All dynamic states we want to use need to be enabled at pipeline creation
+		// All dynamic states we want to use need to be enabled at m_vkPipeline creation
 		std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH, };
 		if (hasDynamicState) {
 			dynamicStateEnables.push_back(VK_DYNAMIC_STATE_CULL_MODE_EXT);
@@ -296,7 +296,7 @@ public:
 
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -308,11 +308,11 @@ public:
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState  = vkglTF::Vertex::getPipelineVertexInputState({vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Color});
 
-		// Create the graphics pipeline state objects
+		// Create the graphics m_vkPipeline state objects
 
 		shaderStages[0] = loadShader(getShadersPath() + "pipelines/phong.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "pipelines/phong.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -386,7 +386,7 @@ public:
 				rebuildCB |= overlay->checkBox("Depth test", &dynamicState.depthTest);
 				rebuildCB |= overlay->checkBox("Depth write", &dynamicState.depthWrite);
 			} else {
-				overlay->text("Extension or features not supported");
+				overlay->text("Extension or m_vkPhysicalDeviceFeatures not supported");
 			}
 		}
 		if (overlay->header("Dynamic state 2")) {
@@ -394,7 +394,7 @@ public:
 				rebuildCB |= overlay->checkBox("Rasterizer discard", &dynamicState2.rasterizerDiscardEnable);
 			}
 			else {
-				overlay->text("Extension or features not supported");
+				overlay->text("Extension or m_vkPhysicalDeviceFeatures not supported");
 			}
 		}
 		if (overlay->header("Dynamic state 3")) {
@@ -403,7 +403,7 @@ public:
 				rebuildCB |= overlay->colorPicker("Clear color", clearColor);
 			}
 			else {
-				overlay->text("Extension or features not supported");
+				overlay->text("Extension or m_vkPhysicalDeviceFeatures not supported");
 			}
 		}
 		if (rebuildCB) {

@@ -359,7 +359,7 @@ public:
 			// Set up separate renderpass with references to the color and depth attachments
 			std::array<VkAttachmentDescription, 3> attachmentDescs = {};
 
-			// Init attachment properties
+			// Init attachment m_vkPhysicalDeviceProperties
 			for (uint32_t i = 0; i < 3; ++i)
 			{
 				attachmentDescs[i].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -473,7 +473,7 @@ public:
 			// Set up separate renderpass with references to the color and depth attachments
 			std::array<VkAttachmentDescription, 1> attachmentDescs = {};
 
-			// Init attachment properties
+			// Init attachment m_vkPhysicalDeviceProperties
 			attachmentDescs[0].samples = VK_SAMPLE_COUNT_1_BIT;
 			attachmentDescs[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			attachmentDescs[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;

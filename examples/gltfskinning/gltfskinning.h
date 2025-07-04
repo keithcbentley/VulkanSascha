@@ -202,7 +202,7 @@ class VulkanExample : public VulkanExampleBase
 		} values;
 	} shaderData;
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	struct Pipelines
 	{
 		VkPipeline solid{ VK_NULL_HANDLE };

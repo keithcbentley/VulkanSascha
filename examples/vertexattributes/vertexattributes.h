@@ -107,7 +107,7 @@ public:
 		VkPipeline vertexAttributesInterleaved;
 		VkPipeline vertexAttributesSeparate;
 	} pipelines;
-	VkPipelineLayout pipelineLayout;
+	VkPipelineLayout m_vkPipelineLayout;
 
 	struct DescriptorSetLayouts {
 		VkDescriptorSetLayout matrices;

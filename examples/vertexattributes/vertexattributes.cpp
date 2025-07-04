@@ -156,7 +156,7 @@ VulkanExample::~VulkanExample()
 	if (m_vkDevice) {
 		vkDestroyPipeline(m_vkDevice, pipelines.vertexAttributesInterleaved, nullptr);
 		vkDestroyPipeline(m_vkDevice, pipelines.vertexAttributesSeparate, nullptr);
-		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.matrices, nullptr);
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.textures, nullptr);
 		indices.destroy();
@@ -167,10 +167,10 @@ VulkanExample::~VulkanExample()
 		separateVertexBuffers.uv.destroy();
 		interleavedVertexBuffer.destroy();
 		for (Image image : scene.images) {
-			vkDestroyImageView(vulkanDevice->logicalDevice, image.texture.view, nullptr);
-			vkDestroyImage(vulkanDevice->logicalDevice, image.texture.image, nullptr);
-			vkDestroySampler(vulkanDevice->logicalDevice, image.texture.sampler, nullptr);
-			vkFreeMemory(vulkanDevice->logicalDevice, image.texture.deviceMemory, nullptr);
+			vkDestroyImageView(vulkanDevice->m_vkDevice, image.texture.view, nullptr);
+			vkDestroyImage(vulkanDevice->m_vkDevice, image.texture.image, nullptr);
+			vkDestroySampler(vulkanDevice->m_vkDevice, image.texture.sampler, nullptr);
+			vkFreeMemory(vulkanDevice->m_vkDevice, image.texture.deviceMemory, nullptr);
 		}
 	}
 }
@@ -196,8 +196,8 @@ void VulkanExample::drawSceneNode(VkCommandBuffer commandBuffer, Node node)
 				pushConstBlock.nodeMatrix = nodeMatrix;
 				pushConstBlock.alphaMask = (material.alphaMode == "MASK");
 				pushConstBlock.alphaMaskCutoff = material.alphaCutOff;
-				vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
-				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &material.descriptorSet, 0, nullptr);
+				vkCmdPushConstants(commandBuffer, m_vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 1, 1, &material.descriptorSet, 0, nullptr);
 				vkCmdDrawIndexed(commandBuffer, primitive.indexCount, 1, primitive.firstIndex, 0, 0);
 			}
 		}
@@ -240,7 +240,7 @@ void VulkanExample::buildCommandBuffers()
 		vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vertexAttributeSettings == VertexAttributeSettings::separate ? pipelines.vertexAttributesSeparate : pipelines.vertexAttributesInterleaved);
 
 		// Bind scene matrices descriptor to set 0
-		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 		// Use the same index buffer, no matter how vertex attributes are passed
 		vkCmdBindIndexBuffer(drawCmdBuffers[i], indices.buffer, 0, VK_INDEX_TYPE_UINT32);
@@ -304,7 +304,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 	// Load materials
 	scene.materials.resize(glTFInput.materials.size());
 	for (size_t i = 0; i < glTFInput.materials.size(); i++) {
-		// We only read the most basic properties required for our sample
+		// We only read the most basic m_vkPhysicalDeviceProperties required for our sample
 		tinygltf::Material glTFMaterial = glTFInput.materials[i];
 		// Get the base color factor
 		if (glTFMaterial.values.find("baseColorFactor") != glTFMaterial.values.end()) {
@@ -459,7 +459,7 @@ void VulkanExample::setupDescriptors()
 	// Push constant ranges are part of the pipeline layout
 	pipelineLayoutCI.pushConstantRangeCount = 1;
 	pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 	// Descriptor set for scene matrices
 	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.matrices, 1);
@@ -495,7 +495,7 @@ void VulkanExample::preparePipelines()
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCI = vks::initializers::pipelineVertexInputStateCreateInfo();
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 	pipelineCI.pVertexInputState = &vertexInputStateCI;
 	pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 	pipelineCI.pRasterizationState = &rasterizationStateCI;

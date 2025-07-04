@@ -37,7 +37,7 @@ public:
 
 	vks::Buffer vertexBuffer;
 	vks::Buffer indexBuffer;
-	uint32_t indexCount{ 0 };
+	uint32_t m_indexCount{ 0 };
 
 	struct UniformData {
 		glm::mat4 projection;
@@ -48,8 +48,8 @@ public:
 	} uniformData;
 	vks::Buffer uniformBuffer;
 
-	VkPipeline pipeline{ VK_NULL_HANDLE };
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
@@ -66,8 +66,8 @@ public:
 	{
 		if (m_vkDevice) {
 			destroyTextureImage(texture);
-                    vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-                        vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+                    vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+                        vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
                     vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			vertexBuffer.destroy();
 			indexBuffer.destroy();
@@ -75,7 +75,7 @@ public:
 		}
 	}
 
-	// Enable physical m_vkDevice features required for this example
+	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported
@@ -95,7 +95,7 @@ public:
 			Linear tiling is thus only implemented for learning purposes, one should always prefer optimal tiled image.
 
 		Optimal tiled images:
-			These are stored in an implementation specific layout matching the capability of the hardware. They usually support more formats and features and are much faster.
+			These are stored in an implementation specific layout matching the capability of the hardware. They usually support more formats and m_vkPhysicalDeviceFeatures and are much faster.
 			Optimal tiled images are stored on the m_vkDevice and not accessible by the host. So they can't be written directly to (like liner tiled images) and always require
 			some sort of data copy, either from a buffer or	a linear tiled image.
 
@@ -134,7 +134,7 @@ public:
 #endif
 		assert(result == KTX_SUCCESS);
 
-		// Get properties required for using and upload texture data from the ktx texture object
+		// Get m_vkPhysicalDeviceProperties required for using and upload texture data from the ktx texture object
 		texture.width = ktxTexture->baseWidth;
 		texture.height = ktxTexture->baseHeight;
 		texture.mipLevels = ktxTexture->numLevels;
@@ -148,9 +148,9 @@ public:
 		bool forceLinearTiling = false;
 		if (forceLinearTiling) {
 			// Don't use linear if format is not supported for (linear) shader sampling
-			// Get m_vkDevice properties for the requested texture format
+			// Get m_vkDevice m_vkPhysicalDeviceProperties for the requested texture format
 			VkFormatProperties formatProperties;
-			vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
+			vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, format, &formatProperties);
 			useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
 		}
 
@@ -254,9 +254,9 @@ public:
 			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
-			// Insert a memory dependency at the proper pipeline stages that will execute the image layout transition
-			// Source pipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
-			// Destination pipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
+			// Insert a memory dependency at the proper m_vkPipeline stages that will execute the image layout transition
+			// Source m_vkPipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
+			// Destination m_vkPipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
 			vkCmdPipelineBarrier(
 				copyCmd,
 				VK_PIPELINE_STAGE_HOST_BIT,
@@ -281,9 +281,9 @@ public:
 			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-			// Insert a memory dependency at the proper pipeline stages that will execute the image layout transition
-			// Source pipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
-			// Destination pipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+			// Insert a memory dependency at the proper m_vkPipeline stages that will execute the image layout transition
+			// Source m_vkPipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
+			// Destination m_vkPipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 			vkCmdPipelineBarrier(
 				copyCmd,
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -361,9 +361,9 @@ public:
 			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-			// Insert a memory dependency at the proper pipeline stages that will execute the image layout transition
-			// Source pipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
-			// Destination pipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+			// Insert a memory dependency at the proper m_vkPipeline stages that will execute the image layout transition
+			// Source m_vkPipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
+			// Destination m_vkPipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 			vkCmdPipelineBarrier(
 				copyCmd,
 				VK_PIPELINE_STAGE_HOST_BIT,
@@ -396,9 +396,9 @@ public:
 		sampler.maxLod = (useStaging) ? (float)texture.mipLevels : 0.0f;
 		// Enable anisotropic filtering
 		// This feature is optional, so we must check if it's supported on the m_vkDevice
-		if (vulkanDevice->features.samplerAnisotropy) {
+		if (vulkanDevice->m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
 			// Use max. level of anisotropy for this example
-			sampler.maxAnisotropy = vulkanDevice->properties.limits.maxSamplerAnisotropy;
+			sampler.maxAnisotropy = vulkanDevice->m_vkPhysicalDeviceProperties.limits.maxSamplerAnisotropy;
 			sampler.anisotropyEnable = VK_TRUE;
 		} else {
 			// The m_vkDevice does not support anisotropic filtering
@@ -470,14 +470,14 @@ public:
 			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			VkDeviceSize offsets[1] = { 0 };
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.buffer, offsets);
 			vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-			vkCmdDrawIndexed(drawCmdBuffers[i], indexCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, 1, 0, 0, 0);
 
 			drawUI(drawCmdBuffers[i]);
 
@@ -502,7 +502,7 @@ public:
 
 		// Setup indices
 		std::vector<uint32_t> indices = { 0,1,2, 2,3,0 };
-		indexCount = static_cast<uint32_t>(indices.size());
+		m_indexCount = static_cast<uint32_t>(indices.size());
 
 		// Create buffers and upload data to the GPU
 		struct StagingBuffers {
@@ -556,7 +556,7 @@ public:
 		VkDescriptorImageInfo textureDescriptor;
 		// The image's view (images are never directly accessed by the shader, but rather through views defining subresources)
 		textureDescriptor.imageView = texture.view;
-		// The sampler (Telling the pipeline how to sample the texture, including repeat, border, etc.)
+		// The sampler (Telling the m_vkPipeline how to sample the texture, including repeat, border, etc.)
 		textureDescriptor.sampler = texture.sampler;
 		// The current layout of the image(Note: Should always fit the actual use, e.g.shader read)
 		textureDescriptor.imageLayout = texture.imageLayout;
@@ -578,7 +578,7 @@ public:
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -611,7 +611,7 @@ public:
 		vertexInputState.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributes.size());
 		vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
 		pipelineCreateInfo.pVertexInputState = &vertexInputState;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;
@@ -622,7 +622,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms

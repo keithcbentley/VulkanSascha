@@ -252,7 +252,7 @@ public:
 
 		// Find a suitable depth format
 		VkFormat attDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &attDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(m_vkPhysicalDevice, &attDepthFormat);
 		assert(validDepthFormat);
 
 		// G-Buffer
@@ -273,7 +273,7 @@ public:
 		{
 			std::array<VkAttachmentDescription, 4> attachmentDescs = {};
 
-			// Init attachment properties
+			// Init attachment m_vkPhysicalDeviceProperties
 			for (uint32_t i = 0; i < static_cast<uint32_t>(attachmentDescs.size()); i++)
 			{
 				attachmentDescs[i].samples = VK_SAMPLE_COUNT_1_BIT;

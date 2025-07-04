@@ -10,7 +10,7 @@
 #include "VulkanglTFModel.h"
 
 
-// Offscreen frame buffer properties
+// Offscreen frame buffer m_vkPhysicalDeviceProperties
 #define FB_DIM 256
 #define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
 
@@ -242,7 +242,7 @@ public:
 
 		// Find a suitable depth format
 		VkFormat fbDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &fbDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(m_vkPhysicalDevice, &fbDepthFormat);
 		assert(validDepthFormat);
 
 		// Create a separate render pass for the offscreen rendering as it may differ from the one used for scene rendering

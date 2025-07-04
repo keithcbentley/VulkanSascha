@@ -128,7 +128,7 @@ public:
 		buffers.lights.destroy();
 	}
 
-	// Enable physical m_vkDevice features required for this example
+	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported

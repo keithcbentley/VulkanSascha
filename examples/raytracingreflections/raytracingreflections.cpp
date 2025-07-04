@@ -32,8 +32,8 @@ public:
 	} uniformData;
 	vks::Buffer ubo;
 
-	VkPipeline pipeline;
-	VkPipelineLayout pipelineLayout;
+	VkPipeline m_vkPipeline;
+	VkPipelineLayout m_vkPipelineLayout;
 	VkDescriptorSet descriptorSet;
 	VkDescriptorSetLayout descriptorSetLayout;
 
@@ -54,8 +54,8 @@ public:
 
 	~VulkanExample()
 	{
-		vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 		deleteStorageImage();
 		deleteAccelerationStructure(bottomLevelAS);
@@ -166,7 +166,7 @@ public:
 		instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		instance.accelerationStructureReference = bottomLevelAS.deviceAddress;
 
-		// Buffer for instance data
+		// Buffer for m_vulkanInstance data
 		vks::Buffer instancesBuffer;
 		VK_CHECK_RESULT(vulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -258,7 +258,7 @@ public:
 		const uint32_t sbtSize = groupCount * handleSizeAligned;
 
 		std::vector<uint8_t> shaderHandleStorage(sbtSize);
-		VK_CHECK_RESULT(vkGetRayTracingShaderGroupHandlesKHR(m_vkDevice, pipeline, 0, groupCount, sbtSize, shaderHandleStorage.data()));
+		VK_CHECK_RESULT(vkGetRayTracingShaderGroupHandlesKHR(m_vkDevice, m_vkPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data()));
 
 		createShaderBindingTable(shaderBindingTables.raygen, 1);
 		createShaderBindingTable(shaderBindingTables.miss, 1);
@@ -320,7 +320,7 @@ public:
 	}
 
 	/*
-		Create our ray tracing pipeline
+		Create our ray tracing m_vkPipeline
 	*/
 	void createRayTracingPipeline()
 	{
@@ -341,7 +341,7 @@ public:
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayout));
 
 		VkPipelineLayoutCreateInfo pPipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pPipelineLayoutCI, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pPipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 		/*
 			Setup ray tracing shader groups
@@ -399,8 +399,8 @@ public:
 		rayTracingPipelineCI.groupCount = static_cast<uint32_t>(shaderGroups.size());
 		rayTracingPipelineCI.pGroups = shaderGroups.data();
 		rayTracingPipelineCI.maxPipelineRayRecursionDepth = std::min(uint32_t(4), rayTracingPipelineProperties.maxRayRecursionDepth);
-		rayTracingPipelineCI.layout = pipelineLayout;
-		VK_CHECK_RESULT(vkCreateRayTracingPipelinesKHR(m_vkDevice, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &pipeline));
+		rayTracingPipelineCI.layout = m_vkPipelineLayout;
+		VK_CHECK_RESULT(vkCreateRayTracingPipelinesKHR(m_vkDevice, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	/*
@@ -451,8 +451,8 @@ public:
 		{
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, 1, &descriptorSet, 0, 0);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_vkPipeline);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, 0);
 
 			/*
 				Dispatch the ray tracing commands
@@ -530,7 +530,7 @@ public:
 
 	void getEnabledFeatures()
 	{
-		// Enable features required for ray tracing using feature chaining via pNext		
+		// Enable m_vkPhysicalDeviceFeatures required for ray tracing using feature chaining via pNext		
 		enabledBufferDeviceAddresFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
 		enabledBufferDeviceAddresFeatures.bufferDeviceAddress = VK_TRUE;
 

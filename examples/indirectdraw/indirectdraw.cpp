@@ -47,7 +47,7 @@ public:
 		vkglTF::Model skysphere;
 	} models;
 
-	// Per-instance data block
+	// Per-m_vulkanInstance data block
 	struct InstanceData {
 		glm::vec3 pos;
 		glm::vec3 rot;
@@ -73,7 +73,7 @@ public:
 		VkPipeline skysphere{ VK_NULL_HANDLE };
 	} pipelines;
 
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
 
@@ -81,7 +81,7 @@ public:
 
 	uint32_t objectCount = 0;
 
-	// Store the indirect draw commands containing index offsets and instance count per object
+	// Store the indirect draw commands containing index offsets and m_vulkanInstance count per object
 	std::vector<VkDrawIndexedIndirectCommand> indirectCommands;
 
 	VulkanExample() : VulkanExampleBase()
@@ -100,7 +100,7 @@ public:
 			vkDestroyPipeline(m_vkDevice, pipelines.plants, nullptr);
 			vkDestroyPipeline(m_vkDevice, pipelines.ground, nullptr);
 			vkDestroyPipeline(m_vkDevice, pipelines.skysphere, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 			textures.plants.destroy();
 			textures.ground.destroy();
@@ -110,7 +110,7 @@ public:
 		}
 	}
 
-	// Enable physical m_vkDevice features required for this example
+	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Example uses multi draw indirect if available
@@ -154,7 +154,7 @@ public:
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
 			// Skysphere
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.skysphere);
@@ -174,8 +174,8 @@ public:
 
 			// If the multi draw feature is supported:
 			// One draw call for an arbitrary number of objects
-			// Index offsets and instance count are taken from the indirect buffer
-			if (vulkanDevice->features.multiDrawIndirect)
+			// Index offsets and m_vulkanInstance count are taken from the indirect buffer
+			if (vulkanDevice->m_vkPhysicalDeviceFeatures.multiDrawIndirect)
 			{
 				vkCmdDrawIndexedIndirect(drawCmdBuffers[i], indirectCommandsBuffer.buffer, 0, indirectDrawCount, sizeof(VkDrawIndexedIndirectCommand));
 			}
@@ -246,7 +246,7 @@ public:
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipelines
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -260,7 +260,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;
 		pipelineCreateInfo.pColorBlendState = &colorBlendState;
@@ -281,12 +281,12 @@ public:
 		bindingDescriptions = {
 		    // Binding point 0: Mesh vertex layout description at per-vertex rate
 		    vks::initializers::vertexInputBindingDescription(0, sizeof(vkglTF::Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
-		    // Binding point 1: Instanced data at per-instance rate
+		    // Binding point 1: Instanced data at per-m_vulkanInstance rate
 		    vks::initializers::vertexInputBindingDescription(1, sizeof(InstanceData), VK_VERTEX_INPUT_RATE_INSTANCE)
 		};
 
 		// Vertex attribute bindings
-		// Note that the shader declaration for per-vertex and per-instance attributes is the same, the different input rates are only stored in the bindings:
+		// Note that the shader declaration for per-vertex and per-m_vulkanInstance attributes is the same, the different input rates are only stored in the bindings:
 		// instanced.vert:
 		//	layout (location = 0) in vec3 inPos;		Per-Vertex
 		//	...
@@ -299,7 +299,7 @@ public:
 		    vks::initializers::vertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6),					// Location 2: Texture coordinates
 		    vks::initializers::vertexInputAttributeDescription(0, 3, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 8),				// Location 3: Color
 		    // Per-Instance attributes
-		    // These are fetched for each instance rendered
+		    // These are fetched for each m_vulkanInstance rendered
 		    vks::initializers::vertexInputAttributeDescription(1, 4, VK_FORMAT_R32G32B32_SFLOAT, offsetof(InstanceData, pos)),	// Location 4: Position
 		    vks::initializers::vertexInputAttributeDescription(1, 5, VK_FORMAT_R32G32B32_SFLOAT, offsetof(InstanceData, rot)),	// Location 5: Rotation
 		    vks::initializers::vertexInputAttributeDescription(1, 6, VK_FORMAT_R32_SFLOAT, offsetof(InstanceData, scale)),		// Location 6: Scale
@@ -469,7 +469,7 @@ public:
 
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay)
 	{
-		if (!vulkanDevice->features.multiDrawIndirect) {
+		if (!vulkanDevice->m_vkPhysicalDeviceFeatures.multiDrawIndirect) {
 			if (overlay->header("Info")) {
 				overlay->text("multiDrawIndirect not supported");
 			}

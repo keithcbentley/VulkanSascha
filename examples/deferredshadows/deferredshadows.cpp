@@ -88,7 +88,7 @@ public:
 		VkPipeline offscreen{ VK_NULL_HANDLE };
 		VkPipeline shadowpass{ VK_NULL_HANDLE };
 	} pipelines;
-	VkPipelineLayout pipelineLayout{ VK_NULL_HANDLE };
+	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 
 	struct {
 		VkDescriptorSet model{ VK_NULL_HANDLE };
@@ -143,7 +143,7 @@ public:
 		vkDestroyPipeline(m_vkDevice, pipelines.offscreen, nullptr);
 		vkDestroyPipeline(m_vkDevice, pipelines.shadowpass, nullptr);
 
-		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 
@@ -161,7 +161,7 @@ public:
 		vkDestroySemaphore(m_vkDevice, offscreenSemaphore, nullptr);
 	}
 
-	// Enable physical m_vkDevice features required for this example
+	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
 	virtual void getEnabledFeatures()
 	{
 		// Geometry shader support is required for writing to multiple shadow map layers in one single pass
@@ -194,7 +194,7 @@ public:
 	{
 		frameBuffers.shadow = new vks::Framebuffer(vulkanDevice);
 
-		// Shadowmap properties
+		// Shadowmap m_vkPhysicalDeviceProperties
 #if defined(__ANDROID__)
 		// Use smaller shadow maps on mobile due to performance reasons
 		frameBuffers.shadow->width = 1024;
@@ -206,7 +206,7 @@ public:
 
 		// Find a suitable depth format
 		VkFormat shadowMapFormat;
-		VkBool32 validShadowMapFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &shadowMapFormat);
+		VkBool32 validShadowMapFormat = vks::tools::getSupportedDepthFormat(m_vkPhysicalDevice, &shadowMapFormat);
 		assert(validShadowMapFormat);
 
 		// Create a layered depth attachment for rendering the depth maps from the lights' point of view
@@ -266,7 +266,7 @@ public:
 		// Depth attachment
 		// Find a suitable depth format
 		VkFormat attDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &attDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(m_vkPhysicalDevice, &attDepthFormat);
 		assert(validDepthFormat);
 
 		attachmentInfo.format = attDepthFormat;
@@ -284,11 +284,11 @@ public:
 	void renderScene(VkCommandBuffer cmdBuffer, bool shadow)
 	{
 		// Background
-		vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, shadow ? &descriptorSets.shadow : &descriptorSets.background, 0, NULL);
+		vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, shadow ? &descriptorSets.shadow : &descriptorSets.background, 0, NULL);
 		models.background.draw(cmdBuffer);
 
 		// Objects
-		vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, shadow ? &descriptorSets.shadow : &descriptorSets.model, 0, NULL);
+		vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, shadow ? &descriptorSets.shadow : &descriptorSets.model, 0, NULL);
 		models.model.bindBuffers(cmdBuffer);
 		vkCmdDrawIndexed(cmdBuffer, models.model.indices.count, 3, 0, 0, 0);
 	}
@@ -417,7 +417,7 @@ public:
 			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets.composition, 0, nullptr);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSets.composition, 0, nullptr);
 
 			// Final composition as full screen quad
 			// Note: Also used for debug display if debugDisplayTarget > 0
@@ -544,7 +544,7 @@ public:
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipelines
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -558,7 +558,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;

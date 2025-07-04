@@ -572,7 +572,7 @@ public:
 		computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computenbody/particle_calculate.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
 
 		// We want to use as much shared memory for the compute shader invocations as available, so we calculate it based on the m_vkDevice limits and pass it to the shader via specialization constants
-		uint32_t sharedDataSize = std::min((uint32_t)1024, (uint32_t)(vulkanDevice->properties.limits.maxComputeSharedMemorySize / sizeof(glm::vec4)));
+		uint32_t sharedDataSize = std::min((uint32_t)1024, (uint32_t)(vulkanDevice->m_vkPhysicalDeviceProperties.limits.maxComputeSharedMemorySize / sizeof(glm::vec4)));
 		VkSpecializationMapEntry specializationMapEntry = vks::initializers::specializationMapEntry(0, 0, sizeof(uint32_t));
 		VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(1, &specializationMapEntry, sizeof(int32_t), &sharedDataSize);
 		computePipelineCreateInfo.stage.pSpecializationInfo = &specializationInfo;

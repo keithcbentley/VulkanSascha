@@ -72,15 +72,15 @@ public:
 		// Release all Vulkan resources required for rendering imGui
 		vertexBuffer.destroy();
 		indexBuffer.destroy();
-		vkDestroyImage(device->logicalDevice, fontImage, nullptr);
-		vkDestroyImageView(device->logicalDevice, fontView, nullptr);
-		vkFreeMemory(device->logicalDevice, fontMemory, nullptr);
-		vkDestroySampler(device->logicalDevice, sampler, nullptr);
-		vkDestroyPipelineCache(device->logicalDevice, pipelineCache, nullptr);
-		vkDestroyPipeline(device->logicalDevice, pipeline, nullptr);
-		vkDestroyPipelineLayout(device->logicalDevice, pipelineLayout, nullptr);
-		vkDestroyDescriptorPool(device->logicalDevice, descriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(device->logicalDevice, descriptorSetLayout, nullptr);
+		vkDestroyImage(device->m_vkDevice, fontImage, nullptr);
+		vkDestroyImageView(device->m_vkDevice, fontView, nullptr);
+		vkFreeMemory(device->m_vkDevice, fontMemory, nullptr);
+		vkDestroySampler(device->m_vkDevice, sampler, nullptr);
+		vkDestroyPipelineCache(device->m_vkDevice, pipelineCache, nullptr);
+		vkDestroyPipeline(device->m_vkDevice, pipeline, nullptr);
+		vkDestroyPipelineLayout(device->m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyDescriptorPool(device->m_vkDevice, descriptorPool, nullptr);
+		vkDestroyDescriptorSetLayout(device->m_vkDevice, descriptorSetLayout, nullptr);
 	}
 
 	// Initialize styles, keys, etc.
@@ -154,7 +154,7 @@ public:
 			deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 			deviceProperties2.pNext = &driverProperties;
 			driverProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
-			vkGetPhysicalDeviceProperties2(device->physicalDevice, &deviceProperties2);
+			vkGetPhysicalDeviceProperties2(device->m_vkPhysicalDevice, &deviceProperties2);
 		}
 
 		// Create target image for copy
@@ -171,14 +171,14 @@ public:
 		imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_CHECK_RESULT(vkCreateImage(device->logicalDevice, &imageInfo, nullptr, &fontImage));
+		VK_CHECK_RESULT(vkCreateImage(device->m_vkDevice, &imageInfo, nullptr, &fontImage));
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(device->logicalDevice, fontImage, &memReqs);
+		vkGetImageMemoryRequirements(device->m_vkDevice, fontImage, &memReqs);
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device->logicalDevice, &memAllocInfo, nullptr, &fontMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(device->logicalDevice, fontImage, fontMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(device->m_vkDevice, &memAllocInfo, nullptr, &fontMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(device->m_vkDevice, fontImage, fontMemory, 0));
 
 		// Image view
 		VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
@@ -188,7 +188,7 @@ public:
 		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		viewInfo.subresourceRange.levelCount = 1;
 		viewInfo.subresourceRange.layerCount = 1;
-		VK_CHECK_RESULT(vkCreateImageView(device->logicalDevice, &viewInfo, nullptr, &fontView));
+		VK_CHECK_RESULT(vkCreateImageView(device->m_vkDevice, &viewInfo, nullptr, &fontView));
 
 		// Staging buffers for font data upload
 		vks::Buffer stagingBuffer;
@@ -256,25 +256,25 @@ public:
 		samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(device->logicalDevice, &samplerInfo, nullptr, &sampler));
+		VK_CHECK_RESULT(vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &sampler));
 
 		// Descriptor pool
 		std::vector<VkDescriptorPoolSize> poolSizes = {
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(device->logicalDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(device->m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
 
 		// Descriptor set layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device->logicalDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device->m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Descriptor set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device->logicalDevice, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(device->m_vkDevice, &allocInfo, &descriptorSet));
 		VkDescriptorImageInfo fontDescriptor = vks::initializers::descriptorImageInfo(
 			sampler,
 			fontView,
@@ -283,12 +283,12 @@ public:
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &fontDescriptor)
 		};
-		vkUpdateDescriptorSets(device->logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(device->m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 
 		// Pipeline cache
 		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
 		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-		VK_CHECK_RESULT(vkCreatePipelineCache(device->logicalDevice, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
+		VK_CHECK_RESULT(vkCreatePipelineCache(device->m_vkDevice, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
 
 		// Pipeline layout
 		// Push constants for UI rendering parameters
@@ -296,9 +296,9 @@ public:
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
 		pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 		pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(device->logicalDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(device->m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
-		// Setup graphics pipeline for UI rendering
+		// Setup graphics m_vkPipeline for UI rendering
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
 			vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
 
@@ -369,7 +369,7 @@ public:
 		shaderStages[0] = example->loadShader(shadersPath + "imgui/ui.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = example->loadShader(shadersPath + "imgui/ui.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device->logicalDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device->m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
 	}
 
 	// Starts a new imGui frame and sets up windows and ui elements
@@ -383,10 +383,10 @@ public:
 		ImGui::SetWindowPos(ImVec2(20 * example->ui.scale, 20 * example->ui.scale), ImGuiSetCond_FirstUseEver);
         ImGui::SetWindowSize(ImVec2(300 * example->ui.scale, 300 * example->ui.scale), ImGuiSetCond_Always);
 		ImGui::TextUnformatted(example->title.c_str());
-		ImGui::TextUnformatted(device->properties.deviceName);
+		ImGui::TextUnformatted(device->m_vkPhysicalDeviceProperties.deviceName);
 		
 		//SRS - Display Vulkan API version and m_vkDevice driver information if available (otherwise blank)
-		ImGui::Text("Vulkan API %i.%i.%i", VK_API_VERSION_MAJOR(device->properties.apiVersion), VK_API_VERSION_MINOR(device->properties.apiVersion), VK_API_VERSION_PATCH(device->properties.apiVersion));
+		ImGui::Text("Vulkan API %i.%i.%i", VK_API_VERSION_MAJOR(device->m_vkPhysicalDeviceProperties.apiVersion), VK_API_VERSION_MINOR(device->m_vkPhysicalDeviceProperties.apiVersion), VK_API_VERSION_PATCH(device->m_vkPhysicalDeviceProperties.apiVersion));
 		ImGui::Text("%s %s", driverProperties.driverName, driverProperties.driverInfo);
 
 		// Update frame time display
@@ -560,8 +560,8 @@ public:
 		glm::vec4 lightPos;
 	} uboVS;
 
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipeline;
+	VkPipelineLayout m_vkPipelineLayout;
+	VkPipeline m_vkPipeline;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSet descriptorSet;
 
@@ -582,8 +582,8 @@ public:
 
 	~VulkanExample()
 	{
-		vkDestroyPipeline(m_vkDevice, pipeline, nullptr);
-		vkDestroyPipelineLayout(m_vkDevice, pipelineLayout, nullptr);
+		vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
+		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
 
 		uniformBufferVS.destroy();
@@ -627,8 +627,8 @@ public:
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			// Render scene
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			VkDeviceSize offsets[1] = { 0 };
 			if (uiSettings.displayBackground) {
@@ -674,7 +674,7 @@ public:
 
 		// Pipeline layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Descriptor set
 		VkDescriptorSetAllocateInfo allocInfo =	vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
@@ -700,7 +700,7 @@ public:
 
 		std::array<VkPipelineShaderStageCreateInfo,2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(pipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -714,7 +714,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "imgui/scene.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "imgui/scene.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms

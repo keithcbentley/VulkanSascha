@@ -30,10 +30,10 @@
 class VulkanSwapChain
 {
 private: 
-	VkInstance instance{ VK_NULL_HANDLE };
-	VkDevice device{ VK_NULL_HANDLE };
-	VkPhysicalDevice physicalDevice{ VK_NULL_HANDLE };
-	VkSurfaceKHR surface{ VK_NULL_HANDLE };
+	VkInstance m_vkInstance{ VK_NULL_HANDLE };
+	VkDevice m_vkDevice{ VK_NULL_HANDLE };
+	VkPhysicalDevice m_vkPhysicalDevice{ VK_NULL_HANDLE };
+	VkSurfaceKHR m_vkSurface{ VK_NULL_HANDLE };
 public:
 	VkFormat colorFormat{};
 	VkColorSpaceKHR colorSpace{};
