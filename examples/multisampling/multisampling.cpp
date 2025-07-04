@@ -55,7 +55,7 @@ public:
 	{
 		title = "Multisampling";
 		camera.type = Camera::CameraType::lookat;
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
 		camera.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
 		camera.setTranslation(glm::vec3(2.5f, 2.5f, -7.5f));
 	}
@@ -105,8 +105,8 @@ public:
 		VkImageCreateInfo info = vks::initializers::imageCreateInfo();
 		info.imageType = VK_IMAGE_TYPE_2D;
 		info.format = swapChain.colorFormat;
-		info.extent.width = width;
-		info.extent.height = height;
+		info.extent.width = m_drawAreaWidth;
+		info.extent.height = m_drawAreaHeight;
 		info.extent.depth = 1;
 		info.mipLevels = 1;
 		info.arrayLayers = 1;
@@ -153,8 +153,8 @@ public:
 		// Depth target
 		info.imageType = VK_IMAGE_TYPE_2D;
 		info.format = depthFormat;
-		info.extent.width = width;
-		info.extent.height = height;
+		info.extent.width = m_drawAreaWidth;
+		info.extent.height = m_drawAreaHeight;
 		info.extent.depth = 1;
 		info.mipLevels = 1;
 		info.arrayLayers = 1;
@@ -204,7 +204,7 @@ public:
 	{
 		// Overrides the virtual function of the base class
 		
-		attachmentSize = { width, height };
+		attachmentSize = { m_drawAreaWidth, m_drawAreaHeight };
 
 		std::array<VkAttachmentDescription, 3> attachments = {};
 
@@ -298,9 +298,9 @@ public:
 		// Overrides the virtual function of the base class
 
 		// SRS - If the window is resized, the MSAA attachments need to be released and recreated
-		if (attachmentSize.width != width || attachmentSize.height != height)
+		if (attachmentSize.width != m_drawAreaWidth || attachmentSize.height != m_drawAreaHeight)
 		{
-			attachmentSize = { width, height };
+			attachmentSize = { m_drawAreaWidth, m_drawAreaHeight };
 			
 			// Destroy MSAA target
 			vkDestroyImage(m_vkDevice, multisampleTarget.color.image, nullptr);
@@ -325,8 +325,8 @@ public:
 		frameBufferCreateInfo.renderPass = renderPass;
 		frameBufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 		frameBufferCreateInfo.pAttachments = attachments.data();
-		frameBufferCreateInfo.width = width;
-		frameBufferCreateInfo.height = height;
+		frameBufferCreateInfo.width = m_drawAreaWidth;
+		frameBufferCreateInfo.height = m_drawAreaHeight;
 		frameBufferCreateInfo.layers = 1;
 
 		// Create frame buffers for every swap chain image
@@ -350,8 +350,8 @@ public:
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
 		renderPassBeginInfo.renderPass = renderPass;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 3;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -364,10 +364,10 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
@@ -508,7 +508,7 @@ public:
 	void prepare()
 	{
 		sampleCount = getMaxAvailableSampleCount();
-		ui.rasterizationSamples = sampleCount;
+		m_UIOverlay.rasterizationSamples = sampleCount;
 		VulkanExampleBase::prepare();
 		loadAssets();
 		prepareUniformBuffers();

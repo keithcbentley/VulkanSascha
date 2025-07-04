@@ -16,7 +16,7 @@ VulkanExample::VulkanExample() : VulkanExampleBase()
 	camera.flipY = true;
 	camera.setPosition(glm::vec3(0.0f, 1.0f, 0.0f));
 	camera.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
-	camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
+	camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
 	camera.setRotationSpeed(0.25f);
 	enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 	enabledDeviceExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
@@ -86,8 +86,8 @@ void VulkanExample::setupFrameBuffer()
 	frameBufferCreateInfo.renderPass = renderPass;
 	frameBufferCreateInfo.attachmentCount = 3;
 	frameBufferCreateInfo.pAttachments = attachments;
-	frameBufferCreateInfo.width = width;
-	frameBufferCreateInfo.height = height;
+	frameBufferCreateInfo.width = m_drawAreaWidth;
+	frameBufferCreateInfo.height = m_drawAreaHeight;
 	frameBufferCreateInfo.layers = 1;
 
 	// Create frame buffers for every swap chain image
@@ -230,13 +230,13 @@ void VulkanExample::buildCommandBuffers()
 	renderPassBeginInfo.renderPass = renderPass;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
-	renderPassBeginInfo.renderArea.extent.width = width;
-	renderPassBeginInfo.renderArea.extent.height = height;
+	renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+	renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 	renderPassBeginInfo.clearValueCount = 3;
 	renderPassBeginInfo.pClearValues = clearValues;
 
-	const VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
-	const VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+	const VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
+	const VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 
 	for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 	{
@@ -343,10 +343,10 @@ void VulkanExample::prepareShadingRateImage()
 	}
 
 	// Shading rate image size depends on shading rate texel size
-	// For each texel in the target image, there is a corresponding shading texel size width x height block in the shading rate image
+	// For each texel in the target image, there is a corresponding shading texel size m_drawAreaWidth x m_drawAreaHeight block in the shading rate image
 	VkExtent3D imageExtent{};
-	imageExtent.width = static_cast<uint32_t>(ceil(width / (float)physicalDeviceShadingRateImageProperties.maxFragmentShadingRateAttachmentTexelSize.width));
-	imageExtent.height = static_cast<uint32_t>(ceil(height / (float)physicalDeviceShadingRateImageProperties.maxFragmentShadingRateAttachmentTexelSize.height));
+	imageExtent.width = static_cast<uint32_t>(ceil(m_drawAreaWidth / (float)physicalDeviceShadingRateImageProperties.maxFragmentShadingRateAttachmentTexelSize.width));
+	imageExtent.height = static_cast<uint32_t>(ceil(m_drawAreaHeight / (float)physicalDeviceShadingRateImageProperties.maxFragmentShadingRateAttachmentTexelSize.height));
 	imageExtent.depth = 1;
 
 	VkImageCreateInfo imageCI{};

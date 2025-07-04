@@ -58,9 +58,9 @@ public:
 #elif defined(VK_USE_PLATFORM_METAL_EXT)
 	void initSurface(CAMetalLayer* metalLayer);
 #elif (defined(_DIRECT2DISPLAY) || defined(VK_USE_PLATFORM_HEADLESS_EXT))
-	void initSurface(uint32_t width, uint32_t height);
+	void initSurface(uint32_t m_drawAreaWidth, uint32_t m_drawAreaHeight);
 #if defined(_DIRECT2DISPLAY)
-	void createDirect2DisplaySurface(uint32_t width, uint32_t height);
+	void createDirect2DisplaySurface(uint32_t m_drawAreaWidth, uint32_t m_drawAreaHeight);
 #endif
 #elif defined(VK_USE_PLATFORM_SCREEN_QNX)
 	void initSurface(screen_context_t screen_context, screen_window_t screen_window);
@@ -68,7 +68,7 @@ public:
 	/* Set the Vulkan objects required for swapchain creation and management, must be called before swapchain creation */
 	void setContext(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device);
 	/**
-	* Create the swapchain and get its images with given width and height
+	* Create the swapchain and get its images with given m_drawAreaWidth and m_drawAreaHeight
 	* 
 	* @param width Pointer to the width of the swapchain (may be adjusted to fit the requirements of the swapchain)
 	* @param height Pointer to the height of the swapchain (may be adjusted to fit the requirements of the swapchain)

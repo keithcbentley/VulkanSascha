@@ -123,7 +123,7 @@ public:
 #endif
 		camera.position = { 2.15f, 0.3f, -8.75f };
 		camera.setRotation(glm::vec3(-0.75f, 12.5f, 0.0f));
-		camera.setPerspective(60.0f, (float)width / (float)height, zNear, zFar);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, zNear, zFar);
 		timerSpeed *= 0.25f;
 	}
 
@@ -197,8 +197,8 @@ public:
 		// Shadowmap m_vkPhysicalDeviceProperties
 #if defined(__ANDROID__)
 		// Use smaller shadow maps on mobile due to performance reasons
-		frameBuffers.shadow->width = 1024;
-		frameBuffers.shadow->height = 1024;
+		frameBuffers.shadow->m_drawAreaWidth = 1024;
+		frameBuffers.shadow->m_drawAreaHeight = 1024;
 #else
 		frameBuffers.shadow->width = 2048;
 		frameBuffers.shadow->height = 2048;
@@ -236,8 +236,8 @@ public:
 
 #if defined(__ANDROID__)
 		// Use max. screen dimension as deferred framebuffer size
-		frameBuffers.deferred->width = std::max(width, height);
-		frameBuffers.deferred->height = std::max(width, height);
+		frameBuffers.deferred->m_drawAreaWidth = std::max(m_drawAreaWidth, m_drawAreaHeight);
+		frameBuffers.deferred->m_drawAreaHeight = std::max(m_drawAreaWidth, m_drawAreaHeight);
 #else
 		frameBuffers.deferred->width = 2048;
 		frameBuffers.deferred->height = 2048;
@@ -397,8 +397,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -411,10 +411,10 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSets.composition, 0, nullptr);

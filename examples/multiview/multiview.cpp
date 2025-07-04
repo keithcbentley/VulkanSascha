@@ -118,7 +118,7 @@ public:
 			VkImageCreateInfo imageCI= vks::initializers::imageCreateInfo();
 			imageCI.imageType = VK_IMAGE_TYPE_2D;
 			imageCI.format = depthFormat;
-			imageCI.extent = { width, height, 1 };
+			imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 			imageCI.mipLevels = 1;
 			imageCI.arrayLayers = multiviewLayerCount;
 			imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -166,7 +166,7 @@ public:
 			VkImageCreateInfo imageCI = vks::initializers::imageCreateInfo();
 			imageCI.imageType = VK_IMAGE_TYPE_2D;
 			imageCI.format = swapChain.colorFormat;
-			imageCI.extent = { width, height, 1 };
+			imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 			imageCI.mipLevels = 1;
 			imageCI.arrayLayers = multiviewLayerCount;
 			imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -323,8 +323,8 @@ public:
 			framebufferCI.renderPass = multiviewPass.renderPass;
 			framebufferCI.attachmentCount = 2;
 			framebufferCI.pAttachments = attachments;
-			framebufferCI.width = width;
-			framebufferCI.height = height;
+			framebufferCI.width = m_drawAreaWidth;
+			framebufferCI.height = m_drawAreaHeight;
 			framebufferCI.layers = 1;
 			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &framebufferCI, nullptr, &multiviewPass.frameBuffer));
 		}
@@ -349,8 +349,8 @@ public:
 			renderPassBeginInfo.renderPass = renderPass;
 			renderPassBeginInfo.renderArea.offset.x = 0;
 			renderPassBeginInfo.renderArea.offset.y = 0;
-			renderPassBeginInfo.renderArea.extent.width = width;
-			renderPassBeginInfo.renderArea.extent.height = height;
+			renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+			renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 			renderPassBeginInfo.clearValueCount = 2;
 			renderPassBeginInfo.pClearValues = clearValues;
 
@@ -359,8 +359,8 @@ public:
 
 				VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 				vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-				VkViewport viewport = vks::initializers::viewport((float)width / 2.0f, (float)height, 0.0f, 1.0f);
-				VkRect2D scissor = vks::initializers::rect2D(width / 2, height, 0, 0);
+				VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth / 2.0f, (float)m_drawAreaHeight, 0.0f, 1.0f);
+				VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth / 2, m_drawAreaHeight, 0, 0);
 				vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 				vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
@@ -371,8 +371,8 @@ public:
 				vkCmdDraw(drawCmdBuffers[i], 3, 1, 0, 0);
 
 				// Right eye
-				viewport.x = (float)width / 2;
-				scissor.offset.x = width / 2;
+				viewport.x = (float)m_drawAreaWidth / 2;
+				scissor.offset.x = m_drawAreaWidth / 2;
 				vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 				vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
@@ -401,8 +401,8 @@ public:
 			renderPassBeginInfo.renderPass = multiviewPass.renderPass;
 			renderPassBeginInfo.renderArea.offset.x = 0;
 			renderPassBeginInfo.renderArea.offset.y = 0;
-			renderPassBeginInfo.renderArea.extent.width = width;
-			renderPassBeginInfo.renderArea.extent.height = height;
+			renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+			renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 			renderPassBeginInfo.clearValueCount = 2;
 			renderPassBeginInfo.pClearValues = clearValues;
 
@@ -411,9 +411,9 @@ public:
 
 				VK_CHECK_RESULT(vkBeginCommandBuffer(multiviewPass.commandBuffers[i], &cmdBufInfo));
 				vkCmdBeginRenderPass(multiviewPass.commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-				VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+				VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 				vkCmdSetViewport(multiviewPass.commandBuffers[i], 0, 1, &viewport);
-				VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+				VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 				vkCmdSetScissor(multiviewPass.commandBuffers[i], 0, 1, &scissor);
 
 				vkCmdBindDescriptorSets(multiviewPass.commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
@@ -587,7 +587,7 @@ public:
 		// See http://paulbourke.net/stereographics/stereorender/
 
 		// Calculate some variables
-		float aspectRatio = (float)(width * 0.5f) / (float)height;
+		float aspectRatio = (float)(m_drawAreaWidth * 0.5f) / (float)m_drawAreaHeight;
 		float wd2 = zNear * tan(glm::radians(fov / 2.0f));
 		float ndfl = zNear / focalLength;
 		float left, right;

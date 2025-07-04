@@ -78,7 +78,7 @@ public:
 		camera.type = Camera::CameraType::lookat;
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -6.0f));
 		camera.setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
-		camera.setPerspective(60.0f, (float) width / (float) height, 0.1f, 256.0f);
+		camera.setPerspective(60.0f, (float) m_drawAreaWidth / (float) m_drawAreaHeight, 0.1f, 256.0f);
 	}
 
 	~VulkanExample()
@@ -136,8 +136,8 @@ public:
 		VkFramebufferCreateInfo fbufCreateInfo = vks::initializers::framebufferCreateInfo();
 		fbufCreateInfo.renderPass = geometryPass.renderPass;
 		fbufCreateInfo.attachmentCount = 0;
-		fbufCreateInfo.width = width;
-		fbufCreateInfo.height = height;
+		fbufCreateInfo.width = m_drawAreaWidth;
+		fbufCreateInfo.height = m_drawAreaHeight;
 		fbufCreateInfo.layers = 1;
 
 		VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &fbufCreateInfo, nullptr, &geometryPass.framebuffer));
@@ -160,7 +160,7 @@ public:
 
 		// Set up GeometrySBO data.
 		geometrySBO.count = 0;
-		geometrySBO.maxNodeCount = NODE_COUNT * width * height;
+		geometrySBO.maxNodeCount = NODE_COUNT * m_drawAreaWidth * m_drawAreaHeight;
 		memcpy(stagingBuffer.mapped, &geometrySBO, sizeof(geometrySBO));
 
 		// Copy data to m_vkDevice
@@ -179,8 +179,8 @@ public:
 		VkImageCreateInfo imageInfo = vks::initializers::imageCreateInfo();
 		imageInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageInfo.format = VK_FORMAT_R32_UINT;
-		imageInfo.extent.width = width;
-		imageInfo.extent.height = height;
+		imageInfo.extent.width = m_drawAreaWidth;
+		imageInfo.extent.height = m_drawAreaHeight;
 		imageInfo.extent.depth = 1;
 		imageInfo.mipLevels = 1;
 		imageInfo.arrayLayers = 1;
@@ -220,8 +220,8 @@ public:
 
 		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewInfo, nullptr, &geometryPass.headIndex.view));
 
-		geometryPass.headIndex.width = width;
-		geometryPass.headIndex.height = height;
+		geometryPass.headIndex.width = m_drawAreaWidth;
+		geometryPass.headIndex.height = m_drawAreaHeight;
 		geometryPass.headIndex.mipLevels = 1;
 		geometryPass.headIndex.layerCount = 1;
 		geometryPass.headIndex.descriptor.imageView = geometryPass.headIndex.view;
@@ -426,11 +426,11 @@ public:
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		
-		VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
-		VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+		VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
+		VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{

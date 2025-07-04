@@ -106,8 +106,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -123,8 +123,8 @@ public:
 			scene.bindBuffers(drawCmdBuffers[i]);
 
 			// Render a viewport for each pipeline
-			float w = (float)width / (float)splitX;
-			float h = (float)height / (float)splitY;
+			float w = (float)m_drawAreaWidth / (float)splitX;
+			float h = (float)m_drawAreaHeight / (float)splitY;
 			uint32_t idx = 0;
 			for (uint32_t y = 0; y < splitX; y++) {
 				for (uint32_t x = 0; x < splitY; x++) {
@@ -464,7 +464,7 @@ public:
 		if (!paused) {
 			rotation += frameTimer * 0.1f;
 		}
-		camera.setPerspective(45.0f, ((float)width / (float)splitX) / ((float)height / (float)splitY), 0.1f, 256.0f);
+		camera.setPerspective(45.0f, ((float)m_drawAreaWidth / (float)splitX) / ((float)m_drawAreaHeight / (float)splitY), 0.1f, 256.0f);
 		uniformData.projection = camera.matrices.perspective;
 		uniformData.modelView = camera.matrices.view * glm::rotate(glm::mat4(1.0f), glm::radians(rotation * 360.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 		memcpy(uniformBuffer.mapped, &uniformData, sizeof(UniformData));

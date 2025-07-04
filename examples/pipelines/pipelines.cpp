@@ -40,7 +40,7 @@ public:
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -10.5f));
 		camera.setRotation(glm::vec3(-25.0f, 15.0f, 0.0f));
 		camera.setRotationSpeed(0.5f);
-		camera.setPerspective(60.0f, (float)(width / 3.0f) / (float)height, 0.1f, 256.0f);
+		camera.setPerspective(60.0f, (float)(m_drawAreaWidth / 3.0f) / (float)m_drawAreaHeight, 0.1f, 256.0f);
 	}
 
 	~VulkanExample()
@@ -68,7 +68,7 @@ public:
 			enabledFeatures.fillModeNonSolid = VK_TRUE;
 		};
 
-		// Wide lines must be present for line width > 1.0f
+		// Wide lines must be present for line m_drawAreaWidth > 1.0f
 		if (deviceFeatures.wideLines) {
 			enabledFeatures.wideLines = VK_TRUE;
 		}
@@ -86,8 +86,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -99,27 +99,27 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height,	0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight,	0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 			scene.bindBuffers(drawCmdBuffers[i]);
 
 			// Left : Render the scene using the solid colored pipeline with phong shading
-			viewport.width = (float)width / 3.0f;
+			viewport.width = (float)m_drawAreaWidth / 3.0f;
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.phong);
 			vkCmdSetLineWidth(drawCmdBuffers[i], 1.0f);
 			scene.draw(drawCmdBuffers[i]);
 
 			// Center : Render the scene using a toon style pipeline
-			viewport.x = (float)width / 3.0f;
+			viewport.x = (float)m_drawAreaWidth / 3.0f;
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.toon);
-			// Line width > 1.0f only if wide lines feature is supported
+			// Line m_drawAreaWidth > 1.0f only if wide lines feature is supported
 			if (enabledFeatures.wideLines) {
 				vkCmdSetLineWidth(drawCmdBuffers[i], 2.0f);
 			}
@@ -127,7 +127,7 @@ public:
 
 			// Right : Render the scene as wireframe (if that feature is supported by the implementation)
 			if (enabledFeatures.fillModeNonSolid) {
-				viewport.x = (float)width / 3.0f + (float)width / 3.0f;
+				viewport.x = (float)m_drawAreaWidth / 3.0f + (float)m_drawAreaWidth / 3.0f;
 				vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 				vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.wireframe);
 				scene.draw(drawCmdBuffers[i]);
@@ -256,7 +256,7 @@ public:
 	void updateUniformBuffers()
 	{
 		// Override the base sample camera setup, since we use three viewports
-		camera.setPerspective(60.0f, (float)(width / 3.0f) / (float)height, 0.1f, 256.0f);
+		camera.setPerspective(60.0f, (float)(m_drawAreaWidth / 3.0f) / (float)m_drawAreaHeight, 0.1f, 256.0f);
 		uniformData.projection = camera.matrices.perspective;
 		uniformData.modelView = camera.matrices.view;
 		memcpy(uniformBuffer.mapped, &uniformData, sizeof(UniformData));

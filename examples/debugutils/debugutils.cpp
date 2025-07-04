@@ -72,7 +72,7 @@ public:
 		camera.setRotation(glm::vec3(-4.35f, 16.25f, 0.0f));
 		camera.setRotationSpeed(0.5f);
 		camera.setPosition(glm::vec3(0.1f, 1.1f, -8.5f));
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
 	}
 
 	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
@@ -494,8 +494,8 @@ public:
 				VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
 				renderPassBeginInfo.renderPass = renderPass;
 				renderPassBeginInfo.framebuffer = frameBuffers[i];
-				renderPassBeginInfo.renderArea.extent.width = width;
-				renderPassBeginInfo.renderArea.extent.height = height;
+				renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+				renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 				renderPassBeginInfo.clearValueCount = 2;
 				renderPassBeginInfo.pClearValues = clearValues;
 
@@ -503,10 +503,10 @@ public:
 
 				vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-				VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+				VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 				vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-				VkRect2D scissor = vks::initializers::rect2D(wireframe ? width / 2 : width, height, 0, 0);
+				VkRect2D scissor = vks::initializers::rect2D(wireframe ? m_drawAreaWidth / 2 : m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 				vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 				vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
@@ -525,7 +525,7 @@ public:
 				{
 					cmdBeginLabel(drawCmdBuffers[i], "Wireframe draw", { 0.53f, 0.78f, 0.91f, 1.0f });
 
-					scissor.offset.x = width / 2;
+					scissor.offset.x = m_drawAreaWidth / 2;
 					vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 					vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.wireframe);
@@ -534,7 +534,7 @@ public:
 					cmdEndLabel(drawCmdBuffers[i]);
 
 					scissor.offset.x = 0;
-					scissor.extent.width = width;
+					scissor.extent.width = m_drawAreaWidth;
 					vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 				}
 
@@ -678,7 +678,7 @@ public:
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t)models.sceneGlow.indices.buffer, "Glow index buffer");
 		
 		// Shader module count starts at 2 when UI overlay in base class is enabled
-                uint32_t moduleIndex = m_exampleSettings.m_showOverlayUI ? 2 : 0;
+                uint32_t moduleIndex = m_exampleSettings.m_showUIOverlay ? 2 : 0;
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)shaderModules[moduleIndex + 0], "Toon shading vertex shader");
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)shaderModules[moduleIndex + 1], "Toon shading fragment shader");
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)shaderModules[moduleIndex + 2], "Color-only vertex shader");

@@ -117,12 +117,12 @@ public:
 	{
 		title = "Basic indexed triangle";
 		// To keep things simple, we don't use the UI overlay from the framework
-                m_exampleSettings.m_showOverlayUI = false;
+                m_exampleSettings.m_showUIOverlay = false;
 		// Setup a default look-at camera
 		camera.type = Camera::CameraType::lookat;
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -2.5f));
 		camera.setRotation(glm::vec3(0.0f));
-		camera.setPerspective(60.0f, (float)width / (float)height, 1.0f, 256.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 1.0f, 256.0f);
 		// Values not set here are initialized in the base class constructor
 	}
 
@@ -464,8 +464,8 @@ public:
 		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCI.imageType = VK_IMAGE_TYPE_2D;
 		imageCI.format = depthFormat;
-		// Use example's height and width
-		imageCI.extent = { width, height, 1 };
+		// Use example's m_drawAreaHeight and m_drawAreaWidth
+		imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 		imageCI.mipLevels = 1;
 		imageCI.arrayLayers = 1;
 		imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -525,8 +525,8 @@ public:
 			frameBufferCI.renderPass = renderPass;
 			frameBufferCI.attachmentCount = static_cast<uint32_t>(attachments.size());
 			frameBufferCI.pAttachments = attachments.data();
-			frameBufferCI.width = width;
-			frameBufferCI.height = height;
+			frameBufferCI.width = m_drawAreaWidth;
+			frameBufferCI.height = m_drawAreaHeight;
 			frameBufferCI.layers = 1;
 			// Create the framebuffer
 			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCI, nullptr, &frameBuffers[i]));
@@ -958,8 +958,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 		renderPassBeginInfo.framebuffer = frameBuffers[imageIndex];
@@ -972,15 +972,15 @@ public:
 		vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		// Update dynamic viewport state
 		VkViewport viewport{};
-		viewport.height = (float)height;
-		viewport.width = (float)width;
+		viewport.height = (float)m_drawAreaHeight;
+		viewport.width = (float)m_drawAreaWidth;
 		viewport.minDepth = (float)0.0f;
 		viewport.maxDepth = (float)1.0f;
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 		// Update dynamic scissor state
 		VkRect2D scissor{};
-		scissor.extent.width = width;
-		scissor.extent.height = height;
+		scissor.extent.width = m_drawAreaWidth;
+		scissor.extent.height = m_drawAreaHeight;
 		scissor.offset.x = 0;
 		scissor.offset.y = 0;
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);

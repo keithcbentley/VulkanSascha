@@ -83,8 +83,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -100,14 +100,14 @@ public:
 			// We render to two viewports simultaneously, so we need to viewports and two scissor rectangles
 			// 0 = right, 1 = left
 			VkViewport viewports[2] = {
-				{ (float)width / 2.0f, 0, (float)width / 2.0f, (float)height, 0.0, 1.0f },
-				{ 0, 0, (float)width / 2.0f, (float)height, 0.0, 1.0f },
+				{ (float)m_drawAreaWidth / 2.0f, 0, (float)m_drawAreaWidth / 2.0f, (float)m_drawAreaHeight, 0.0, 1.0f },
+				{ 0, 0, (float)m_drawAreaWidth / 2.0f, (float)m_drawAreaHeight, 0.0, 1.0f },
 			};
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 2, viewports);
 
 			VkRect2D scissorRects[2] = {
-				vks::initializers::rect2D(width/2, height, width / 2, 0),
-				vks::initializers::rect2D(width/2, height, 0, 0),
+				vks::initializers::rect2D(m_drawAreaWidth/2, m_drawAreaHeight, m_drawAreaWidth / 2, 0),
+				vks::initializers::rect2D(m_drawAreaWidth/2, m_drawAreaHeight, 0, 0),
 			};
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 2, scissorRects);
 
@@ -211,7 +211,7 @@ public:
 		// See http://paulbourke.net/stereographics/stereorender/
 
 		// Calculate some variables
-		float aspectRatio = (float)(width * 0.5f) / (float)height;
+		float aspectRatio = (float)(m_drawAreaWidth * 0.5f) / (float)m_drawAreaHeight;
 		float wd2 = zNear * tan(glm::radians(fov / 2.0f));
 		float ndfl = zNear / focalLength;
 		float left, right;

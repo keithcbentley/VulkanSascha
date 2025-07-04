@@ -135,8 +135,8 @@ public:
 };
 
 class Extent3D : public VkExtent3D { };
-//	uint32_t    width;
-//	uint32_t    height;
+//	uint32_t    m_drawAreaWidth;
+//	uint32_t    m_drawAreaHeight;
 //	uint32_t    depth;
 //} VkExtent3D;
 
@@ -2225,6 +2225,27 @@ public:
     }
 };
 
+class ImageSubresourceRange : public VkImageSubresourceRange {
+
+public:
+    ImageSubresourceRange(VkImageAspectFlags aspectMaskArg)
+        : VkImageSubresourceRange {}
+    {
+        aspectMask = aspectMaskArg;
+        levelCount = 1;
+        layerCount = 1;
+    }
+};
+
+class ImageMemoryBarrier : public VkImageMemoryBarrier {
+public:
+    ImageMemoryBarrier()
+        : VkImageMemoryBarrier {}
+    {
+        sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    }
+};
+
 class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
 
     static void destroy(VkCommandBuffer vkCommandBuffer, CommandPool commandPool)
@@ -2368,10 +2389,18 @@ public:
         VkExtent2D vkExtent2D) const
     {
         VkViewport viewport {};
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
         viewport.width = static_cast<float>(vkExtent2D.width);
         viewport.height = static_cast<float>(vkExtent2D.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(*this, 0, 1, &viewport);
+    }
+
+    void cmdSetViewport(uint32_t width, uint32_t height) const
+    {
+        VkViewport viewport {};
+        viewport.width = static_cast<float>(width);
+        viewport.height = static_cast<float>(height);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(*this, 0, 1, &viewport);
@@ -2381,8 +2410,15 @@ public:
         VkExtent2D vkExtent2D) const
     {
         VkRect2D scissor {};
-        scissor.offset = { 0, 0 };
         scissor.extent = vkExtent2D;
+        vkCmdSetScissor(*this, 0, 1, &scissor);
+    }
+
+    void cmdSetScissor(uint32_t width, uint32_t height) const
+    {
+        VkRect2D scissor {};
+        scissor.extent.width = width;
+        scissor.extent.height = height;
         vkCmdSetScissor(*this, 0, 1, &scissor);
     }
 
@@ -2414,6 +2450,34 @@ public:
     void cmdDrawIndexed(uint32_t indexCount) const
     {
         vkCmdDrawIndexed(*this, indexCount, 1, 0, 0, 0);
+    }
+
+    void cmdInsertImageMemoryBarrier(
+        VkImage vkImage,
+        VkAccessFlags vkSrcAccessMask,
+        VkAccessFlags vkDstAccessMask,
+        VkImageLayout vkImageLayoutOld,
+        VkImageLayout vkImageLayoutNew,
+        VkPipelineStageFlags vkSrcStageMask,
+        VkPipelineStageFlags vkDstStageMask,
+        const ImageSubresourceRange& imageSubresourceRange) const
+    {
+        ImageMemoryBarrier imageMemoryBarrier;
+        imageMemoryBarrier.srcAccessMask = vkSrcAccessMask;
+        imageMemoryBarrier.dstAccessMask = vkDstAccessMask;
+        imageMemoryBarrier.oldLayout = vkImageLayoutOld;
+        imageMemoryBarrier.newLayout = vkImageLayoutNew;
+        imageMemoryBarrier.image = vkImage;
+        imageMemoryBarrier.subresourceRange = imageSubresourceRange;
+
+        vkCmdPipelineBarrier(
+            *this,
+            vkSrcStageMask,
+            vkDstStageMask,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &imageMemoryBarrier);
     }
 };
 
@@ -3718,7 +3782,7 @@ private:
     {
         const VkSurfaceCapabilitiesKHR vkSurfaceCapabilities = surface.getSurfaceCapabilities();
         const VkExtent2D surfaceExtent = vkSurfaceCapabilities.currentExtent;
-        //	Can't make "real" swapchains with 0 width or height, e.g.,
+        //	Can't make "real" swapchains with 0 m_drawAreaWidth or m_drawAreaHeight, e.g.,
         //	the window is minimized.  Return a "null" swapChain if
         //	this occurs.
         if (surfaceExtent.width == 0 || surfaceExtent.height == 0) {

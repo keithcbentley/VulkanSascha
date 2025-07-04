@@ -125,7 +125,7 @@ public:
 #endif
 		camera.position = { 1.0f, 0.75f, 0.0f };
 		camera.setRotation(glm::vec3(0.0f, 90.0f, 0.0f));
-		camera.setPerspective(60.0f, (float)width / (float)height, uboSceneParams.nearPlane, uboSceneParams.farPlane);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, uboSceneParams.nearPlane, uboSceneParams.farPlane);
 	}
 
 	~VulkanExample()
@@ -239,16 +239,16 @@ public:
 	{
 		// Attachments
 #if defined(__ANDROID__)
-		const uint32_t ssaoWidth = width / 2;
-		const uint32_t ssaoHeight = height / 2;
+		const uint32_t ssaoWidth = m_drawAreaWidth / 2;
+		const uint32_t ssaoHeight = m_drawAreaHeight / 2;
 #else
-		const uint32_t ssaoWidth = width;
-		const uint32_t ssaoHeight = height;
+		const uint32_t ssaoWidth = m_drawAreaWidth;
+		const uint32_t ssaoHeight = m_drawAreaHeight;
 #endif
 
-		frameBuffers.offscreen.setSize(width, height);
+		frameBuffers.offscreen.setSize(m_drawAreaWidth, m_drawAreaHeight);
 		frameBuffers.ssao.setSize(ssaoWidth, ssaoHeight);
-		frameBuffers.ssaoBlur.setSize(width, height);
+		frameBuffers.ssaoBlur.setSize(m_drawAreaWidth, m_drawAreaHeight);
 
 		// Find a suitable depth format
 		VkFormat attDepthFormat;
@@ -256,16 +256,16 @@ public:
 		assert(validDepthFormat);
 
 		// G-Buffer
-		createAttachment(VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.offscreen.position, width, height);	// Position + Depth
-		createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.offscreen.normal, width, height);			// Normals
-		createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.offscreen.albedo, width, height);			// Albedo (color)
-		createAttachment(attDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &frameBuffers.offscreen.depth, width, height);			// Depth
+		createAttachment(VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.offscreen.position, m_drawAreaWidth, m_drawAreaHeight);	// Position + Depth
+		createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.offscreen.normal, m_drawAreaWidth, m_drawAreaHeight);			// Normals
+		createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.offscreen.albedo, m_drawAreaWidth, m_drawAreaHeight);			// Albedo (color)
+		createAttachment(attDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &frameBuffers.offscreen.depth, m_drawAreaWidth, m_drawAreaHeight);			// Depth
 
 		// SSAO
 		createAttachment(VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.ssao.color, ssaoWidth, ssaoHeight);				// Color
 
 		// SSAO blur
-		createAttachment(VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.ssaoBlur.color, width, height);					// Color
+		createAttachment(VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.ssaoBlur.color, m_drawAreaWidth, m_drawAreaHeight);					// Color
 
 		// Render passes
 
@@ -598,17 +598,17 @@ public:
 				VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
 				renderPassBeginInfo.renderPass = renderPass;
 				renderPassBeginInfo.framebuffer = VulkanExampleBase::frameBuffers[i];
-				renderPassBeginInfo.renderArea.extent.width = width;
-				renderPassBeginInfo.renderArea.extent.height = height;
+				renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+				renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 				renderPassBeginInfo.clearValueCount = 2;
 				renderPassBeginInfo.pClearValues = clearValues.data();
 
 				vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-				VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+				VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 				vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-				VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+				VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 				vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 				vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.composition, 0, 1, &descriptorSets.composition, 0, NULL);

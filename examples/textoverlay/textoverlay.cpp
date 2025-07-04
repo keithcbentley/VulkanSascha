@@ -358,7 +358,7 @@ public:
 		x = (x / fbW * 2.0f) - 1.0f;
 		y = (y / fbH * 2.0f) - 1.0f;
 
-		// Calculate text width
+		// Calculate text m_drawAreaWidth
 		float textWidth = 0;
 		for (auto letter : text)
 		{
@@ -466,8 +466,8 @@ public:
 		camera.type = Camera::CameraType::lookat;
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -2.5f));
 		camera.setRotation(glm::vec3(-25.0f, -0.0f, 0.0f));
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
-                m_exampleSettings.m_showOverlayUI = false;
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
+                m_exampleSettings.m_showUIOverlay = false;
 	}
 
 	~VulkanExample()
@@ -492,8 +492,8 @@ public:
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
 		renderPassBeginInfo.renderPass = renderPass;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -506,10 +506,10 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
@@ -535,32 +535,32 @@ public:
 
 		textOverlay->beginTextUpdate();
 
-		textOverlay->addText(title, 5.0f * ui.scale, 5.0f * ui.scale, TextOverlay::alignLeft);
+		textOverlay->addText(title, 5.0f * m_UIOverlay.scale, 5.0f * m_UIOverlay.scale, TextOverlay::alignLeft);
 
 		std::stringstream ss;
 		ss << std::fixed << std::setprecision(2) << (frameTimer * 1000.0f) << "ms (" << lastFPS << " fps)";
-		textOverlay->addText(ss.str(), 5.0f * ui.scale, 25.0f * ui.scale, TextOverlay::alignLeft);
+		textOverlay->addText(ss.str(), 5.0f * m_UIOverlay.scale, 25.0f * m_UIOverlay.scale, TextOverlay::alignLeft);
 
-		textOverlay->addText(m_vkPhysicalDeviceProperties.deviceName, 5.0f * ui.scale, 45.0f * ui.scale, TextOverlay::alignLeft);
+		textOverlay->addText(m_vkPhysicalDeviceProperties.deviceName, 5.0f * m_UIOverlay.scale, 45.0f * m_UIOverlay.scale, TextOverlay::alignLeft);
 
 		// Display current model view matrix
-		textOverlay->addText("model view matrix", (float)width - 5.0f * ui.scale, 5.0f * ui.scale, TextOverlay::alignRight);
+		textOverlay->addText("model view matrix", (float)m_drawAreaWidth - 5.0f * m_UIOverlay.scale, 5.0f * m_UIOverlay.scale, TextOverlay::alignRight);
 
 		for (uint32_t i = 0; i < 4; i++)
 		{
 			ss.str("");
 			ss << std::fixed << std::setprecision(2) << std::showpos;
 			ss << uniformData.modelView[0][i] << " " << uniformData.modelView[1][i] << " " << uniformData.modelView[2][i] << " " << uniformData.modelView[3][i];
-			textOverlay->addText(ss.str(), (float)width - 5.0f * ui.scale, (25.0f + (float)i * 20.0f) * ui.scale, TextOverlay::alignRight);
+			textOverlay->addText(ss.str(), (float)m_drawAreaWidth - 5.0f * m_UIOverlay.scale, (25.0f + (float)i * 20.0f) * m_UIOverlay.scale, TextOverlay::alignRight);
 		}
 
-		glm::vec3 projected = glm::project(glm::vec3(0.0f), uniformData.modelView, uniformData.projection, glm::vec4(0, 0, (float)width, (float)height));
+		glm::vec3 projected = glm::project(glm::vec3(0.0f), uniformData.modelView, uniformData.projection, glm::vec4(0, 0, (float)m_drawAreaWidth, (float)m_drawAreaHeight));
 		textOverlay->addText("A torus knot", projected.x, projected.y, TextOverlay::alignCenter);
 
 #if defined(__ANDROID__)
 #else
-		textOverlay->addText("Press \"space\" to toggle text overlay", 5.0f * ui.scale, 65.0f * ui.scale, TextOverlay::alignLeft);
-		textOverlay->addText("Hold middle mouse button and drag to move", 5.0f * ui.scale, 85.0f * ui.scale, TextOverlay::alignLeft);
+		textOverlay->addText("Press \"space\" to toggle text overlay", 5.0f * m_UIOverlay.scale, 65.0f * m_UIOverlay.scale, TextOverlay::alignLeft);
+		textOverlay->addText("Hold middle mouse button and drag to move", 5.0f * m_UIOverlay.scale, 85.0f * m_UIOverlay.scale, TextOverlay::alignLeft);
 #endif
 		textOverlay->endTextUpdate();
 
@@ -664,9 +664,9 @@ public:
 			vulkanDevice,
 			queue,
 			renderPass,
-			&width,
-			&height,
-			ui.scale,
+			&m_drawAreaWidth,
+			&m_drawAreaHeight,
+			m_UIOverlay.scale,
 			shaderStages
 			);
 		updateTextOverlay();

@@ -47,8 +47,8 @@ public:
 		camera.type = Camera::CameraType::lookat;
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -10.0f));
 		camera.setRotation(glm::vec3(-7.5f, 72.0f, 0.0f));
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
-                m_exampleSettings.m_showOverlayUI = false;
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
+                m_exampleSettings.m_showUIOverlay = false;
 
 		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
@@ -95,7 +95,7 @@ public:
 		VkImageCreateInfo renderImageCI = vks::initializers::imageCreateInfo();
 		renderImageCI.imageType = VK_IMAGE_TYPE_2D;
 		renderImageCI.format = swapChain.colorFormat;
-		renderImageCI.extent = { width, height, 1 };
+		renderImageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 		renderImageCI.mipLevels = 1;
 		renderImageCI.arrayLayers = 1;
 		renderImageCI.samples = multiSampleCount;
@@ -126,7 +126,7 @@ public:
 		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCI.imageType = VK_IMAGE_TYPE_2D;
 		imageCI.format = depthFormat;
-		imageCI.extent = { width, height, 1 };
+		imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 		imageCI.mipLevels = 1;
 		imageCI.arrayLayers = 1;
 		imageCI.samples = multiSampleCount;
@@ -229,7 +229,7 @@ public:
 
 			VkRenderingInfoKHR renderingInfo{};
 			renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-			renderingInfo.renderArea = { 0, 0, width, height };
+			renderingInfo.renderArea = { 0, 0, m_drawAreaWidth, m_drawAreaHeight };
 			renderingInfo.layerCount = 1;
 			renderingInfo.colorAttachmentCount = 1;
 			renderingInfo.pColorAttachments = &colorAttachment;
@@ -239,10 +239,10 @@ public:
 			// Begin dynamic rendering
 			vkCmdBeginRenderingKHR(drawCmdBuffers[i], &renderingInfo);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);

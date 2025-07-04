@@ -35,7 +35,7 @@ public:
 	{
 		title = "Saving framebuffer to screenshot";
 		camera.type = Camera::CameraType::lookat;
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 512.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 512.0f);
 		camera.setRotation(glm::vec3(-25.0f, 23.75f, 0.0f));
 		camera.setTranslation(glm::vec3(0.0f, 0.0f, -3.0f));
 	}
@@ -67,8 +67,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -81,10 +81,10 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height,	0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight,	0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
@@ -209,8 +209,8 @@ public:
 		imageCreateCI.imageType = VK_IMAGE_TYPE_2D;
 		// Note that vkCmdBlitImage (if supported) will also do format conversions if the swapchain color format would differ
 		imageCreateCI.format = VK_FORMAT_R8G8B8A8_UNORM;
-		imageCreateCI.extent.width = width;
-		imageCreateCI.extent.height = height;
+		imageCreateCI.extent.width = m_drawAreaWidth;
+		imageCreateCI.extent.height = m_drawAreaHeight;
 		imageCreateCI.extent.depth = 1;
 		imageCreateCI.arrayLayers = 1;
 		imageCreateCI.mipLevels = 1;
@@ -264,8 +264,8 @@ public:
 		{
 			// Define the region to blit (we will blit the whole swapchain image)
 			VkOffset3D blitSize;
-			blitSize.x = width;
-			blitSize.y = height;
+			blitSize.x = m_drawAreaWidth;
+			blitSize.y = m_drawAreaHeight;
 			blitSize.z = 1;
 			VkImageBlit imageBlitRegion{};
 			imageBlitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -292,8 +292,8 @@ public:
 			imageCopyRegion.srcSubresource.layerCount = 1;
 			imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			imageCopyRegion.dstSubresource.layerCount = 1;
-			imageCopyRegion.extent.width = width;
-			imageCopyRegion.extent.height = height;
+			imageCopyRegion.extent.width = m_drawAreaWidth;
+			imageCopyRegion.extent.height = m_drawAreaHeight;
 			imageCopyRegion.extent.depth = 1;
 
 			// Issue the copy command
@@ -344,7 +344,7 @@ public:
 		std::ofstream file(filename, std::ios::out | std::ios::binary);
 
 		// ppm header
-		file << "P6\n" << width << "\n" << height << "\n" << 255 << "\n";
+		file << "P6\n" << m_drawAreaWidth << "\n" << m_drawAreaHeight << "\n" << 255 << "\n";
 
 		// If source is BGR (destination is always RGB) and we can't use blit (which does automatic conversion), we'll have to manually swizzle color components
 		bool colorSwizzle = false;
@@ -357,10 +357,10 @@ public:
 		}
 
 		// ppm binary pixel data
-		for (uint32_t y = 0; y < height; y++)
+		for (uint32_t y = 0; y < m_drawAreaHeight; y++)
 		{
 			unsigned int *row = (unsigned int*)data;
-			for (uint32_t x = 0; x < width; x++)
+			for (uint32_t x = 0; x < m_drawAreaWidth; x++)
 			{
 				if (colorSwizzle)
 				{

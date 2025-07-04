@@ -78,9 +78,9 @@ public:
 	VulkanExample() : VulkanExampleBase()
 	{
 		title = "Ray tracing basic";
-            m_exampleSettings.m_showOverlayUI = false;
+            m_exampleSettings.m_showUIOverlay = false;
 		camera.type = Camera::CameraType::lookat;
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 512.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 512.0f);
 		camera.setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
 		camera.setTranslation(glm::vec3(0.0f, 0.0f, -2.5f));
 
@@ -213,8 +213,8 @@ public:
 		VkImageCreateInfo image = vks::initializers::imageCreateInfo();
 		image.imageType = VK_IMAGE_TYPE_2D;
 		image.format = swapChain.colorFormat;
-		image.extent.width = width;
-		image.extent.height = height;
+		image.extent.width = m_drawAreaWidth;
+		image.extent.height = m_drawAreaHeight;
 		image.extent.depth = 1;
 		image.mipLevels = 1;
 		image.arrayLayers = 1;
@@ -768,8 +768,8 @@ public:
 				&missShaderSbtEntry,
 				&hitShaderSbtEntry,
 				&callableShaderSbtEntry,
-				width,
-				height,
+				m_drawAreaWidth,
+				m_drawAreaHeight,
 				1);
 
 			/*
@@ -797,7 +797,7 @@ public:
 			copyRegion.srcOffset = { 0, 0, 0 };
 			copyRegion.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 			copyRegion.dstOffset = { 0, 0, 0 };
-			copyRegion.extent = { width, height, 1 };
+			copyRegion.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 			vkCmdCopyImage(drawCmdBuffers[i], storageImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapChain.images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
 			// Transition swap chain image back for presentation

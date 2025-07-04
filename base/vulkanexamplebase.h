@@ -166,10 +166,10 @@ public:
 	bool prepared = false;
 	bool resized = false;
 	bool viewUpdated = false;
-	uint32_t width = 1280;
-	uint32_t height = 720;
+	uint32_t m_drawAreaWidth = 1280;
+	uint32_t m_drawAreaHeight = 720;
 
-	vks::UIOverlay ui;
+	vks::UIOverlay m_UIOverlay;
 	CommandLineParser m_commandLineParser;
 
 	/** @brief Last frame time measured using a high performance timer (if available) */
@@ -189,7 +189,7 @@ public:
 		/** @brief Set to true if v-sync will be forced for the swapchain */
 		bool m_forceSwapChainVsync = false;
 		/** @brief Enable UI overlay */
-		bool m_showOverlayUI = true;
+		bool m_showUIOverlay = true;
 	} m_exampleSettings;
 
 	/** @brief State of gamepad input (only used on Android) */
@@ -295,7 +295,12 @@ public:
 	/** @brief Default base class constructor */
 	VulkanExampleBase();
 	virtual ~VulkanExampleBase();
-        void setCommandLineOptions();
+	VulkanExampleBase(const VulkanExampleBase&) = delete;
+	VulkanExampleBase& operator=(const VulkanExampleBase&) = delete;
+    VulkanExampleBase(VulkanExampleBase&&) noexcept = delete;
+    VulkanExampleBase& operator=(VulkanExampleBase&&) noexcept = delete;
+
+	void setCommandLineOptions();
 	/** @brief Setup the vulkan instance, enable required extensions and connect to the physical device (GPU) */
 	bool initVulkan();
 
@@ -319,7 +324,7 @@ public:
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 	struct xdg_surface *setupWindow();
 	void initWaylandConnection();
-	void setSize(int width, int height);
+	void setSize(int m_drawAreaWidth, int m_drawAreaHeight);
 	static void registryGlobalCb(void *data, struct wl_registry *registry,
 			uint32_t name, const char *interface, uint32_t version);
 	void registryGlobal(struct wl_registry *registry, uint32_t name,

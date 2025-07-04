@@ -66,7 +66,7 @@ public:
 		camera.type = Camera::CameraType::lookat;
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -2.0f));
 		camera.setRotation(glm::vec3(0.0f));
-		camera.setPerspective(60.0f, (float)width * 0.5f / (float)height, 1.0f, 256.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth * 0.5f / (float)m_drawAreaHeight, 1.0f, 256.0f);
 	}
 
 	~VulkanExample()
@@ -200,8 +200,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -234,10 +234,10 @@ public:
 				1, &imageMemoryBarrier);
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width * 0.5f, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth * 0.5f, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			VkDeviceSize offsets[1] = { 0 };
@@ -254,7 +254,7 @@ public:
 			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSetPostCompute, 0, NULL);
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
-			viewport.x = (float)width / 2.0f;
+			viewport.x = (float)m_drawAreaWidth / 2.0f;
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, 1, 0, 0, 0);
 
@@ -505,7 +505,7 @@ public:
 	void updateUniformBuffers()
 	{
 		// We need to adjust the perspective as this sample displays two viewports side-by-side
-		camera.setPerspective(60.0f, (float)width * 0.5f / (float)height, 1.0f, 256.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth * 0.5f / (float)m_drawAreaHeight, 1.0f, 256.0f);
 		graphics.uniformData.projection = camera.matrices.perspective;
 		graphics.uniformData.modelView = camera.matrices.view;
 		memcpy(graphics.uniformBuffer.mapped, &graphics.uniformData, sizeof(Graphics::UniformData));

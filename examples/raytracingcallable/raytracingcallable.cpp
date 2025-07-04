@@ -49,7 +49,7 @@ public:
 		title = "Ray tracing callable shaders";
 		timerSpeed *= 0.25f;
 		camera.type = Camera::CameraType::lookat;
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 512.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 512.0f);
 		camera.setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
 		camera.setTranslation(glm::vec3(0.0f, 0.0f, -10.0f));
 		enableExtensions();
@@ -495,7 +495,7 @@ public:
 	void handleResize()
 	{
 		// Recreate image
-		createStorageImage(swapChain.colorFormat, { width, height, 1 });
+		createStorageImage(swapChain.colorFormat, { m_drawAreaWidth, m_drawAreaHeight, 1 });
 		// Update descriptor
 		VkDescriptorImageInfo storageImageDescriptor{ VK_NULL_HANDLE, storageImage.view, VK_IMAGE_LAYOUT_GENERAL };
 		VkWriteDescriptorSet resultImageWrite = vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, &storageImageDescriptor);
@@ -533,8 +533,8 @@ public:
 				&shaderBindingTables.miss.stridedDeviceAddressRegion,
 				&shaderBindingTables.hit.stridedDeviceAddressRegion,
 				&shaderBindingTables.callable.stridedDeviceAddressRegion,
-				width,
-				height,
+				m_drawAreaWidth,
+				m_drawAreaHeight,
 				1);
 
 			/*
@@ -562,7 +562,7 @@ public:
 			copyRegion.srcOffset = { 0, 0, 0 };
 			copyRegion.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 			copyRegion.dstOffset = { 0, 0, 0 };
-			copyRegion.extent = { width, height, 1 };
+			copyRegion.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 			vkCmdCopyImage(drawCmdBuffers[i], storageImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapChain.images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
 			// Transition swap chain image back for presentation
@@ -619,7 +619,7 @@ public:
 		createBottomLevelAccelerationStructure();
 		createTopLevelAccelerationStructure();
 
-		createStorageImage(swapChain.colorFormat, { width, height, 1 });
+		createStorageImage(swapChain.colorFormat, { m_drawAreaWidth, m_drawAreaHeight, 1 });
 		createUniformBuffer();
 		createRayTracingPipeline();
 		createShaderBindingTables();

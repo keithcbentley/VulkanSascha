@@ -87,7 +87,7 @@ public:
 		camera.type = Camera::CameraType::lookat;
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -2.0f));
 		camera.setRotation(glm::vec3(0.0f));
-		camera.setPerspective(splitScreen ? 30.0f : 45.0f, (float)width / (float)(height * ((splitScreen) ? 0.5f : 1.0f)), 1.0f, 256.0f);
+		camera.setPerspective(splitScreen ? 30.0f : 45.0f, (float)m_drawAreaWidth / (float)(m_drawAreaHeight * ((splitScreen) ? 0.5f : 1.0f)), 1.0f, 256.0f);
 	}
 
 	~VulkanExample()
@@ -180,8 +180,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -193,10 +193,10 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (splitScreen) ? (float)height / 2.0f : (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (splitScreen) ? (float)m_drawAreaHeight / 2.0f : (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			VkDeviceSize offsets[1] = { 0 };
@@ -211,7 +211,7 @@ public:
 			// Linear filtered bitmap font
 			if (splitScreen)
 			{
-				viewport.y = (float)height / 2.0f;
+				viewport.y = (float)m_drawAreaHeight / 2.0f;
 				vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 				vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSets.bitmap, 0, NULL);
 				vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.bitmap);
@@ -409,7 +409,7 @@ public:
 	void updateUniformBuffers()
 	{
 		// Adjust camera perspective as we render two viewports
-		camera.setPerspective(splitScreen ? 30.0f : 45.0f, (float)width / (float)(height * ((splitScreen) ? 0.5f : 1.0f)), 1.0f, 256.0f);
+		camera.setPerspective(splitScreen ? 30.0f : 45.0f, (float)m_drawAreaWidth / (float)(m_drawAreaHeight * ((splitScreen) ? 0.5f : 1.0f)), 1.0f, 256.0f);
 		uniformData.projection = camera.matrices.perspective;
 		uniformData.modelView = camera.matrices.view;
 		memcpy(uniformBuffer.mapped, &uniformData, sizeof(UniformData));
@@ -453,7 +453,7 @@ public:
 				uniformData.outline = outline ? 1.0f : 0.0f;
 			}
 			if (overlay->checkBox("Splitscreen", &splitScreen)) {
-				camera.setPerspective(splitScreen ? 30.0f : 45.0f, (float)width / (float)(height * ((splitScreen) ? 0.5f : 1.0f)), 1.0f, 256.0f);
+				camera.setPerspective(splitScreen ? 30.0f : 45.0f, (float)m_drawAreaWidth / (float)(m_drawAreaHeight * ((splitScreen) ? 0.5f : 1.0f)), 1.0f, 256.0f);
 				buildCommandBuffers();
 			}
 		}

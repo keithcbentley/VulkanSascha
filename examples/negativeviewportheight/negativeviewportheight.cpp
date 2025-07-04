@@ -49,7 +49,7 @@ public:
 
 	VulkanExample() : VulkanExampleBase()
 	{
-		title = "Negative Viewport height";
+		title = "Negative Viewport m_drawAreaHeight";
 		// [POI] VK_KHR_MAINTENANCE1 is required for using negative viewport heights
 		// Note: This is core as of Vulkan 1.1. So if you target 1.1 you don't have to explicitly enable this
 		enabledDeviceExtensions.push_back(VK_KHR_MAINTENANCE1_EXTENSION_NAME);
@@ -77,8 +77,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -95,23 +95,23 @@ public:
 			VkViewport viewport{};
 			if (negativeViewport) {
 				viewport.x = offsetx;
-				// [POI] When using a negative viewport height, the origin needs to be adjusted too
-				viewport.y = (float)height - offsety;
-				viewport.width = (float)width;
-				// [POI] Flip the sign of the viewport's height
-				viewport.height = -(float)height;
+				// [POI] When using a negative viewport m_drawAreaHeight, the origin needs to be adjusted too
+				viewport.y = (float)m_drawAreaHeight - offsety;
+				viewport.width = (float)m_drawAreaWidth;
+				// [POI] Flip the sign of the viewport's m_drawAreaHeight
+				viewport.height = -(float)m_drawAreaHeight;
 			}
 			else {
 				viewport.x = offsetx;
 				viewport.y = offsety;
-				viewport.width = (float)width;
-				viewport.height = (float)height;
+				viewport.width = (float)m_drawAreaWidth;
+				viewport.height = (float)m_drawAreaHeight;
 			}
 			viewport.minDepth = 0.0f;
 			viewport.maxDepth = 1.0f;
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			VkDeviceSize offsets[1] = { 0 };
@@ -147,7 +147,7 @@ public:
 			float uv[2];
 		};
 
-		const float ar = (float)height / (float)width;
+		const float ar = (float)m_drawAreaHeight / (float)m_drawAreaWidth;
 
 		// OpenGL style (y points upwards)
 		std::vector<Vertex> verticesYPos = {
@@ -298,13 +298,13 @@ public:
 		}
 
 		if (overlay->header("Viewport")) {
-			if (overlay->checkBox("Negative viewport height", &negativeViewport)) {
+			if (overlay->checkBox("Negative viewport m_drawAreaHeight", &negativeViewport)) {
 				buildCommandBuffers();
 			}
-			if (overlay->sliderFloat("offset x", &offsetx, -(float)width, (float)width)) {
+			if (overlay->sliderFloat("offset x", &offsetx, -(float)m_drawAreaWidth, (float)m_drawAreaWidth)) {
 				buildCommandBuffers();
 			}
-			if (overlay->sliderFloat("offset y", &offsety, -(float)height, (float)height)) {
+			if (overlay->sliderFloat("offset y", &offsety, -(float)m_drawAreaHeight, (float)m_drawAreaHeight)) {
 				buildCommandBuffers();
 			}
 		}

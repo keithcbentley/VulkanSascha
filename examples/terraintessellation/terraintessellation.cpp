@@ -2,7 +2,7 @@
 * Vulkan Example - Dynamic terrain tessellation
 * 
 * This samples draw a terrain from a heightmap texture and uses tessellation to add in details based on camera distance
-* The height level is generated in the vertex shader by reading from the heightmap image
+* The m_drawAreaHeight level is generated in the vertex shader by reading from the heightmap image
 *
 * Copyright (C) 2016-2023 by Sascha Willems - www.saschawillems.de
 *
@@ -103,7 +103,7 @@ public:
 	{
 		title = "Dynamic terrain tessellation";
 		camera.type = Camera::CameraType::firstperson;
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 512.0f);
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 512.0f);
 		camera.setRotation(glm::vec3(-12.0f, 159.0f, 0.0f));
 		camera.setTranslation(glm::vec3(18.0f, 22.5f, 57.5f));
 		camera.movementSpeed = 10.0f;
@@ -221,7 +221,7 @@ public:
 		models.skysphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, queue, glTFLoadingFlags);
 
 		textures.skySphere.loadFromFile(getAssetPath() + "textures/skysphere_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue);
-		// Terrain textures are stored in a texture array with layers corresponding to terrain height
+		// Terrain textures are stored in a texture array with layers corresponding to terrain m_drawAreaHeight
 		textures.terrainArray.loadFromFile(getAssetPath() + "textures/terrain_texturearray_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue);
 
 		// Height data is stored in a one-channel texture
@@ -229,7 +229,7 @@ public:
 
 		VkSamplerCreateInfo samplerInfo = vks::initializers::samplerCreateInfo();
 
-		// Setup a mirroring sampler for the height map
+		// Setup a mirroring sampler for the m_drawAreaHeight map
 		vkDestroySampler(m_vkDevice, textures.heightMap.sampler, nullptr);
 		samplerInfo.magFilter = VK_FILTER_LINEAR;
 		samplerInfo.minFilter = VK_FILTER_LINEAR;
@@ -277,8 +277,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -294,10 +294,10 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			vkCmdSetLineWidth(drawCmdBuffers[i], 1.0f);
@@ -390,14 +390,14 @@ public:
 			}
 		}
 
-		// Calculate normals from the height map using a sobel filter
+		// Calculate normals from the m_drawAreaHeight map using a sobel filter
 		for (auto x = 0; x < patchSize; x++) {
 			for (auto y = 0; y < patchSize; y++) {
 				// We get 
 				float heights[3][3];
 				for (auto sx = -1; sx <= 1; sx++) {
 					for (auto sy = -1; sy <= 1; sy++) {
-						// Get height at sampled position from heightmap
+						// Get m_drawAreaHeight at sampled position from heightmap
 						glm::ivec2 rpos = glm::ivec2(x + sx, y + sy) * glm::ivec2(scale);
 						rpos.x = std::max(0, std::min(rpos.x, (int)dim - 1));
 						rpos.y = std::max(0, std::min(rpos.y, (int)dim - 1));
@@ -664,7 +664,7 @@ public:
 		uniformDataTessellation.projection = camera.matrices.perspective;
 		uniformDataTessellation.modelview = camera.matrices.view * glm::mat4(1.0f);
 		uniformDataTessellation.lightPos.y = -0.5f - uniformDataTessellation.displacementFactor; // todo: Not uesed yet
-		uniformDataTessellation.viewportDim = glm::vec2((float)width, (float)height);
+		uniformDataTessellation.viewportDim = glm::vec2((float)m_drawAreaWidth, (float)m_drawAreaHeight);
 
 		frustum.update(uniformDataTessellation.projection * uniformDataTessellation.modelview);
 		memcpy(uniformDataTessellation.frustumPlanes, frustum.planes.data(), sizeof(glm::vec4) * 6);

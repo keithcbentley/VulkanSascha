@@ -61,9 +61,9 @@ public:
 		
 		//SRS - Set ImGui font and style scale factors to handle retina and other HiDPI displays
 		ImGuiIO& io = ImGui::GetIO();
-		io.FontGlobalScale = example->ui.scale;
+		io.FontGlobalScale = example->m_UIOverlay.scale;
 		ImGuiStyle& style = ImGui::GetStyle();
-		style.ScaleAllSizes(example->ui.scale);
+		style.ScaleAllSizes(example->m_UIOverlay.scale);
 	};
 
 	~ImGUI()
@@ -136,7 +136,7 @@ public:
 		}
 	}
 
-	// Initialize all Vulkan resources used by the ui
+	// Initialize all Vulkan resources used by the m_UIOverlay
 	void initResources(VkRenderPass renderPass, VkQueue copyQueue, const std::string& shadersPath)
 	{
 		ImGuiIO& io = ImGui::GetIO();
@@ -366,13 +366,13 @@ public:
 
 		pipelineCreateInfo.pVertexInputState = &vertexInputState;
 
-		shaderStages[0] = example->loadShader(shadersPath + "imgui/ui.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-		shaderStages[1] = example->loadShader(shadersPath + "imgui/ui.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+		shaderStages[0] = example->loadShader(shadersPath + "imgui/m_UIOverlay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+		shaderStages[1] = example->loadShader(shadersPath + "imgui/m_UIOverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device->m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
 	}
 
-	// Starts a new imGui frame and sets up windows and ui elements
+	// Starts a new imGui frame and sets up windows and m_UIOverlay elements
 	void newFrame(VulkanExampleBase *example, bool updateFrameGraph)
 	{
 		ImGui::NewFrame();
@@ -380,8 +380,8 @@ public:
 		// Init imGui windows and elements
 
 		// Debug window
-		ImGui::SetWindowPos(ImVec2(20 * example->ui.scale, 20 * example->ui.scale), ImGuiSetCond_FirstUseEver);
-        ImGui::SetWindowSize(ImVec2(300 * example->ui.scale, 300 * example->ui.scale), ImGuiSetCond_Always);
+		ImGui::SetWindowPos(ImVec2(20 * example->m_UIOverlay.scale, 20 * example->m_UIOverlay.scale), ImGuiSetCond_FirstUseEver);
+        ImGui::SetWindowSize(ImVec2(300 * example->m_UIOverlay.scale, 300 * example->m_UIOverlay.scale), ImGuiSetCond_Always);
 		ImGui::TextUnformatted(example->title.c_str());
 		ImGui::TextUnformatted(device->m_vkPhysicalDeviceProperties.deviceName);
 		
@@ -409,8 +409,8 @@ public:
 		ImGui::InputFloat3("rotation", &example->camera.rotation.x, 2);
 
 		// Example settings window
-		ImGui::SetNextWindowPos(ImVec2(20 * example->ui.scale, 360 * example->ui.scale), ImGuiSetCond_FirstUseEver);
-		ImGui::SetNextWindowSize(ImVec2(300 * example->ui.scale, 200 * example->ui.scale), ImGuiSetCond_FirstUseEver);
+		ImGui::SetNextWindowPos(ImVec2(20 * example->m_UIOverlay.scale, 360 * example->m_UIOverlay.scale), ImGuiSetCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(300 * example->m_UIOverlay.scale, 200 * example->m_UIOverlay.scale), ImGuiSetCond_FirstUseEver);
 		ImGui::Begin("Example settings");
 		ImGui::Checkbox("Render models", &uiSettings.displayModels);
 		ImGui::Checkbox("Display logos", &uiSettings.displayLogos);
@@ -571,13 +571,13 @@ public:
 		camera.type = Camera::CameraType::lookat;
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -4.8f));
 		camera.setRotation(glm::vec3(4.5f, -380.0f, 0.0f));
-		camera.setPerspective(45.0f, (float)width / (float)height, 0.1f, 256.0f);
+		camera.setPerspective(45.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
 		
 		//SRS - Enable VK_KHR_get_physical_device_properties2 to retrieve m_vkDevice driver information for display
 		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 		// Don't use the ImGui overlay of the base framework in this sample
-                m_exampleSettings.m_showOverlayUI = false;
+                m_exampleSettings.m_showUIOverlay = false;
 	}
 
 	~VulkanExample()
@@ -603,8 +603,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -620,10 +620,10 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			// Render scene
@@ -644,7 +644,7 @@ public:
 			}
 
 			// Render imGui
-			if (ui.visible) {
+			if (m_UIOverlay.visible) {
 				imGui->drawFrame(drawCmdBuffers[i]);
 			}
 
@@ -770,7 +770,7 @@ public:
 	void prepareImGui()
 	{
 		imGui = new ImGUI(this);
-		imGui->init((float)width, (float)height);
+		imGui->init((float)m_drawAreaWidth, (float)m_drawAreaHeight);
 		imGui->initResources(renderPass, queue, getShadersPath());
 	}
 
@@ -796,13 +796,13 @@ public:
 		// Update imGui
 		ImGuiIO& io = ImGui::GetIO();
 
-		io.DisplaySize = ImVec2((float)width, (float)height);
+		io.DisplaySize = ImVec2((float)m_drawAreaWidth, (float)m_drawAreaHeight);
 		io.DeltaTime = frameTimer;
 
 		io.MousePos = ImVec2(mouseState.position.x, mouseState.position.y);
-		io.MouseDown[0] = mouseState.buttons.left && ui.visible;
-		io.MouseDown[1] = mouseState.buttons.right && ui.visible;
-		io.MouseDown[2] = mouseState.buttons.middle && ui.visible;
+		io.MouseDown[0] = mouseState.buttons.left && m_UIOverlay.visible;
+		io.MouseDown[1] = mouseState.buttons.right && m_UIOverlay.visible;
+		io.MouseDown[2] = mouseState.buttons.middle && m_UIOverlay.visible;
 
 		draw();
 	}
@@ -810,7 +810,7 @@ public:
 	virtual void mouseMoved(double x, double y, bool &handled)
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		handled = io.WantCaptureMouse && ui.visible;
+		handled = io.WantCaptureMouse && m_UIOverlay.visible;
 	}
 
 // Input handling is platform specific, to show how it's basically done this sample implements it for Windows

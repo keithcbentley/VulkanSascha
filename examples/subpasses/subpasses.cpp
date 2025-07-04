@@ -97,8 +97,8 @@ public:
 #endif
 		camera.setPosition(glm::vec3(-3.2f, 1.0f, 5.9f));
 		camera.setRotation(glm::vec3(0.5f, 210.05f, 0.0f));
-		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
-		ui.subpass = 2;
+		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
+		m_UIOverlay.subpass = 2;
 
 		enabledFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	}
@@ -215,9 +215,9 @@ public:
 	void setupFrameBuffer()
 	{
 		// If the window is resized, all the framebuffers/attachments used in our composition passes need to be recreated
-		if (attachments.width != width || attachments.height != height) {
-			attachments.width = width;
-			attachments.height = height;
+		if (attachments.width != m_drawAreaWidth || attachments.height != m_drawAreaHeight) {
+			attachments.width = m_drawAreaWidth;
+			attachments.height = m_drawAreaHeight;
 			createGBufferAttachments();
 			// Since the framebuffers/attachments are referred in the descriptor sets, these need to be updated too
 			// Composition pass
@@ -245,8 +245,8 @@ public:
 		frameBufferCreateInfo.renderPass = renderPass;
 		frameBufferCreateInfo.attachmentCount = 5;
 		frameBufferCreateInfo.pAttachments = attachments;
-		frameBufferCreateInfo.width = width;
-		frameBufferCreateInfo.height = height;
+		frameBufferCreateInfo.width = m_drawAreaWidth;
+		frameBufferCreateInfo.height = m_drawAreaHeight;
 		frameBufferCreateInfo.layers = 1;
 
 		// Create frame buffers for every swap chain image
@@ -265,8 +265,8 @@ public:
 	// Override render pass setup from base class
 	void setupRenderPass()
 	{
-		attachments.width = width;
-		attachments.height = height;
+		attachments.width = m_drawAreaWidth;
+		attachments.height = m_drawAreaHeight;
 
 		createGBufferAttachments();
 
@@ -441,8 +441,8 @@ public:
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = width;
-		renderPassBeginInfo.renderArea.extent.height = height;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 5;
 		renderPassBeginInfo.pClearValues = clearValues;
 
@@ -455,10 +455,10 @@ public:
 
 			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-			VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
 			// First sub pass

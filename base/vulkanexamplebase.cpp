@@ -191,7 +191,7 @@ void VulkanExampleBase::renderFrame()
 std::string VulkanExampleBase::getWindowTitle() const
 {
 	std::string windowTitle{ title + " - " + m_vkPhysicalDeviceProperties.deviceName };
-    if (!m_exampleSettings.m_showOverlayUI) {
+    if (!m_exampleSettings.m_showUIOverlay) {
 		windowTitle += " - " + std::to_string(frameCounter) + " fps";
 	}
 	return windowTitle;
@@ -233,16 +233,16 @@ void VulkanExampleBase::prepare()
 	setupRenderPass();
 	createPipelineCache();
 	setupFrameBuffer();
-        m_exampleSettings.m_showOverlayUI = m_exampleSettings.m_showOverlayUI && (!benchmark.active);
-        if (m_exampleSettings.m_showOverlayUI) {
-		ui.device = vulkanDevice;
-		ui.queue = queue;
-		ui.shaders = {
+        m_exampleSettings.m_showUIOverlay = m_exampleSettings.m_showUIOverlay && (!benchmark.active);
+        if (m_exampleSettings.m_showUIOverlay) {
+		m_UIOverlay.device = vulkanDevice;
+		m_UIOverlay.queue = queue;
+		m_UIOverlay.shaders = {
 			loadShader(getShadersPath() + "base/uioverlay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
 			loadShader(getShadersPath() + "base/uioverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
 		};
-		ui.prepareResources();
-		ui.preparePipeline(pipelineCache, renderPass, swapChain.colorFormat, depthFormat);
+		m_UIOverlay.prepareResources();
+		m_UIOverlay.preparePipeline(pipelineCache, renderPass, swapChain.colorFormat, depthFormat);
 	}
 }
 
@@ -299,7 +299,7 @@ void VulkanExampleBase::nextFrame()
 	{
 		lastFPS = static_cast<uint32_t>((float)frameCounter * (1000.0f / fpsTimer));
 #if defined(_WIN32)
-                if (!m_exampleSettings.m_showOverlayUI) {
+                if (!m_exampleSettings.m_showUIOverlay) {
 			std::string windowTitle = getWindowTitle();
 			SetWindowText(window, windowTitle.c_str());
 		}
@@ -344,8 +344,8 @@ void VulkanExampleBase::renderLoop()
 	}
 #endif
 
-	destWidth = width;
-	destHeight = height;
+	destWidth = m_drawAreaWidth;
+	destHeight = m_drawAreaHeight;
 	lastTimestamp = std::chrono::high_resolution_clock::now();
 	tPrevEnd = lastTimestamp;
 #if defined(_WIN32)
@@ -694,32 +694,32 @@ void VulkanExampleBase::renderLoop()
 
 void VulkanExampleBase::updateOverlay()
 {
-    if (!m_exampleSettings.m_showOverlayUI)
+    if (!m_exampleSettings.m_showUIOverlay)
 		return;
 
 	// The overlay does not need to be updated with each frame, so we limit the update rate
 	// Not only does this save performance but it also makes display of fast changig values like fps more stable
-	ui.updateTimer -= frameTimer;
-	if (ui.updateTimer >= 0.0f) {
+	m_UIOverlay.updateTimer -= frameTimer;
+	if (m_UIOverlay.updateTimer >= 0.0f) {
 		return;
 	}
 	// Update at max. rate of 30 fps
-	ui.updateTimer = 1.0f / 30.0f;
+	m_UIOverlay.updateTimer = 1.0f / 30.0f;
 
 	ImGuiIO& io = ImGui::GetIO();
 
-	io.DisplaySize = ImVec2((float)width, (float)height);
+	io.DisplaySize = ImVec2((float)m_drawAreaWidth, (float)m_drawAreaHeight);
 	io.DeltaTime = frameTimer;
 
 	io.MousePos = ImVec2(mouseState.position.x, mouseState.position.y);
-	io.MouseDown[0] = mouseState.buttons.left && ui.visible;
-	io.MouseDown[1] = mouseState.buttons.right && ui.visible;
-	io.MouseDown[2] = mouseState.buttons.middle && ui.visible;
+	io.MouseDown[0] = mouseState.buttons.left && m_UIOverlay.visible;
+	io.MouseDown[1] = mouseState.buttons.right && m_UIOverlay.visible;
+	io.MouseDown[2] = mouseState.buttons.middle && m_UIOverlay.visible;
 
 	ImGui::NewFrame();
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
-	ImGui::SetNextWindowPos(ImVec2(10 * ui.scale, 10 * ui.scale));
+	ImGui::SetNextWindowPos(ImVec2(10 * m_UIOverlay.scale, 10 * m_UIOverlay.scale));
 	ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiSetCond_FirstUseEver);
 	ImGui::Begin("Vulkan Example", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
 	ImGui::TextUnformatted(title.c_str());
@@ -727,10 +727,10 @@ void VulkanExampleBase::updateOverlay()
 	ImGui::Text("%.2f ms/frame (%.1d fps)", (1000.0f / lastFPS), lastFPS);
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 5.0f * ui.scale));
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 5.0f * m_UIOverlay.scale));
 #endif
-	ImGui::PushItemWidth(110.0f * ui.scale);
-	OnUpdateUIOverlay(&ui);
+	ImGui::PushItemWidth(110.0f * m_UIOverlay.scale);
+	OnUpdateUIOverlay(&m_UIOverlay);
 	ImGui::PopItemWidth();
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 	ImGui::PopStyleVar();
@@ -740,9 +740,9 @@ void VulkanExampleBase::updateOverlay()
 	ImGui::PopStyleVar();
 	ImGui::Render();
 
-	if (ui.update() || ui.updated) {
+	if (m_UIOverlay.update() || m_UIOverlay.updated) {
 		buildCommandBuffers();
-		ui.updated = false;
+		m_UIOverlay.updated = false;
 	}
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -754,13 +754,13 @@ void VulkanExampleBase::updateOverlay()
 
 void VulkanExampleBase::drawUI(const VkCommandBuffer commandBuffer)
 {
-    if (m_exampleSettings.m_showOverlayUI && ui.visible) {
-		const VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
-		const VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+    if (m_exampleSettings.m_showUIOverlay && m_UIOverlay.visible) {
+		const VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
+		const VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		ui.draw(commandBuffer);
+		m_UIOverlay.draw(commandBuffer);
 	}
 }
 
@@ -803,8 +803,8 @@ void VulkanExampleBase::setCommandLineOptions() {
     m_commandLineParser.add("validationlogfile", { "-vl", "--validationlogfile" }, 0, "Log validation messages to a textfile");
     m_commandLineParser.add("vsync", { "-vs", "--vsync" }, 0, "Enable V-Sync");
     m_commandLineParser.add("fullscreen", { "-f", "--fullscreen" }, 0, "Start in fullscreen mode");
-    m_commandLineParser.add("width", { "-w", "--width" }, 1, "Set window width");
-    m_commandLineParser.add("height", { "-h", "--height" }, 1, "Set window height");
+    m_commandLineParser.add("m_drawAreaWidth", { "-w", "--m_drawAreaWidth" }, 1, "Set window m_drawAreaWidth");
+    m_commandLineParser.add("m_drawAreaHeight", { "-h", "--m_drawAreaHeight" }, 1, "Set window m_drawAreaHeight");
     m_commandLineParser.add("shaders", { "-s", "--shaders" }, 1, "Select shader type to use (gls, hlsl or slang)");
     m_commandLineParser.add("gpuselection", { "-g", "--gpu" }, 1, "Select GPU to run on");
     m_commandLineParser.add("gpulist", { "-gl", "--listgpus" }, 0, "Display a list of available Vulkan devices");
@@ -835,11 +835,11 @@ void VulkanExampleBase::setCommandLineOptions() {
     if (m_commandLineParser.isSet("vsync")) {
         m_exampleSettings.m_forceSwapChainVsync = true;
     }
-    if (m_commandLineParser.isSet("height")) {
-        height = m_commandLineParser.getValueAsInt("height", height);
+    if (m_commandLineParser.isSet("m_drawAreaHeight")) {
+        m_drawAreaHeight = m_commandLineParser.getValueAsInt("m_drawAreaHeight", m_drawAreaHeight);
     }
-    if (m_commandLineParser.isSet("width")) {
-        width = m_commandLineParser.getValueAsInt("width", width);
+    if (m_commandLineParser.isSet("m_drawAreaWidth")) {
+        m_drawAreaWidth = m_commandLineParser.getValueAsInt("m_drawAreaWidth", m_drawAreaWidth);
     }
     if (m_commandLineParser.isSet("fullscreen")) {
         m_exampleSettings.m_fullscreen = true;
@@ -979,8 +979,8 @@ VulkanExampleBase::~VulkanExampleBase()
             vkDestroyFence(m_vkDevice, fence, nullptr);
 	}
 
-	if (m_exampleSettings.m_showOverlayUI) {
-		ui.freeResources();
+	if (m_exampleSettings.m_showUIOverlay) {
+		m_UIOverlay.freeResources();
 	}
 
 	delete vulkanDevice;
@@ -1233,13 +1233,13 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 
 	if (m_exampleSettings.m_fullscreen)
 	{
-		if ((width != (uint32_t)screenWidth) && (height != (uint32_t)screenHeight))
+		if ((m_drawAreaWidth != (uint32_t)screenWidth) && (m_drawAreaHeight != (uint32_t)screenHeight))
 		{
 			DEVMODE dmScreenSettings;
 			memset(&dmScreenSettings, 0, sizeof(dmScreenSettings));
 			dmScreenSettings.dmSize       = sizeof(dmScreenSettings);
-			dmScreenSettings.dmPelsWidth  = width;
-			dmScreenSettings.dmPelsHeight = height;
+			dmScreenSettings.dmPelsWidth  = m_drawAreaWidth;
+			dmScreenSettings.dmPelsHeight = m_drawAreaHeight;
 			dmScreenSettings.dmBitsPerPel = 32;
 			dmScreenSettings.dmFields     = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
 			if (ChangeDisplaySettings(&dmScreenSettings, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL)
@@ -1253,8 +1253,8 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 					return nullptr;
 				}
 			}
-			screenWidth = width;
-			screenHeight = height;
+			screenWidth = m_drawAreaWidth;
+			screenHeight = m_drawAreaHeight;
 		}
 
 	}
@@ -1276,8 +1276,8 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 	RECT windowRect = {
 		0L,
 		0L,
-            m_exampleSettings.m_fullscreen ? (long)screenWidth : (long)width,
-            m_exampleSettings.m_fullscreen ? (long)screenHeight : (long)height
+            m_exampleSettings.m_fullscreen ? (long)screenWidth : (long)m_drawAreaWidth,
+            m_exampleSettings.m_fullscreen ? (long)screenHeight : (long)m_drawAreaHeight
 	};
 
 	AdjustWindowRectEx(&windowRect, dwStyle, FALSE, dwExStyle);
@@ -1337,8 +1337,8 @@ void VulkanExampleBase::handleMessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPAR
 			paused = !paused;
 			break;
 		case KEY_F1:
-			ui.visible = !ui.visible;
-			ui.updated = true;
+			m_UIOverlay.visible = !m_UIOverlay.visible;
+			m_UIOverlay.updated = true;
 			break;
 		case KEY_F2:
 			if (camera.type == Camera::CameraType::lookat) {
@@ -1524,7 +1524,7 @@ int32_t VulkanExampleBase::handleAppInput(struct android_app* app, AInputEvent* 
 						bool handled = false;
 						if (vulkanExample->settings.overlay) {
 							ImGuiIO& io = ImGui::GetIO();
-							handled = io.WantCaptureMouse && vulkanExample->ui.visible;
+							handled = io.WantCaptureMouse && vulkanExample->m_UIOverlay.visible;
 						}
 						if (!handled) {
 							int32_t eventX = AMotionEvent_getX(event, 0);
@@ -1576,8 +1576,8 @@ int32_t VulkanExampleBase::handleAppInput(struct android_app* app, AInputEvent* 
 		case AKEYCODE_1:							// support keyboards with no function keys
 		case AKEYCODE_F1:
 		case AKEYCODE_BUTTON_L1:
-			vulkanExample->ui.visible = !vulkanExample->ui.visible;
-			vulkanExample->ui.updated = true;
+			vulkanExample->m_UIOverlay.visible = !vulkanExample->m_UIOverlay.visible;
+			vulkanExample->m_UIOverlay.updated = true;
 			break;
 		case AKEYCODE_BUTTON_R1:
 			vulkanExample->keyPressed(GAMEPAD_BUTTON_R1);
@@ -1780,8 +1780,8 @@ static CVReturn displayLinkOutputCallback(CVDisplayLinkRef displayLink, const CV
 			break;
 		case KEY_1:										// support keyboards with no function keys
 		case KEY_F1:
-			vulkanExample->ui.visible = !vulkanExample->ui.visible;
-			vulkanExample->ui.updated = true;
+			vulkanExample->m_UIOverlay.visible = !vulkanExample->m_UIOverlay.visible;
+			vulkanExample->m_UIOverlay.updated = true;
 			break;
 		case KEY_DELETE:								// support keyboards with no escape key
 		case KEY_ESCAPE:
@@ -1830,7 +1830,7 @@ static CVReturn displayLinkOutputCallback(CVDisplayLinkRef displayLink, const CV
 {
 	NSPoint location = [event locationInWindow];
 	NSPoint point = [self convertPoint:location fromView:nil];
-	point.y = self.frame.size.height - point.y;
+	point.y = self.frame.size.m_drawAreaHeight - point.y;
 	return point;
 }
 
@@ -1908,7 +1908,7 @@ static CVReturn displayLinkOutputCallback(CVDisplayLinkRef displayLink, const CV
 - (NSSize)windowWillResize:(NSWindow *)sender toSize:(NSSize)frameSize
 {
 	CVDisplayLinkStop(displayLink);
-	vulkanExample->windowWillResize(frameSize.width, frameSize.height);
+	vulkanExample->windowWillResize(frameSize.m_drawAreaWidth, frameSize.m_drawAreaHeight);
 	return frameSize;
 }
 
@@ -1952,7 +1952,7 @@ void* VulkanExampleBase::setupWindow(void* view)
 	nsAppDelegate->vulkanExample = this;
 	[NSApp setDelegate:nsAppDelegate];
 
-	const auto kContentRect = NSMakeRect(0.0f, 0.0f, width, height);
+	const auto kContentRect = NSMakeRect(0.0f, 0.0f, m_drawAreaWidth, m_drawAreaHeight);
 	const auto kWindowStyle = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable;
 
 	auto window = [[NSWindow alloc] initWithContentRect:kContentRect
@@ -2063,21 +2063,21 @@ IDirectFBSurface *VulkanExampleBase::setupWindow()
 
 	if (settings.fullscreen)
 	{
-		width = layer_config.width;
-		height = layer_config.height;
+		m_drawAreaWidth = layer_config.m_drawAreaWidth;
+		m_drawAreaHeight = layer_config.m_drawAreaHeight;
 	}
 	else
 	{
-		if (layer_config.width > width)
-			posx = (layer_config.width - width) / 2;
-		if (layer_config.height > height)
-			posy = (layer_config.height - height) / 2;
+		if (layer_config.m_drawAreaWidth > m_drawAreaWidth)
+			posx = (layer_config.m_drawAreaWidth - m_drawAreaWidth) / 2;
+		if (layer_config.m_drawAreaHeight > m_drawAreaHeight)
+			posy = (layer_config.m_drawAreaHeight - m_drawAreaHeight) / 2;
 	}
 
 	DFBWindowDescription desc;
 	desc.flags = (DFBWindowDescriptionFlags)(DWDESC_WIDTH | DWDESC_HEIGHT | DWDESC_POSX | DWDESC_POSY);
-	desc.width = width;
-	desc.height = height;
+	desc.m_drawAreaWidth = m_drawAreaWidth;
+	desc.m_drawAreaHeight = m_drawAreaHeight;
 	desc.posx = posx;
 	desc.posy = posy;
 	ret = layer->CreateWindow(layer, &desc, &window);
@@ -2176,8 +2176,8 @@ void VulkanExampleBase::handleEvent(const DFBWindowEvent *event)
 				paused = !paused;
 				break;
 			case KEY_F1:
-				ui.visible = !ui.visible;
-				ui.updated = true;
+				m_UIOverlay.visible = !m_UIOverlay.visible;
+				m_UIOverlay.updated = true;
 				break;
 			default:
 				break;
@@ -2351,8 +2351,8 @@ void VulkanExampleBase::keyboardKey(struct wl_keyboard *keyboard,
 		break;
 	case KEY_F1:
 		if (state) {
-			ui.visible = !ui.visible;
-			ui.updated = true;
+			m_UIOverlay.visible = !m_UIOverlay.visible;
+			m_UIOverlay.updated = true;
 		}
 		break;
 	case KEY_ESCAPE:
@@ -2476,13 +2476,13 @@ void VulkanExampleBase::initWaylandConnection()
 	}
 }
 
-void VulkanExampleBase::setSize(int width, int height)
+void VulkanExampleBase::setSize(int m_drawAreaWidth, int m_drawAreaHeight)
 {
-	if (width <= 0 || height <= 0)
+	if (m_drawAreaWidth <= 0 || m_drawAreaHeight <= 0)
 		return;
 
-	destWidth = width;
-	destHeight = height;
+	destWidth = m_drawAreaWidth;
+	destHeight = m_drawAreaHeight;
 
 	windowResize();
 }
@@ -2504,12 +2504,12 @@ static const struct xdg_surface_listener xdg_surface_listener = {
 
 static void
 xdg_toplevel_handle_configure(void *data, struct xdg_toplevel *toplevel,
-			      int32_t width, int32_t height,
+			      int32_t m_drawAreaWidth, int32_t m_drawAreaHeight,
 			      struct wl_array *states)
 {
 	VulkanExampleBase *base = (VulkanExampleBase *) data;
 
-	base->setSize(width, height);
+	base->setSize(m_drawAreaWidth, m_drawAreaHeight);
 }
 
 static void
@@ -2576,14 +2576,14 @@ xcb_window_t VulkanExampleBase::setupWindow()
 
 	if (settings.fullscreen)
 	{
-		width = destWidth = screen->width_in_pixels;
-		height = destHeight = screen->height_in_pixels;
+		m_drawAreaWidth = destWidth = screen->width_in_pixels;
+		m_drawAreaHeight = destHeight = screen->height_in_pixels;
 	}
 
 	xcb_create_window(connection,
 		XCB_COPY_FROM_PARENT,
 		window, screen->root,
-		0, 0, width, height, 0,
+		0, 0, m_drawAreaWidth, m_drawAreaHeight, 0,
 		XCB_WINDOW_CLASS_INPUT_OUTPUT,
 		screen->root_visual,
 		value_mask, value_list);
@@ -2719,8 +2719,8 @@ void VulkanExampleBase::handleEvent(const xcb_generic_event_t *event)
 				paused = !paused;
 				break;
 			case KEY_F1:
-				ui.visible = !ui.visible;
-				ui.updated = true;
+				m_UIOverlay.visible = !m_UIOverlay.visible;
+				m_UIOverlay.updated = true;
 				break;
 		}
 	}
@@ -2755,10 +2755,10 @@ void VulkanExampleBase::handleEvent(const xcb_generic_event_t *event)
 	case XCB_CONFIGURE_NOTIFY:
 	{
 		const xcb_configure_notify_event_t *cfgEvent = (const xcb_configure_notify_event_t *)event;
-		if ((prepared) && ((cfgEvent->width != width) || (cfgEvent->height != height)))
+		if ((prepared) && ((cfgEvent->m_drawAreaWidth != m_drawAreaWidth) || (cfgEvent->m_drawAreaHeight != m_drawAreaHeight)))
 		{
-				destWidth = cfgEvent->width;
-				destHeight = cfgEvent->height;
+				destWidth = cfgEvent->m_drawAreaWidth;
+				destHeight = cfgEvent->m_drawAreaHeight;
 				if ((destWidth > 0) && (destHeight > 0))
 				{
 					windowResize();
@@ -2845,8 +2845,8 @@ void VulkanExampleBase::handleEvent()
 							paused = !paused;
 							break;
 						case KEYCODE_F1:
-							ui.visible = !ui.visible;
-							ui.updated = true;
+							m_UIOverlay.visible = !m_UIOverlay.visible;
+							m_UIOverlay.updated = true;
 							break;
 						default:
 							break;
@@ -2884,8 +2884,8 @@ void VulkanExampleBase::handleEvent()
 								quit = true;
 								break;
 							}
-							width = size[0];
-							height = size[1];
+							m_drawAreaWidth = size[0];
+							m_drawAreaHeight = size[1];
 							windowResize();
 							break;
 						default:
@@ -3000,18 +3000,18 @@ void VulkanExampleBase::setupWindow()
 		exit(EXIT_FAILURE);
 	}
 
-	if ((width == 0) || (height == 0) || (settings.fullscreen) || use_window_size) {
+	if ((m_drawAreaWidth == 0) || (m_drawAreaHeight == 0) || (settings.fullscreen) || use_window_size) {
 		rc = screen_get_window_property_iv(screen_window, SCREEN_PROPERTY_SIZE, size);
 		if (rc) {
 			printf("Cannot obtain current window size!\n");
 			fflush(stdout);
 			exit(EXIT_FAILURE);
 		}
-		width = size[0];
-		height = size[1];
+		m_drawAreaWidth = size[0];
+		m_drawAreaHeight = size[1];
 	} else {
-		size[0] = width;
-		size[1] = height;
+		size[0] = m_drawAreaWidth;
+		size[1] = m_drawAreaHeight;
 		rc = screen_set_window_property_iv(screen_window, SCREEN_PROPERTY_SIZE, size);
 		if (rc) {
 			printf("Cannot set window size!\n");
@@ -3084,7 +3084,7 @@ void VulkanExampleBase::setupDepthStencil()
 	imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCI.imageType = VK_IMAGE_TYPE_2D;
 	imageCI.format = depthFormat;
-	imageCI.extent = { width, height, 1 };
+	imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 	imageCI.mipLevels = 1;
 	imageCI.arrayLayers = 1;
 	imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -3135,8 +3135,8 @@ void VulkanExampleBase::setupFrameBuffer()
 		frameBufferCreateInfo.renderPass = renderPass;
 		frameBufferCreateInfo.attachmentCount = 2;
 		frameBufferCreateInfo.pAttachments = attachments;
-		frameBufferCreateInfo.width = width;
-		frameBufferCreateInfo.height = height;
+		frameBufferCreateInfo.width = m_drawAreaWidth;
+		frameBufferCreateInfo.height = m_drawAreaHeight;
 		frameBufferCreateInfo.layers = 1;
                 VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCreateInfo, nullptr, &frameBuffers[i]));
 	}
@@ -3231,8 +3231,8 @@ void VulkanExampleBase::windowResize()
         vkDeviceWaitIdle(m_vkDevice);
 
 	// Recreate swap chain
-	width = destWidth;
-	height = destHeight;
+	m_drawAreaWidth = destWidth;
+	m_drawAreaHeight = destHeight;
 	createSwapChain();
 
 	// Recreate the frame buffers
@@ -3245,9 +3245,9 @@ void VulkanExampleBase::windowResize()
 	}
 	setupFrameBuffer();
 
-	if ((width > 0.0f) && (height > 0.0f)) {
-            if (m_exampleSettings.m_showOverlayUI) {
-			ui.resize(width, height);
+	if ((m_drawAreaWidth > 0.0f) && (m_drawAreaHeight > 0.0f)) {
+            if (m_exampleSettings.m_showUIOverlay) {
+			m_UIOverlay.resize(m_drawAreaWidth, m_drawAreaHeight);
 		}
 	}
 
@@ -3265,8 +3265,8 @@ void VulkanExampleBase::windowResize()
 
 	vkDeviceWaitIdle(m_vkDevice);
 
-	if ((width > 0.0f) && (height > 0.0f)) {
-		camera.updateAspectRatio((float)width / (float)height);
+	if ((m_drawAreaWidth > 0.0f) && (m_drawAreaHeight > 0.0f)) {
+		camera.updateAspectRatio((float)m_drawAreaWidth / (float)m_drawAreaHeight);
 	}
 
 	// Notify derived class
@@ -3282,9 +3282,9 @@ void VulkanExampleBase::handleMouseMove(int32_t x, int32_t y)
 
 	bool handled = false;
 
-	if (m_exampleSettings.m_showOverlayUI) {
+	if (m_exampleSettings.m_showUIOverlay) {
 		ImGuiIO& io = ImGui::GetIO();
-		handled = io.WantCaptureMouse && ui.visible;
+		handled = io.WantCaptureMouse && m_UIOverlay.visible;
 	}
 	mouseMoved((float)x, (float)y, handled);
 
@@ -3327,7 +3327,7 @@ void VulkanExampleBase::createSurface()
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
 	swapChain.initSurface(connection, window);
 #elif (defined(_DIRECT2DISPLAY) || defined(VK_USE_PLATFORM_HEADLESS_EXT))
-	swapChain.initSurface(width, height);
+	swapChain.initSurface(m_drawAreaWidth, m_drawAreaHeight);
 #elif defined(VK_USE_PLATFORM_SCREEN_QNX)
 	swapChain.initSurface(screen_context, screen_window);
 #endif
@@ -3335,7 +3335,7 @@ void VulkanExampleBase::createSurface()
 
 void VulkanExampleBase::createSwapChain()
 {
-    swapChain.create(width, height, m_exampleSettings.m_forceSwapChainVsync, m_exampleSettings.m_fullscreen);
+    swapChain.create(m_drawAreaWidth, m_drawAreaHeight, m_exampleSettings.m_forceSwapChainVsync, m_exampleSettings.m_fullscreen);
 }
 
 void VulkanExampleBase::OnUpdateUIOverlay(vks::UIOverlay *overlay) {}
