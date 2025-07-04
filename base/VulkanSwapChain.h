@@ -46,15 +46,15 @@ public:
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
 	void initSurface(void* platformHandle, void* platformWindow);
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
-	void initSurface(ANativeWindow* window);
+	void initSurface(ANativeWindow* m_hwnd);
 #elif defined(VK_USE_PLATFORM_DIRECTFB_EXT)
-	void initSurface(IDirectFB* dfb, IDirectFBSurface* window);
+	void initSurface(IDirectFB* dfb, IDirectFBSurface* m_hwnd);
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-	void initSurface(wl_display* display, wl_surface* window);
+	void initSurface(wl_display* display, wl_surface* m_hwnd);
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
-	void initSurface(xcb_connection_t* connection, xcb_window_t window);
+	void initSurface(xcb_connection_t* connection, xcb_window_t m_hwnd);
 #elif (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK))
-	void initSurface(void* view);
+	void initSurface(void* m_vkImageView);
 #elif defined(VK_USE_PLATFORM_METAL_EXT)
 	void initSurface(CAMetalLayer* metalLayer);
 #elif (defined(_DIRECT2DISPLAY) || defined(VK_USE_PLATFORM_HEADLESS_EXT))
@@ -76,7 +76,7 @@ public:
 	*/
 	void create(uint32_t& width, uint32_t& height, bool vsync = false, bool fullscreen = false);
 	/**
-	* Acquires the next image in the swap chain
+	* Acquires the next m_vkImage in the swap chain
 	* 
 	* @param presentCompleteSemaphore (Optional) Semaphore that is signaled when the image is ready for use
 	* @param imageIndex Pointer to the image index that will be increased if the next image could be acquired
@@ -87,7 +87,7 @@ public:
 	*/
 	VkResult acquireNextImage(VkSemaphore presentCompleteSemaphore, uint32_t& imageIndex);
 	/**
-	* Queue an image for presentation
+	* Queue an m_vkImage for presentation
 	*
 	* @param queue Presentation queue for presenting the image
 	* @param imageIndex Index of the swapchain image to queue for presentation

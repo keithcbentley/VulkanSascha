@@ -99,14 +99,14 @@ public:
 		VkPipeline pipeline;
 	};
 
-	// Contains the texture for a single glTF image
+	// Contains the texture for a single glTF m_vkImage
 	// Images may be reused by texture objects and are as such separated
 	struct Image {
 		vks::Texture2D texture;
 	};
 
-	// A glTF texture stores a reference to the image and a sampler
-	// In this sample, we are only interested in the image
+	// A glTF texture stores a reference to the m_vkImage and a sampler
+	// In this sample, we are only interested in the m_vkImage
 	struct Texture {
 		int32_t imageIndex;
 	};

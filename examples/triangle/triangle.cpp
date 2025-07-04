@@ -43,8 +43,8 @@ public:
 
 	// Vertex buffer and attributes
 	struct {
-		VkDeviceMemory memory{ VK_NULL_HANDLE }; // Handle to the m_vkDevice memory for this buffer
-		VkBuffer buffer{ VK_NULL_HANDLE };		 // Handle to the Vulkan buffer object that the memory is bound to
+		VkDeviceMemory memory{ VK_NULL_HANDLE }; // Handle to the m_vkDevice m_vkDeviceMemory for this buffer
+		VkBuffer buffer{ VK_NULL_HANDLE };		 // Handle to the Vulkan buffer object that the m_vkDeviceMemory is bound to
 	} vertices;
 
 	// Index buffer
@@ -102,7 +102,7 @@ public:
 	// Synchronization primitives
 	// Synchronization is an important concept of Vulkan that OpenGL mostly hid away. Getting this right is crucial to using Vulkan.
 
-	// Semaphores are used to coordinate operations within the graphics queue and ensure correct command ordering
+	// Semaphores are used to coordinate operations within the graphics m_vkQueue and ensure correct command ordering
 	std::vector<VkSemaphore> presentCompleteSemaphores{};
 	std::vector<VkSemaphore> renderCompleteSemaphores{};
 
@@ -153,14 +153,14 @@ public:
 		}
 	}
 
-	// This function is used to request a m_vkDevice memory type that supports all the property flags we request (e.g. m_vkDevice local, host visible)
-	// Upon success it will return the index of the memory type that fits our requested memory m_vkPhysicalDeviceProperties
-	// This is necessary as implementations can offer an arbitrary number of memory types with different
-	// memory m_vkPhysicalDeviceProperties.
-	// You can check https://vulkan.gpuinfo.org/ for details on different memory configurations
+	// This function is used to request a m_vkDevice m_vkDeviceMemory type that supports all the property flags we request (e.g. m_vkDevice local, host visible)
+	// Upon success it will return the index of the m_vkDeviceMemory type that fits our requested m_vkDeviceMemory m_vkPhysicalDeviceProperties
+	// This is necessary as implementations can offer an arbitrary number of m_vkDeviceMemory types with different
+	// m_vkDeviceMemory m_vkPhysicalDeviceProperties.
+	// You can check https://vulkan.gpuinfo.org/ for details on different m_vkDeviceMemory configurations
 	uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties)
 	{
-		// Iterate over all memory types available for the m_vkDevice used in this example
+		// Iterate over all m_vkDeviceMemory types available for the m_vkDevice used in this example
 		for (uint32_t i = 0; i < deviceMemoryProperties.memoryTypeCount; i++)
 		{
 			if ((typeBits & 1) == 1)
@@ -173,7 +173,7 @@ public:
 			typeBits >>= 1;
 		}
 
-		throw "Could not find a suitable memory type!";
+		throw "Could not find a suitable m_vkDeviceMemory type!";
 	}
 
 	// Create the per-frame (in flight) Vulkan synchronization primitives used in this example
@@ -188,15 +188,15 @@ public:
 			// Fence used to ensure that command buffer has completed exection before using it again
 			VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceCI, nullptr, &waitFences[i]));
 		}
-		// Semaphores are used for correct command ordering within a queue
-		// Used to ensure that image presentation is complete before starting to submit again
+		// Semaphores are used for correct command ordering within a m_vkQueue
+		// Used to ensure that m_vkImage presentation is complete before starting to submit again
 		presentCompleteSemaphores.resize(MAX_CONCURRENT_FRAMES);
 		for (auto& semaphore : presentCompleteSemaphores) {
 			VkSemaphoreCreateInfo semaphoreCI{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 			VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCI, nullptr, &semaphore));
 		}
 		// Render completion
-		// Semaphore used to ensure that all commands submitted have been finished before submitting the image to the queue
+		// Semaphore used to ensure that all commands submitted have been finished before submitting the m_vkImage to the m_vkQueue
 		renderCompleteSemaphores.resize(swapChain.images.size());
 		for (auto& semaphore : renderCompleteSemaphores) {
 			VkSemaphoreCreateInfo semaphoreCI{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
@@ -219,12 +219,12 @@ public:
 	}
 
 	// Prepare vertex and index buffers for an indexed triangle
-	// Also uploads them to m_vkDevice local memory using staging and initializes vertex input and attribute binding to match the vertex shader
+	// Also uploads them to m_vkDevice local m_vkDeviceMemory using staging and initializes vertex input and attribute binding to match the vertex shader
 	void createVertexBuffer()
 	{
-		// A note on memory management in Vulkan in general:
-		//	This is a very complex topic and while it's fine for an example application to small individual memory allocations that is not
-		//	what should be done a real-world application, where you should allocate large chunks of memory at once instead.
+		// A note on m_vkDeviceMemory management in Vulkan in general:
+		//	This is a very complex topic and while it's fine for an example application to small individual m_vkDeviceMemory allocations that is not
+		//	what should be done a real-world application, where you should allocate large chunks of m_vkDeviceMemory at once instead.
 
 		// Setup vertices
 		std::vector<Vertex> vertexBuffer{
@@ -243,7 +243,7 @@ public:
 		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		VkMemoryRequirements memReqs;
 
-		// Static data like vertex and index buffer should be stored on the m_vkDevice memory for optimal (and fastest) access by the GPU
+		// Static data like vertex and index buffer should be stored on the m_vkDevice m_vkDeviceMemory for optimal (and fastest) access by the GPU
 		//
 		// To achieve this we use so-called "staging buffers" :
 		// - Create a buffer that's visible to the host (and can be mapped)
@@ -253,7 +253,7 @@ public:
 		// - Delete the host visible (staging) buffer
 		// - Use the m_vkDevice local buffers for rendering
 		//
-		// Note: On unified memory architectures where host (CPU) and GPU share the same memory, staging is not necessary
+		// Note: On unified m_vkDeviceMemory architectures where host (CPU) and GPU share the same m_vkDeviceMemory, staging is not necessary
 		// To keep this sample easy to follow, there is no check for that in place
 
 		struct StagingBuffer {
@@ -278,7 +278,7 @@ public:
 		VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &vertexBufferInfoCI, nullptr, &stagingBuffers.vertices.buffer));
 		vkGetBufferMemoryRequirements(m_vkDevice, stagingBuffers.vertices.buffer, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		// Request a host visible memory type that can be used to copy our data to
+		// Request a host visible m_vkDeviceMemory type that can be used to copy our data to
 		// Also request it to be coherent, so that writes are visible to the GPU right after unmapping the buffer
 		memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &stagingBuffers.vertices.memory));
@@ -322,8 +322,8 @@ public:
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &indices.memory));
 		VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, indices.buffer, indices.memory, 0));
 
-		// Buffer copies have to be submitted to a queue, so we need a command buffer for them
-		// Note: Some devices offer a dedicated transfer queue (with only the transfer bit set) that may be faster when doing lots of copies
+		// Buffer copies have to be submitted to a m_vkQueue, so we need a command buffer for them
+		// Note: Some devices offer a dedicated transfer m_vkQueue (with only the transfer bit set) that may be faster when doing lots of copies
 		VkCommandBuffer copyCmd;
 
 		VkCommandBufferAllocateInfo cmdBufAllocateInfo{};
@@ -345,7 +345,7 @@ public:
 		vkCmdCopyBuffer(copyCmd, stagingBuffers.indices.buffer, indices.buffer,	1, &copyRegion);
 		VK_CHECK_RESULT(vkEndCommandBuffer(copyCmd));
 
-		// Submit the command buffer to the queue to finish the copy
+		// Submit the command buffer to the m_vkQueue to finish the copy
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.commandBufferCount = 1;
@@ -358,8 +358,8 @@ public:
 		VkFence fence;
                 VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceCI, nullptr, &fence));
 
-		// Submit to the queue
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
+		// Submit to the m_vkQueue
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, fence));
 		// Wait for the fence to signal that command buffer has finished executing
                 VK_CHECK_RESULT(vkWaitForFences(m_vkDevice, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
 
@@ -384,7 +384,7 @@ public:
 		// We have one buffer (and as such descriptor) per frame
 		descriptorTypeCounts[0].descriptorCount = MAX_CONCURRENT_FRAMES;
 		// For additional types you need to add new entries in the type count list
-		// E.g. for two combined image samplers :
+		// E.g. for two combined m_vkImage samplers :
 		// typeCounts[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		// typeCounts[1].descriptorCount = 2;
 
@@ -398,11 +398,11 @@ public:
 		// Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
 		// Our sample will create one set per uniform buffer per frame
 		descriptorPoolCI.maxSets = MAX_CONCURRENT_FRAMES;
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCI, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCI, nullptr, &m_vkDescriptorPool));
 	}
 
 	// Descriptor set layouts define the interface between our application and the shader
-	// Basically connects the different shader stages to descriptors for binding uniform buffers, image samplers, etc.
+	// Basically connects the different shader stages to descriptors for binding uniform buffers, m_vkImage samplers, etc.
 	// So every shader binding should map to one descriptor set layout binding
 	void createDescriptorSetLayout()
 	{
@@ -429,7 +429,7 @@ public:
 		for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
 			VkDescriptorSetAllocateInfo allocInfo{};
 			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			allocInfo.descriptorPool = descriptorPool;
+			allocInfo.descriptorPool = m_vkDescriptorPool;
 			allocInfo.descriptorSetCount = 1;
 			allocInfo.pSetLayouts = &descriptorSetLayout;
 			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &uniformBuffers[i].descriptorSet));
@@ -459,11 +459,11 @@ public:
 	// Note: Override of virtual function in the base class and called from within VulkanExampleBase::prepare
 	void setupDepthStencil() override
 	{
-		// Create an optimal image used as the depth stencil attachment
+		// Create an optimal m_vkImage used as the depth stencil attachment
 		VkImageCreateInfo imageCI{};
 		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCI.imageType = VK_IMAGE_TYPE_2D;
-		imageCI.format = depthFormat;
+		imageCI.format = m_vkFormatDepth;
 		// Use example's m_drawAreaHeight and m_drawAreaWidth
 		imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 		imageCI.mipLevels = 1;
@@ -472,71 +472,71 @@ public:
 		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &depthStencil.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &m_defaultDepthStencil.m_vkImage));
 
-		// Allocate memory for the image (m_vkDevice local) and bind it to our image
+		// Allocate m_vkDeviceMemory for the m_vkImage (m_vkDevice local) and bind it to our m_vkImage
 		VkMemoryAllocateInfo memAlloc{};
 		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(m_vkDevice, depthStencil.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, m_defaultDepthStencil.m_vkImage, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &depthStencil.memory));
-		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, depthStencil.image, depthStencil.memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &m_defaultDepthStencil.m_vkDeviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, m_defaultDepthStencil.m_vkImage, m_defaultDepthStencil.m_vkDeviceMemory, 0));
 
-		// Create a view for the depth stencil image
+		// Create a m_vkImageView for the depth stencil m_vkImage
 		// Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
-		// This allows for multiple views of one image with differing ranges (e.g. for different layers)
+		// This allows for multiple views of one m_vkImage with differing ranges (e.g. for different layers)
 		VkImageViewCreateInfo depthStencilViewCI{};
 		depthStencilViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		depthStencilViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		depthStencilViewCI.format = depthFormat;
+		depthStencilViewCI.format = m_vkFormatDepth;
 		depthStencilViewCI.subresourceRange = {};
 		depthStencilViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		// Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT)
-		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+		if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
 			depthStencilViewCI.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
 		depthStencilViewCI.subresourceRange.baseMipLevel = 0;
 		depthStencilViewCI.subresourceRange.levelCount = 1;
 		depthStencilViewCI.subresourceRange.baseArrayLayer = 0;
 		depthStencilViewCI.subresourceRange.layerCount = 1;
-		depthStencilViewCI.image = depthStencil.image;
-		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &depthStencilViewCI, nullptr, &depthStencil.view));
+		depthStencilViewCI.image = m_defaultDepthStencil.m_vkImage;
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &depthStencilViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
 	}
 
-	// Create a frame buffer for each swap chain image
+	// Create a frame buffer for each swap chain m_vkImage
 	// Note: Override of virtual function in the base class and called from within VulkanExampleBase::prepare
 	void setupFrameBuffer() override
 	{
-		// Create a frame buffer for every image in the swapchain
-		frameBuffers.resize(swapChain.images.size());
-		for (size_t i = 0; i < frameBuffers.size(); i++)
+		// Create a frame buffer for every m_vkImage in the swapchain
+		m_vkFrameBuffers.resize(swapChain.images.size());
+		for (size_t i = 0; i < m_vkFrameBuffers.size(); i++)
 		{
 			std::array<VkImageView, 2> attachments{};
-			// Color attachment is the view of the swapchain image
+			// Color attachment is the m_vkImageView of the swapchain m_vkImage
 			attachments[0] = swapChain.imageViews[i];
 			// Depth/Stencil attachment is the same for all frame buffers due to how depth works with current GPUs
-			attachments[1] = depthStencil.view;         
+			attachments[1] = m_defaultDepthStencil.m_vkImageView;         
 
 			VkFramebufferCreateInfo frameBufferCI{};
 			frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			// All frame buffers use the same renderpass setup
-			frameBufferCI.renderPass = renderPass;
+			frameBufferCI.renderPass = m_vkRenderPass;
 			frameBufferCI.attachmentCount = static_cast<uint32_t>(attachments.size());
 			frameBufferCI.pAttachments = attachments.data();
 			frameBufferCI.width = m_drawAreaWidth;
 			frameBufferCI.height = m_drawAreaHeight;
 			frameBufferCI.layers = 1;
 			// Create the framebuffer
-			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCI, nullptr, &frameBuffers[i]));
+			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCI, nullptr, &m_vkFrameBuffers[i]));
 		}
 	}
 
 	// Render pass setup
 	// Render passes are a new concept in Vulkan. They describe the attachments used during rendering and may contain multiple subpasses with attachment dependencies
 	// This allows the driver to know up-front what the rendering will look like and is a good opportunity to optimize especially on tile-based renderers (with multiple subpasses)
-	// Using sub pass dependencies also adds implicit layout transitions for the attachment used, so we don't need to add explicit image memory barriers to transform them
+	// Using sub pass dependencies also adds implicit layout transitions for the attachment used, so we don't need to add explicit m_vkImage m_vkDeviceMemory barriers to transform them
 	// Note: Override of virtual function in the base class and called from within VulkanExampleBase::prepare
 	void setupRenderPass() override
 	{
@@ -556,7 +556,7 @@ public:
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;                   // Layout to which the attachment is transitioned when the render pass is finished
 		                                                                                // As we want to present the color buffer to the swapchain, we transition to PRESENT_KHR
 		// Depth attachment
-		attachments[1].format = depthFormat;                                           // A proper depth format is selected in the example base
+		attachments[1].format = m_vkFormatDepth;                                           // A proper depth format is selected in the example base
 		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;                           // Clear depth at start of first subpass
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;                     // We don't need depth after render pass has finished (DONT_CARE may result in better performance)
@@ -589,7 +589,7 @@ public:
 		// Setup subpass dependencies
 		// These will add the implicit attachment layout transitions specified by the attachment descriptions
 		// The actual usage layout is preserved through the layout specified in the attachment reference
-		// Each subpass dependency will introduce a memory and execution dependency between the source and dest subpass described by
+		// Each subpass dependency will introduce a m_vkDeviceMemory and execution dependency between the source and dest subpass described by
 		// srcStageMask, dstStageMask, srcAccessMask, dstAccessMask (and dependencyFlags is set)
 		// Note: VK_SUBPASS_EXTERNAL is a special constant that refers to all commands executed outside of the actual renderpass)
 		std::array<VkSubpassDependency, 2> dependencies{};
@@ -621,7 +621,7 @@ public:
 		renderPassCI.pSubpasses = &subpassDescription;                             // Description of that subpass
 		renderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size()); // Number of subpass dependencies
 		renderPassCI.pDependencies = dependencies.data();                          // Subpass dependencies used by the render pass
-		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassCI, nullptr, &renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassCI, nullptr, &m_vkRenderPass));
 	}
 
 	// Vulkan loads its shaders from an immediate binary representation called SPIR-V
@@ -699,7 +699,7 @@ public:
 		// The layout used for this m_vkPipeline (can be shared among multiple pipelines using the same layout)
 		pipelineCI.layout = m_vkPipelineLayout;
 		// Renderpass this m_vkPipeline is attached to
-		pipelineCI.renderPass = renderPass;
+		pipelineCI.renderPass = m_vkRenderPass;
 
 		// Construct the different states making up the m_vkPipeline
 
@@ -780,7 +780,7 @@ public:
 		vertexInputBinding.stride = sizeof(Vertex);
 		vertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-		// Input attribute bindings describe shader attribute locations and memory layouts
+		// Input attribute bindings describe shader attribute locations and m_vkDeviceMemory layouts
 		std::array<VkVertexInputAttributeDescription, 2> vertexInputAttributs{};
 		// These match the following shader layout (see triangle.vert):
 		//	layout (location = 0) in vec3 inPos;
@@ -844,7 +844,7 @@ public:
 		pipelineCI.pDynamicState = &dynamicStateCI;
 
 		// Create rendering m_vkPipeline using the specified states
-                VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+                VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 
 		// Shader modules are no longer needed once the graphics m_vkPipeline has been created
                 vkDestroyShaderModule(m_vkDevice, shaderStages[0].module, nullptr);
@@ -873,17 +873,17 @@ public:
 		// Create the buffers
 		for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
                     VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferInfo, nullptr, &uniformBuffers[i].buffer));
-			// Get memory requirements including size, alignment and memory type
+			// Get m_vkDeviceMemory requirements including size, alignment and m_vkDeviceMemory type
                     vkGetBufferMemoryRequirements(m_vkDevice, uniformBuffers[i].buffer, &memReqs);
 			allocInfo.allocationSize = memReqs.size;
-			// Get the memory type index that supports host visible memory access
-			// Most implementations offer multiple memory types and selecting the correct one to allocate memory from is crucial
+			// Get the m_vkDeviceMemory type index that supports host visible m_vkDeviceMemory access
+			// Most implementations offer multiple m_vkDeviceMemory types and selecting the correct one to allocate m_vkDeviceMemory from is crucial
 			// We also want the buffer to be host coherent so we don't have to flush (or sync after every update.
 			// Note: This may affect performance so you might not want to do this in a real world application that updates buffers on a regular base
 			allocInfo.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-			// Allocate memory for the uniform buffer
+			// Allocate m_vkDeviceMemory for the uniform buffer
                         VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &(uniformBuffers[i].memory)));
-			// Bind memory to buffer
+			// Bind m_vkDeviceMemory to buffer
                         VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, uniformBuffers[i].buffer, uniformBuffers[i].memory, 0));
 			// We map the buffer once, so we can update it without having to map it again
                         VK_CHECK_RESULT(vkMapMemory(m_vkDevice, uniformBuffers[i].memory, 0, sizeof(ShaderData), 0, (void**)&uniformBuffers[i].mapped));
@@ -914,7 +914,7 @@ public:
 		vkWaitForFences(m_vkDevice, 1, &waitFences[currentFrame], VK_TRUE, UINT64_MAX);
 		VK_CHECK_RESULT(vkResetFences(m_vkDevice, 1, &waitFences[currentFrame]));
 
-		// Get the next swap chain image from the implementation
+		// Get the next swap chain m_vkImage from the implementation
 		// Note that the implementation is free to return the images in any order, so we must use the acquire function and can't just cycle through the images/imageIndex on our own
 		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(m_vkDevice, swapChain.swapChain, UINT64_MAX, presentCompleteSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -923,7 +923,7 @@ public:
 			return;
 		}
 		else if ((result != VK_SUCCESS) && (result != VK_SUBOPTIMAL_KHR)) {
-			throw "Could not acquire the next swap chain image!";
+			throw "Could not acquire the next swap chain m_vkImage!";
 		}
 
 		// Update the uniform buffer for the next frame
@@ -933,11 +933,11 @@ public:
 		shaderData.modelMatrix = glm::mat4(1.0f);
 
 		// Copy the current matrices to the current frame's uniform buffer
-		// Note: Since we requested a host coherent memory type for the uniform buffer, the write is instantly visible to the GPU
+		// Note: Since we requested a host coherent m_vkDeviceMemory type for the uniform buffer, the write is instantly visible to the GPU
 		memcpy(uniformBuffers[currentFrame].mapped, &shaderData, sizeof(ShaderData));
 
 		// Build the command buffer
-		// Unlike in OpenGL all rendering commands are recorded into command buffers that are then submitted to the queue
+		// Unlike in OpenGL all rendering commands are recorded into command buffers that are then submitted to the m_vkQueue
 		// This allows to generate work upfront in a separate thread
 		// For basic command buffers (like in this sample), recording is so fast that there is no need to offload this
 
@@ -955,14 +955,14 @@ public:
 		VkRenderPassBeginInfo renderPassBeginInfo{};
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassBeginInfo.pNext = nullptr;
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
 		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
-		renderPassBeginInfo.framebuffer = frameBuffers[imageIndex];
+		renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
 
 		const VkCommandBuffer commandBuffer = commandBuffers[currentFrame];
 		VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffer, &cmdBufInfo));
@@ -1001,11 +1001,11 @@ public:
 		// VK_IMAGE_LAYOUT_PRESENT_SRC_KHR for presenting it to the windowing system
 		VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
 
-		// Submit the command buffer to the graphics queue
+		// Submit the command buffer to the graphics m_vkQueue
 
-		// Pipeline stage at which the queue submission will wait (via pWaitSemaphores)
+		// Pipeline stage at which the m_vkQueue submission will wait (via pWaitSemaphores)
 		VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		// The submit info structure specifies a command buffer queue submission batch
+		// The submit info structure specifies a command buffer m_vkQueue submission batch
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.pWaitDstStageMask = &waitStageMask;      // Pointer to the list of m_vkPipeline stages that the semaphore waits will occur at
@@ -1019,12 +1019,12 @@ public:
 		submitInfo.pSignalSemaphores = &renderCompleteSemaphores[imageIndex];
 		submitInfo.signalSemaphoreCount = 1;
 
-		// Submit to the graphics queue passing a wait fence
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, waitFences[currentFrame]));
+		// Submit to the graphics m_vkQueue passing a wait fence
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, waitFences[currentFrame]));
 
 		// Present the current frame buffer to the swap chain
 		// Pass the semaphore signaled by the command buffer submission from the submit info as the wait semaphore for swap chain presentation
-		// This ensures that the image is not presented to the windowing system until all commands have been submitted
+		// This ensures that the m_vkImage is not presented to the windowing system until all commands have been submitted
 
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1033,13 +1033,13 @@ public:
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = &swapChain.swapChain;
 		presentInfo.pImageIndices = &imageIndex;
-		result = vkQueuePresentKHR(queue, &presentInfo);
+		result = vkQueuePresentKHR(m_vkQueue, &presentInfo);
 
 		if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
 			windowResize();
 		}
 		else if (result != VK_SUCCESS) {
-			throw "Could not present the image to the swap chain!";
+			throw "Could not present the m_vkImage to the swap chain!";
 		}
 
 		// Select the next frame to render to, based on the max. no. of concurrent frames

@@ -48,7 +48,7 @@ public:
 
 	VkPhysicalDeviceMultiviewFeaturesKHR physicalDeviceMultiviewFeatures{};
 
-	// Camera and view m_vkPhysicalDeviceProperties
+	// Camera and m_vkImageView m_vkPhysicalDeviceProperties
 	float eyeSeparation = 0.08f;
 	const float focalLength = 0.5f;
 	const float fov = 90.0f;
@@ -90,7 +90,7 @@ public:
 			vkDestroyRenderPass(m_vkDevice, multiviewPass.renderPass, nullptr);
 			vkDestroySampler(m_vkDevice, multiviewPass.sampler, nullptr);
 			vkDestroyFramebuffer(m_vkDevice, multiviewPass.frameBuffer, nullptr);
-			vkFreeCommandBuffers(m_vkDevice, cmdPool, static_cast<uint32_t>(multiviewPass.commandBuffers.size()), multiviewPass.commandBuffers.data());
+			vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool, static_cast<uint32_t>(multiviewPass.commandBuffers.size()), multiviewPass.commandBuffers.data());
 			vkDestroySemaphore(m_vkDevice, multiviewPass.semaphore, nullptr);
 			for (auto& fence : multiviewPass.waitFences) {
 				vkDestroyFence(m_vkDevice, fence, nullptr);
@@ -117,7 +117,7 @@ public:
 		{
 			VkImageCreateInfo imageCI= vks::initializers::imageCreateInfo();
 			imageCI.imageType = VK_IMAGE_TYPE_2D;
-			imageCI.format = depthFormat;
+			imageCI.format = m_vkFormatDepth;
 			imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 			imageCI.mipLevels = 1;
 			imageCI.arrayLayers = multiviewLayerCount;
@@ -139,11 +139,11 @@ public:
 			depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 			depthStencilView.pNext = NULL;
 			depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			depthStencilView.format = depthFormat;
+			depthStencilView.format = m_vkFormatDepth;
 			depthStencilView.flags = 0;
 			depthStencilView.subresourceRange = {};
 			depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-			if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+			if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
 				depthStencilView.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 			}
 			depthStencilView.subresourceRange.baseMipLevel = 0;
@@ -232,7 +232,7 @@ public:
 			attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			// Depth attachment
-			attachments[1].format = depthFormat;
+			attachments[1].format = m_vkFormatDepth;
 			attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 			attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -288,8 +288,8 @@ public:
 			*/
 
 			/*
-				Bit mask that specifies which view rendering is broadcast to
-				0011 = Broadcast to first and second view (layer)
+				Bit mask that specifies which m_vkImageView rendering is broadcast to
+				0011 = Broadcast to first and second m_vkImageView (layer)
 			*/
 			const uint32_t viewMask = 0b00000011;
 
@@ -342,11 +342,11 @@ public:
 			VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
 			VkClearValue clearValues[2];
-			clearValues[0].color = defaultClearColor;
+			clearValues[0].color = m_vkClearColorValueDefault;
 			clearValues[1].depthStencil = { 1.0f, 0 };
 
 			VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-			renderPassBeginInfo.renderPass = renderPass;
+			renderPassBeginInfo.renderPass = m_vkRenderPass;
 			renderPassBeginInfo.renderArea.offset.x = 0;
 			renderPassBeginInfo.renderArea.offset.y = 0;
 			renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -355,7 +355,7 @@ public:
 			renderPassBeginInfo.pClearValues = clearValues;
 
 			for (int32_t i = 0; i < drawCmdBuffers.size(); ++i) {
-				renderPassBeginInfo.framebuffer = frameBuffers[i];
+				renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 				VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 				vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -394,7 +394,7 @@ public:
 			VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
 			VkClearValue clearValues[2];
-			clearValues[0].color = defaultClearColor;
+			clearValues[0].color = m_vkClearColorValueDefault;
 			clearValues[1].depthStencil = { 1.0f, 0 };
 
 			VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
@@ -428,7 +428,7 @@ public:
 
 	void loadAssets()
 	{
-		scene.loadFromFile(getAssetPath() + "models/sampleroom.gltf", vulkanDevice, queue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
+		scene.loadFromFile(getAssetPath() + "models/sampleroom.gltf", vulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
 	}
 
 	void prepareDescriptors()
@@ -441,7 +441,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		/*
 			Layouts
@@ -458,7 +458,7 @@ public:
 		/*
 			Descriptors
 		*/
-		VkDescriptorSetAllocateInfo allocateInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocateInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocateInfo, &descriptorSet));
 		updateDescriptors();
 	}
@@ -479,7 +479,7 @@ public:
 		VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCI, nullptr, &multiviewPass.semaphore));
 
 		/*
-			Display multi view m_vkPhysicalDeviceFeatures and m_vkPhysicalDeviceProperties
+			Display multi m_vkImageView m_vkPhysicalDeviceFeatures and m_vkPhysicalDeviceProperties
 		*/
 
 		VkPhysicalDeviceFeatures2KHR deviceFeatures2{};
@@ -539,7 +539,7 @@ public:
 		shaderStages[1] = loadShader(getShadersPath() + "multiview/multiview.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		pipelineCI.stageCount = 2;
 		pipelineCI.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 
 		/*
 			Full screen pass
@@ -558,7 +558,7 @@ public:
 		rasterizationStateCI.cullMode = VK_CULL_MODE_FRONT_BIT;
 
 		/*
-			Separate pipelines per eye (view) using specialization constants to set view array layer to sample from
+			Separate pipelines per eye (m_vkImageView) using specialization constants to set m_vkImageView array layer to sample from
 		*/
 		for (uint32_t i = 0; i < 2; i++) {
 			shaderStages[0] = loadShader(getShadersPath() + "multiview/viewdisplay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -568,8 +568,8 @@ public:
 			VkPipelineVertexInputStateCreateInfo emptyInputState = vks::initializers::pipelineVertexInputStateCreateInfo();
 			pipelineCI.pVertexInputState = &emptyInputState;
 			pipelineCI.layout = m_vkPipelineLayout;
-			pipelineCI.renderPass = renderPass;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &viewDisplayPipelines[i]));
+			pipelineCI.renderPass = m_vkRenderPass;
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &viewDisplayPipelines[i]));
 		}
 
 	}
@@ -638,7 +638,7 @@ public:
 		prepareDescriptors();
 		preparePipelines();
 		
-		VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
+		VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
 		multiviewPass.commandBuffers.resize(drawCmdBuffers.size());
 		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, multiviewPass.commandBuffers.data()));
 
@@ -653,7 +653,7 @@ public:
 		prepared = true;
 	}
 
-	// SRS - Recreate and update Multiview resources when window size has changed
+	// SRS - Recreate and update Multiview resources when m_hwnd size has changed
 	virtual void windowResized()
 	{
 		vkDestroyImageView(m_vkDevice, multiviewPass.color.view, nullptr);
@@ -671,9 +671,9 @@ public:
 		updateDescriptors();
 		
 		// SRS - Recreate Multiview command buffers in case number of swapchain images has changed on resize
-		vkFreeCommandBuffers(m_vkDevice, cmdPool, static_cast<uint32_t>(multiviewPass.commandBuffers.size()), multiviewPass.commandBuffers.data());
+		vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool, static_cast<uint32_t>(multiviewPass.commandBuffers.size()), multiviewPass.commandBuffers.data());
 
-		VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
+		VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
 		multiviewPass.commandBuffers.resize(drawCmdBuffers.size());
 		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, multiviewPass.commandBuffers.data()));
 
@@ -697,22 +697,22 @@ public:
 		VulkanExampleBase::prepareFrame();
 
 		// Multiview offscreen render
-		VK_CHECK_RESULT(vkWaitForFences(m_vkDevice, 1, &multiviewPass.waitFences[currentBuffer], VK_TRUE, UINT64_MAX));
-		VK_CHECK_RESULT(vkResetFences(m_vkDevice, 1, &multiviewPass.waitFences[currentBuffer]));
-		submitInfo.pWaitSemaphores = &semaphores.presentComplete;
-		submitInfo.pSignalSemaphores = &multiviewPass.semaphore;
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &multiviewPass.commandBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, multiviewPass.waitFences[currentBuffer]));
+		VK_CHECK_RESULT(vkWaitForFences(m_vkDevice, 1, &multiviewPass.waitFences[m_currentBufferIndex], VK_TRUE, UINT64_MAX));
+		VK_CHECK_RESULT(vkResetFences(m_vkDevice, 1, &multiviewPass.waitFences[m_currentBufferIndex]));
+		m_vkSubmitInfo.pWaitSemaphores = &semaphores.m_vkSemaphorePresentComplete;
+		m_vkSubmitInfo.pSignalSemaphores = &multiviewPass.semaphore;
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &multiviewPass.commandBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, multiviewPass.waitFences[m_currentBufferIndex]));
 
 		// View display
-		VK_CHECK_RESULT(vkWaitForFences(m_vkDevice, 1, &waitFences[currentBuffer], VK_TRUE, UINT64_MAX));
-		VK_CHECK_RESULT(vkResetFences(m_vkDevice, 1, &waitFences[currentBuffer]));
-		submitInfo.pWaitSemaphores = &multiviewPass.semaphore;
-		submitInfo.pSignalSemaphores = &semaphores.renderComplete;
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, waitFences[currentBuffer]));
+		VK_CHECK_RESULT(vkWaitForFences(m_vkDevice, 1, &m_vkFences[m_currentBufferIndex], VK_TRUE, UINT64_MAX));
+		VK_CHECK_RESULT(vkResetFences(m_vkDevice, 1, &m_vkFences[m_currentBufferIndex]));
+		m_vkSubmitInfo.pWaitSemaphores = &multiviewPass.semaphore;
+		m_vkSubmitInfo.pSignalSemaphores = &semaphores.m_vkSemaphoreRenderComplete;
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, m_vkFences[m_currentBufferIndex]));
 
 		VulkanExampleBase::submitFrame();
 	}

@@ -82,13 +82,13 @@ public:
 	void setupRenderPass() override
 	{
 		// With VK_KHR_dynamic_rendering we no longer need a render pass, so we can skip the sample base render pass setup
-		renderPass = VK_NULL_HANDLE;
+		m_vkRenderPass = VK_NULL_HANDLE;
 	}
 
 	void setupFrameBuffer() override
 	{
 		// With VK_KHR_dynamic_rendering we no longer need a frame buffer, so we can so skip the sample base framebuffer setup
-		// For multi sampling we need intermediate images that are then resolved to the final presentation image 
+		// For multi sampling we need intermediate images that are then resolved to the final presentation m_vkImage 
 		vkDestroyImage(m_vkDevice, renderImage.image, nullptr);
 		vkDestroyImageView(m_vkDevice, renderImage.view, nullptr);
 		vkFreeMemory(m_vkDevice, renderImage.memory, nullptr);
@@ -119,43 +119,43 @@ public:
 		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewCI, nullptr, &renderImage.view));
 	}
 
-	// We need to override the default depth/stencil setup to create a depth image that supports multi sampling
+	// We need to override the default depth/stencil setup to create a depth m_vkImage that supports multi sampling
 	void setupDepthStencil() override
 	{
 		VkImageCreateInfo imageCI{};
 		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCI.imageType = VK_IMAGE_TYPE_2D;
-		imageCI.format = depthFormat;
+		imageCI.format = m_vkFormatDepth;
 		imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 		imageCI.mipLevels = 1;
 		imageCI.arrayLayers = 1;
 		imageCI.samples = multiSampleCount;
 		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &depthStencil.image));
+		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &m_defaultDepthStencil.m_vkImage));
 		VkMemoryRequirements memReqs{};
-		vkGetImageMemoryRequirements(m_vkDevice, depthStencil.image, &memReqs);
+		vkGetImageMemoryRequirements(m_vkDevice, m_defaultDepthStencil.m_vkImage, &memReqs);
 		VkMemoryAllocateInfo memAllloc{};
 		memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memAllloc.allocationSize = memReqs.size;
 		memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllloc, nullptr, &depthStencil.memory));
-		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, depthStencil.image, depthStencil.memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllloc, nullptr, &m_defaultDepthStencil.m_vkDeviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, m_defaultDepthStencil.m_vkImage, m_defaultDepthStencil.m_vkDeviceMemory, 0));
 		VkImageViewCreateInfo depthImageViewCI{};
 		depthImageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		depthImageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		depthImageViewCI.image = depthStencil.image;
-		depthImageViewCI.format = depthFormat;
+		depthImageViewCI.image = m_defaultDepthStencil.m_vkImage;
+		depthImageViewCI.format = m_vkFormatDepth;
 		depthImageViewCI.subresourceRange.baseMipLevel = 0;
 		depthImageViewCI.subresourceRange.levelCount = 1;
 		depthImageViewCI.subresourceRange.baseArrayLayer = 0;
 		depthImageViewCI.subresourceRange.layerCount = 1;
 		depthImageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		// Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT
-		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+		if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
 			depthImageViewCI.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
-		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &depthImageViewCI, nullptr, &depthStencil.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &depthImageViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
 	}
 
 	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
@@ -170,7 +170,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void buildCommandBuffers() override
@@ -195,7 +195,7 @@ public:
 				VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 			vks::tools::insertImageMemoryBarrier(
 				drawCmdBuffers[i],
-				depthStencil.image,
+				m_defaultDepthStencil.m_vkImage,
 				0,
 				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED,
@@ -218,10 +218,10 @@ public:
 			colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 			// A single depth stencil attachment info can be used, but they can also be specified separately.
-			// When both are specified separately, the only requirement is that the image view is identical.			
+			// When both are specified separately, the only requirement is that the m_vkImage m_vkImageView is identical.			
 			VkRenderingAttachmentInfoKHR depthStencilAttachment{};
 			depthStencilAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-			depthStencilAttachment.imageView = depthStencil.view;
+			depthStencilAttachment.imageView = m_defaultDepthStencil.m_vkImageView;
 			depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -255,7 +255,7 @@ public:
 			// End dynamic rendering
 			vkCmdEndRenderingKHR(drawCmdBuffers[i]);
 
-			// This set of barriers prepares the color image for presentation, we don't need to care for the depth image
+			// This set of barriers prepares the color m_vkImage for presentation, we don't need to care for the depth m_vkImage
 			vks::tools::insertImageMemoryBarrier(
 				drawCmdBuffers[i],
 				swapChain.images[i],
@@ -278,7 +278,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 		// Layout
 		const std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -287,7 +287,7 @@ public:
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -338,14 +338,14 @@ public:
 		pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
 		pipelineRenderingCreateInfo.colorAttachmentCount = 1;
 		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain.colorFormat;
-		pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat;
-		pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat;
+		pipelineRenderingCreateInfo.depthAttachmentFormat = m_vkFormatDepth;
+		pipelineRenderingCreateInfo.stencilAttachmentFormat = m_vkFormatDepth;
 		// Chain into the m_vkPipeline creat einfo
 		pipelineCI.pNext = &pipelineRenderingCreateInfo;
 
 		shaderStages[0] = loadShader(getShadersPath() + "dynamicrendering/texture.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "dynamicrendering/texture.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -383,9 +383,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

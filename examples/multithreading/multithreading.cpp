@@ -140,7 +140,7 @@ public:
 		// base class, and create a single primary command buffer instead
 		VkCommandBufferAllocateInfo cmdBufAllocateInfo =
 			vks::initializers::commandBufferAllocateInfo(
-				cmdPool,
+				m_vkCommandPool,
 				VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 				1);
 		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, &primaryCommandBuffer));
@@ -201,7 +201,7 @@ public:
 		ThreadData *thread = &threadData[threadIndex];
 		ObjectData *objectData = &thread->objectData[cmdBufferIndex];
 
-		// Check visibility against view frustum using a simple sphere check based on the radius of the mesh
+		// Check visibility against m_vkImageView frustum using a simple sphere check based on the radius of the mesh
 		objectData->visible = frustum.checkSphere(objectData->pos, models.ufo.dimensions.radius * 0.5f);
 
 		if (!objectData->visible)
@@ -246,7 +246,7 @@ public:
 		thread->pushConstBlock[cmdBufferIndex].mvp = matrices.projection * matrices.view * objectData->model;
 
 		// Update shader push constant block
-		// Contains model view matrix
+		// Contains model m_vkImageView matrix
 		vkCmdPushConstants(
 			cmdBuffer,
 			m_vkPipelineLayout,
@@ -321,7 +321,7 @@ public:
 
 	// Updates the secondary command buffers using a thread pool
 	// and puts them into the primary command buffer that's
-	// lat submitted to the queue for rendering
+	// lat submitted to the m_vkQueue for rendering
 	void updateCommandBuffers(VkFramebuffer frameBuffer)
 	{
 		// Contains the list of secondary command buffers to be submitted
@@ -330,11 +330,11 @@ public:
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
 		VkClearValue clearValues[2];
-		clearValues[0].color = defaultClearColor;
+		clearValues[0].color = m_vkClearColorValueDefault;
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -353,7 +353,7 @@ public:
 
 		// Inheritance info for the secondary command buffers
 		VkCommandBufferInheritanceInfo inheritanceInfo = vks::initializers::commandBufferInheritanceInfo();
-		inheritanceInfo.renderPass = renderPass;
+		inheritanceInfo.renderPass = m_vkRenderPass;
 		// Secondary command buffer also use the currently active framebuffer
 		inheritanceInfo.framebuffer = frameBuffer;
 
@@ -364,7 +364,7 @@ public:
 			commandBuffers.push_back(secondaryCommandBuffers.background);
 		}
 
-		// Add a job to the thread's queue for each object to be rendered
+		// Add a job to the thread's m_vkQueue for each object to be rendered
 		for (uint32_t t = 0; t < numThreads; t++)
 		{
 			for (uint32_t i = 0; i < numObjectsPerThread; i++)
@@ -375,7 +375,7 @@ public:
 
 		threadPool.wait();
 
-		// Only submit if object is within the current view frustum
+		// Only submit if object is within the current m_vkImageView frustum
 		for (uint32_t t = 0; t < numThreads; t++)
 		{
 			for (uint32_t i = 0; i < numObjectsPerThread; i++)
@@ -403,8 +403,8 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models.ufo.loadFromFile(getAssetPath() + "models/retroufo_red_lowpoly.gltf",vulkanDevice, queue,glTFLoadingFlags);
-		models.starSphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		models.ufo.loadFromFile(getAssetPath() + "models/retroufo_red_lowpoly.gltf",vulkanDevice, m_vkQueue,glTFLoadingFlags);
+		models.starSphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void preparePipelines()
@@ -430,7 +430,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -445,14 +445,14 @@ public:
 		// Object rendering pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "multithreading/phong.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "multithreading/phong.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.phong));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.phong));
 
 		// Star sphere rendering pipeline
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
 		depthStencilState.depthWriteEnable = VK_FALSE;
 		shaderStages[0] = loadShader(getShadersPath() + "multithreading/starsphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "multithreading/starsphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.starsphere));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.starsphere));
 	}
 
 	void updateMatrices()
@@ -487,12 +487,12 @@ public:
 
 		VulkanExampleBase::prepareFrame();
 
-		updateCommandBuffers(frameBuffers[currentBuffer]);
+		updateCommandBuffers(m_vkFrameBuffers[m_currentBufferIndex]);
 
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &primaryCommandBuffer;
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &primaryCommandBuffer;
 
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, renderFence));
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, renderFence));
 
 		VulkanExampleBase::submitFrame();
 	}

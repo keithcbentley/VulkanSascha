@@ -71,7 +71,7 @@ void VulkanglTFModel::loadImages(tinygltf::Model &input)
 	for (size_t i = 0; i < input.images.size(); i++)
 	{
 		tinygltf::Image &glTFImage = input.images[i];
-		// Get the image data from the glTF loader
+		// Get the m_vkImage data from the glTF loader
 		unsigned char *buffer       = nullptr;
 		VkDeviceSize   bufferSize   = 0;
 		bool           deleteBuffer = false;
@@ -95,7 +95,7 @@ void VulkanglTFModel::loadImages(tinygltf::Model &input)
 			buffer     = &glTFImage.image[0];
 			bufferSize = glTFImage.image.size();
 		}
-		// Load texture from image buffer
+		// Load texture from m_vkImage buffer
 		images[i].texture.fromBuffer(buffer, bufferSize, VK_FORMAT_R8G8B8A8_UNORM, glTFImage.width, glTFImage.height, vulkanDevice, copyQueue);
 		if (deleteBuffer)
 		{
@@ -682,7 +682,7 @@ void VulkanExample::buildCommandBuffers()
 	clearValues[1].depthStencil = {1.0f, 0};
 
 	VkRenderPassBeginInfo renderPassBeginInfo    = vks::initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass               = renderPass;
+	renderPassBeginInfo.renderPass               = m_vkRenderPass;
 	renderPassBeginInfo.renderArea.offset.x      = 0;
 	renderPassBeginInfo.renderArea.offset.y      = 0;
 	renderPassBeginInfo.renderArea.extent.width  = m_drawAreaWidth;
@@ -695,7 +695,7 @@ void VulkanExample::buildCommandBuffers()
 
 	for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 	{
-		renderPassBeginInfo.framebuffer = frameBuffers[i];
+		renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 		VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 		vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
@@ -727,7 +727,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 
 	// Pass some Vulkan resources required for setup and rendering to the glTF model loading class
 	glTFModel.vulkanDevice = vulkanDevice;
-	glTFModel.copyQueue    = queue;
+	glTFModel.copyQueue    = m_vkQueue;
 
 	std::vector<uint32_t>                indexBuffer;
 	std::vector<VulkanglTFModel::Vertex> vertexBuffer;
@@ -806,7 +806,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 	vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, glTFModel.vertices.buffer, 1, &copyRegion);
 	copyRegion.size = indexBufferSize;
 	vkCmdCopyBuffer(copyCmd, indexStaging.buffer, glTFModel.indices.buffer, 1, &copyRegion);
-	vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+	vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 	// Free staging resources
 	vkDestroyBuffer(m_vkDevice, vertexStaging.buffer, nullptr);
@@ -823,15 +823,15 @@ void VulkanExample::setupDescriptors()
 
 	std::vector<VkDescriptorPoolSize> poolSizes = {
 	    vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-	    // One combined image sampler per material image/texture
+	    // One combined m_vkImage sampler per material m_vkImage/texture
 	    vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(glTFModel.images.size())),
 	    // One ssbo per skin
 	    vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, static_cast<uint32_t>(glTFModel.skins.size())),
 	};
-	// Number of descriptor sets = One for the scene ubo + one per image + one per skin
+	// Number of descriptor sets = One for the scene ubo + one per m_vkImage + one per skin
 	const uint32_t             maxSetCount        = static_cast<uint32_t>(glTFModel.images.size()) + static_cast<uint32_t>(glTFModel.skins.size()) + 1;
 	VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, maxSetCount);
-	VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+	VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 	// Descriptor set layouts
 	VkDescriptorSetLayoutBinding    setLayoutBinding{};
@@ -850,7 +850,7 @@ void VulkanExample::setupDescriptors()
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.jointMatrices));
 
 	// Descriptor set for scene matrices
-	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.matrices, 1);
+	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.matrices, 1);
 	VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 	VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &shaderData.buffer.descriptor);
 	vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
@@ -858,7 +858,7 @@ void VulkanExample::setupDescriptors()
 	// Descriptor set for glTF model skin joint matrices
 	for (auto &skin : glTFModel.skins)
 	{
-		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.jointMatrices, 1);
+		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.jointMatrices, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &skin.descriptorSet));
 		VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(skin.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0, &skin.ssbo.descriptor);
 		vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
@@ -867,7 +867,7 @@ void VulkanExample::setupDescriptors()
 	// Descriptor sets for glTF model materials
 	for (auto &image : glTFModel.images)
 	{
-		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.textures, 1);
+		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.textures, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &image.descriptorSet));
 		VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(image.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &image.texture.descriptor);
 		vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
@@ -928,7 +928,7 @@ void VulkanExample::preparePipelines()
 	    loadShader(getShadersPath() + "gltfskinning/skinnedmodel.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
 	    loadShader(getShadersPath() + "gltfskinning/skinnedmodel.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)};
 
-	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
+	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
 	pipelineCI.pVertexInputState            = &vertexInputStateCI;
 	pipelineCI.pInputAssemblyState          = &inputAssemblyStateCI;
 	pipelineCI.pRasterizationState          = &rasterizationStateCI;
@@ -941,14 +941,14 @@ void VulkanExample::preparePipelines()
 	pipelineCI.pStages                      = shaderStages.data();
 
 	// Solid rendering pipeline
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.solid));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.solid));
 
 	// Wire frame rendering pipeline
 	if (deviceFeatures.fillModeNonSolid)
 	{
 		rasterizationStateCI.polygonMode = VK_POLYGON_MODE_LINE;
 		rasterizationStateCI.lineWidth   = 1.0f;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.wireframe));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.wireframe));
 	}
 }
 

@@ -125,40 +125,40 @@ protected:
 	void* deviceCreatepNextChain = nullptr;
 	/** @brief Logical device, application's view of the physical device (GPU) */
 	VkDevice m_vkDevice{ VK_NULL_HANDLE };
-	// Handle to the m_vkDevice graphics queue that command buffers are submitted to
-	VkQueue queue{ VK_NULL_HANDLE };
+	// Handle to the m_vkDevice graphics m_vkQueue that command buffers are submitted to
+	VkQueue m_vkQueue{ VK_NULL_HANDLE };
 	// Depth buffer format (selected during Vulkan initialization)
-	VkFormat depthFormat{VK_FORMAT_UNDEFINED};
+	VkFormat m_vkFormatDepth{VK_FORMAT_UNDEFINED};
 	// Command buffer pool
-	VkCommandPool cmdPool{ VK_NULL_HANDLE };
+	VkCommandPool m_vkCommandPool{ VK_NULL_HANDLE };
 	/** @brief Pipeline stages used to wait at for graphics queue submissions */
 	VkPipelineStageFlags submitPipelineStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	// Contains command buffers and semaphores to be presented to the queue
-	VkSubmitInfo submitInfo{};
+	// Contains command buffers and semaphores to be presented to the m_vkQueue
+	VkSubmitInfo m_vkSubmitInfo{};
 	// Command buffers used for rendering
 	std::vector<VkCommandBuffer> drawCmdBuffers;
 	// Global render pass for frame buffer writes
-	VkRenderPass renderPass{ VK_NULL_HANDLE };
+	VkRenderPass m_vkRenderPass{ VK_NULL_HANDLE };
 	// List of available frame buffers (same as number of swap chain images)
-	std::vector<VkFramebuffer>frameBuffers;
+	std::vector<VkFramebuffer>m_vkFrameBuffers;
 	// Active frame buffer index
-	uint32_t currentBuffer = 0;
+	uint32_t m_currentBufferIndex = 0;
 	// Descriptor set pool
-	VkDescriptorPool descriptorPool{ VK_NULL_HANDLE };
+	VkDescriptorPool m_vkDescriptorPool{ VK_NULL_HANDLE };
 	// List of shader modules created (stored for cleanup)
-	std::vector<VkShaderModule> shaderModules;
+	std::vector<VkShaderModule> m_vkShaderModules;
 	// Pipeline cache object
-	VkPipelineCache pipelineCache{ VK_NULL_HANDLE };
+	VkPipelineCache m_vkPipelineCache{ VK_NULL_HANDLE };
 	// Wraps the swap chain to present images (framebuffers) to the windowing system
 	VulkanSwapChain swapChain;
 	// Synchronization semaphores
 	struct {
-		// Swap chain image presentation
-		VkSemaphore presentComplete;
+		// Swap chain m_vkImage presentation
+		VkSemaphore m_vkSemaphorePresentComplete;
 		// Command buffer submission and execution
-		VkSemaphore renderComplete;
+		VkSemaphore m_vkSemaphoreRenderComplete;
 	} semaphores{};
-	std::vector<VkFence> waitFences;
+	std::vector<VkFence> m_vkFences;
 	bool requiresStencil{ false };
 
 public:
@@ -208,7 +208,7 @@ public:
 		glm::vec2 position;
 	} mouseState;
 
-	VkClearColorValue defaultClearColor = { { 0.025f, 0.025f, 0.025f, 1.0f } };
+	VkClearColorValue m_vkClearColorValueDefault = { { 0.025f, 0.025f, 0.025f, 1.0f } };
 
 	static std::vector<const char*> args;
 
@@ -227,15 +227,15 @@ public:
 
 	/** @brief Default depth stencil attachment used by the default render pass */
 	struct {
-		VkImage image;
-		VkDeviceMemory memory;
-		VkImageView view;
-	} depthStencil{};
+		VkImage m_vkImage;
+		VkDeviceMemory m_vkDeviceMemory;
+		VkImageView m_vkImageView;
+	} m_defaultDepthStencil{};
 
 	// OS specific
 #if defined(_WIN32)
-	HWND window;
-	HINSTANCE windowInstance;
+	HWND m_hwnd;
+	HINSTANCE m_hinstance;
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
 	// true if application has focused, false if moved to background
 	bool focused = false;
@@ -247,7 +247,7 @@ public:
 	double touchTimer = 0.0;
 	int64_t lastTapTime = 0;
 #elif (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT))
-	void* view;
+	void* m_vkImageView;
 #if defined(VK_USE_PLATFORM_METAL_EXT)
 	CAMetalLayer* metalLayer;
 #endif
@@ -258,7 +258,7 @@ public:
 	bool quit = false;
 	IDirectFB *dfb = nullptr;
 	IDirectFBDisplayLayer *layer = nullptr;
-	IDirectFBWindow *window = nullptr;
+	IDirectFBWindow *m_hwnd = nullptr;
 	IDirectFBSurface *m_vkSurface = nullptr;
 	IDirectFBEventBuffer *event_buffer = nullptr;
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
@@ -281,7 +281,7 @@ public:
 	bool quit = false;
 	xcb_connection_t *connection;
 	xcb_screen_t *screen;
-	xcb_window_t window;
+	xcb_window_t m_hwnd;
 	xcb_intern_atom_reply_t *atom_wm_delete_window;
 #elif defined(VK_USE_PLATFORM_HEADLESS_EXT)
 	bool quit = false;
@@ -313,7 +313,7 @@ public:
 	static int32_t handleAppInput(struct android_app* app, AInputEvent* event);
 	static void handleAppCommand(android_app* app, int32_t cmd);
 #elif (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT))
-	void* setupWindow(void* view);
+	void* setupWindow(void* m_vkImageView);
 	void displayLinkOutputCb();
 	void mouseDragged(float x, float y);
 	void windowWillResize(float x, float y);
@@ -413,7 +413,7 @@ public:
 	/** @brief Adds the drawing commands for the ImGui overlay to the given command buffer */
 	void drawUI(const VkCommandBuffer commandBuffer);
 
-	/** Prepare the next frame for workload submission by acquiring the next swap chain image */
+	/** Prepare the next frame for workload submission by acquiring the next swap chain m_vkImage */
 	void prepareFrame();
 	/** @brief Presents the current image to the swap chain */
 	void submitFrame();

@@ -4,7 +4,7 @@
 	This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
 
 	This example implements projective cascaded shadow mapping. This technique splits up the camera frustum into
-	multiple frustums with each getting its own full-res shadow map, implemented as a layered depth-only image.
+	multiple frustums with each getting its own full-res shadow map, implemented as a layered depth-only m_vkImage.
 	The shader then selects the proper shadow map layer depending on what split of the frustum the depth value
 	to compare fits into.
 
@@ -89,7 +89,7 @@ public:
 		VkPipeline pipeline;
 	} depthPass;
 
-	// Layered depth image containing the shadow cascade depths
+	// Layered depth m_vkImage containing the shadow cascade depths
 	struct DepthImage {
 		VkImage image;
 		VkDeviceMemory mem;
@@ -195,7 +195,7 @@ public:
 
 	/*
 		Setup resources used by the depth pass
-		The depth image is layered with each layer storing one shadow map cascade
+		The depth m_vkImage is layered with each layer storing one shadow map cascade
 	*/
 	void prepareDepthPass()
 	{
@@ -254,7 +254,7 @@ public:
 		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassCreateInfo, nullptr, &depthPass.renderPass));
 
 		/*
-			Layered depth image and views
+			Layered depth m_vkImage and views
 		*/
 
 		VkImageCreateInfo imageInfo = vks::initializers::imageCreateInfo();
@@ -276,7 +276,7 @@ public:
 		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &depth.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, depth.image, depth.mem, 0));
-		// Full depth map view (all layers)
+		// Full depth map m_vkImageView (all layers)
 		VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
 		viewInfo.format = depthFormat;
@@ -289,10 +289,10 @@ public:
 		viewInfo.image = depth.image;
 		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &depth.view));
 
-		// One image view and framebuffer per cascade
+		// One m_vkImage m_vkImageView and framebuffer per cascade
 		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
-			// Image view for this cascade's layer (inside the depth map)
-			// This view is used to render to that specific depth image layer
+			// Image m_vkImageView for this cascade's layer (inside the depth map)
+			// This m_vkImageView is used to render to that specific depth m_vkImage layer
 			VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
 			viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
 			viewInfo.format = depthFormat;
@@ -342,7 +342,7 @@ public:
 			/*
 				Generate depth map cascades
 
-				Uses multiple passes with each pass rendering the scene to the cascade's depth image layer
+				Uses multiple passes with each pass rendering the scene to the cascade's depth m_vkImage layer
 				Could be optimized using a geometry shader (and layered frame buffer) on devices that support geometry shaders
 			*/
 			{
@@ -388,8 +388,8 @@ public:
 				clearValues[1].depthStencil = { 1.0f, 0 };
 
 				VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-				renderPassBeginInfo.renderPass = renderPass;
-				renderPassBeginInfo.framebuffer = frameBuffers[i];
+				renderPassBeginInfo.renderPass = m_vkRenderPass;
+				renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 				renderPassBeginInfo.renderArea.offset.x = 0;
 				renderPassBeginInfo.renderArea.offset.y = 0;
 				renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -431,8 +431,8 @@ public:
 	void loadAssets()
 	{
 		uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY;
-		models.terrain.loadFromFile(getAssetPath() + "models/terrain_gridlines.gltf", vulkanDevice, queue, glTFLoadingFlags);
-		models.tree.loadFromFile(getAssetPath() + "models/oaktree.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		models.terrain.loadFromFile(getAssetPath() + "models/terrain_gridlines.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.tree.loadFromFile(getAssetPath() + "models/oaktree.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void setupLayoutsAndDescriptors()
@@ -446,7 +446,7 @@ public:
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo =
 			vks::initializers::descriptorPoolCreateInfo(static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), 4 + SHADOW_MAP_CASCADE_COUNT);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		/*
 			Descriptor set layouts
@@ -470,7 +470,7 @@ public:
 			vks::initializers::descriptorImageInfo(depth.sampler, depth.view, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
 		VkDescriptorSetAllocateInfo allocInfo =
-			vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+			vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 
 		// Scene rendering / debug display
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
@@ -520,7 +520,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -538,7 +538,7 @@ public:
 		// Empty vertex input state
 		VkPipelineVertexInputStateCreateInfo emptyInputState = vks::initializers::pipelineVertexInputStateCreateInfo();
 		pipelineCI.pVertexInputState = &emptyInputState;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.debugShadowMap));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.debugShadowMap));
 
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal });
 		/*
@@ -552,9 +552,9 @@ public:
 		VkSpecializationMapEntry specializationMapEntry = vks::initializers::specializationMapEntry(0, 0, sizeof(uint32_t));
 		VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(1, &specializationMapEntry, sizeof(uint32_t), &enablePCF);
 		shaderStages[1].pSpecializationInfo = &specializationInfo;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadow));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadow));
 		enablePCF = 1;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadowPCF));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadowPCF));
 
 		/*
 			Depth map generation
@@ -568,7 +568,7 @@ public:
 		rasterizationState.depthClampEnable = deviceFeatures.depthClamp;
 		pipelineCI.layout = depthPass.pipelineLayout;
 		pipelineCI.renderPass = depthPass.renderPass;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &depthPass.pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &depthPass.pipeline));
 	}
 
 	void prepareUniformBuffers()
@@ -619,7 +619,7 @@ public:
 		float range = maxZ - minZ;
 		float ratio = maxZ / minZ;
 
-		// Calculate split depths based on view camera frustum
+		// Calculate split depths based on m_vkImageView camera frustum
 		// Based on method presented in https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
 		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
 			float p = (i + 1) / static_cast<float>(SHADOW_MAP_CASCADE_COUNT);
@@ -725,9 +725,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

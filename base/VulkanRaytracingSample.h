@@ -57,7 +57,7 @@ public:
 		VkBuffer buffer;
 	};
 
-	// Holds information for a storage image that the ray tracing shaders output to
+	// Holds information for a storage m_vkImage that the ray tracing shaders output to
 	struct StorageImage {
 		VkDeviceMemory memory = VK_NULL_HANDLE;
 		VkImage image = VK_NULL_HANDLE;

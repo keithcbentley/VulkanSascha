@@ -13,7 +13,7 @@ void VulkanRaytracingSample::setupRenderPass()
 	// Update the default render pass with different color attachment load ops to keep attachment contents
 	// With this change, we can e.g. draw an UI on top of the ray traced scene
 
-	vkDestroyRenderPass(m_vkDevice, renderPass, nullptr);
+	vkDestroyRenderPass(m_vkDevice, m_vkRenderPass, nullptr);
 
 	VkAttachmentLoadOp colorLoadOp{ VK_ATTACHMENT_LOAD_OP_LOAD };
 	VkImageLayout colorInitialLayout{ VK_IMAGE_LAYOUT_PRESENT_SRC_KHR };
@@ -35,7 +35,7 @@ void VulkanRaytracingSample::setupRenderPass()
 	attachments[0].initialLayout = colorInitialLayout;
 	attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	// Depth attachment
-	attachments[1].format = depthFormat;
+	attachments[1].format = m_vkFormatDepth;
 	attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -90,7 +90,7 @@ void VulkanRaytracingSample::setupRenderPass()
 	renderPassInfo.pSubpasses = &subpassDescription;
 	renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 	renderPassInfo.pDependencies = dependencies.data();
-	VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfo, nullptr, &renderPass));
+	VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfo, nullptr, &m_vkRenderPass));
 }
 
 void VulkanRaytracingSample::setupFrameBuffer()
@@ -98,23 +98,23 @@ void VulkanRaytracingSample::setupFrameBuffer()
 	VkImageView attachments[2];
 
 	// Depth/Stencil attachment is the same for all frame buffers
-	attachments[1] = depthStencil.view;
+	attachments[1] = m_defaultDepthStencil.m_vkImageView;
 
 	VkFramebufferCreateInfo frameBufferCreateInfo = {};
 	frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	frameBufferCreateInfo.pNext = NULL;
-	frameBufferCreateInfo.renderPass = renderPass;
+	frameBufferCreateInfo.renderPass = m_vkRenderPass;
 	frameBufferCreateInfo.attachmentCount = 2;
 	frameBufferCreateInfo.pAttachments = attachments;
 	frameBufferCreateInfo.width = m_drawAreaWidth;
 	frameBufferCreateInfo.height = m_drawAreaHeight;
 	frameBufferCreateInfo.layers = 1;
 
-	// Create frame buffers for every swap chain image
-	frameBuffers.resize(swapChain.images.size());
-	for (uint32_t i = 0; i < frameBuffers.size(); i++) {
+	// Create frame buffers for every swap chain m_vkImage
+	m_vkFrameBuffers.resize(swapChain.images.size());
+	for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++) {
 		attachments[0] = swapChain.imageViews[i];
-		VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCreateInfo, nullptr, &frameBuffers[i]));
+		VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
 	}
 }
 
@@ -144,7 +144,7 @@ void VulkanRaytracingSample::enableExtensions()
 VulkanRaytracingSample::ScratchBuffer VulkanRaytracingSample::createScratchBuffer(VkDeviceSize size)
 {
 	ScratchBuffer scratchBuffer{};
-	// Buffer and memory
+	// Buffer and m_vkDeviceMemory
 	VkBufferCreateInfo bufferCreateInfo{};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferCreateInfo.size = size;
@@ -182,7 +182,7 @@ void VulkanRaytracingSample::deleteScratchBuffer(ScratchBuffer& scratchBuffer)
 
 void VulkanRaytracingSample::createAccelerationStructure(AccelerationStructure& accelerationStructure, VkAccelerationStructureTypeKHR type, VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo)
 {
-	// Buffer and memory
+	// Buffer and m_vkDeviceMemory
 	VkBufferCreateInfo bufferCreateInfo{};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferCreateInfo.size = buildSizeInfo.accelerationStructureSize;
@@ -231,7 +231,7 @@ uint64_t VulkanRaytracingSample::getBufferDeviceAddress(VkBuffer buffer)
 
 void VulkanRaytracingSample::createStorageImage(VkFormat format, VkExtent3D extent)
 {
-	// Release resources if image is to be recreated
+	// Release resources if m_vkImage is to be recreated
 	if (storageImage.image != VK_NULL_HANDLE) {
 		vkDestroyImageView(m_vkDevice, storageImage.view, nullptr);
 		vkDestroyImage(m_vkDevice, storageImage.image, nullptr);
@@ -276,7 +276,7 @@ void VulkanRaytracingSample::createStorageImage(VkFormat format, VkExtent3D exte
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL,
 		{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
-	vulkanDevice->flushCommandBuffer(cmdBuffer, queue);
+	vulkanDevice->flushCommandBuffer(cmdBuffer, m_vkQueue);
 }
 
 void VulkanRaytracingSample::deleteStorageImage()
@@ -350,11 +350,11 @@ void VulkanRaytracingSample::createShaderBindingTable(ShaderBindingTable& shader
 void VulkanRaytracingSample::drawUI(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer)
 {
 	VkClearValue clearValues[2];
-	clearValues[0].color = defaultClearColor;
+	clearValues[0].color = m_vkClearColorValueDefault;
 	clearValues[1].depthStencil = { 1.0f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = renderPass;
+	renderPassBeginInfo.renderPass = m_vkRenderPass;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
 	renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;

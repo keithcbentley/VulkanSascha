@@ -77,7 +77,7 @@ namespace vks
 			}
 		}
 
-		// Add a new job to the thread's queue
+		// Add a new job to the thread's m_vkQueue
 		void addJob(std::function<void()> function)
 		{
 			std::lock_guard<std::mutex> lock(queueMutex);

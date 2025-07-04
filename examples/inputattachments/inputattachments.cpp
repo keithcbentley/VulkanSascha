@@ -169,7 +169,7 @@ public:
 	// Override framebuffer setup from base class
 	void setupFrameBuffer()
 	{
-		// If the window is resized, all the framebuffers/attachments used in our composition passes need to be recreated
+		// If the m_hwnd is resized, all the framebuffers/attachments used in our composition passes need to be recreated
 		if (attachmentSize.width != m_drawAreaWidth || attachmentSize.height != m_drawAreaHeight)
 		{
 			attachmentSize = { m_drawAreaWidth, m_drawAreaHeight };
@@ -183,14 +183,14 @@ public:
 			attachments.resize(swapChain.images.size());
 			for (auto i = 0; i < attachments.size(); i++) {
 				createAttachment(colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments[i].color);
-				createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments[i].depth);
+				createAttachment(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments[i].depth);
 			}
 
 			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentWrite, nullptr);
 			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentRead, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentWrite, nullptr);
 			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentRead, nullptr);
-			vkDestroyDescriptorPool(m_vkDevice, descriptorPool, nullptr);
+			vkDestroyDescriptorPool(m_vkDevice, m_vkDescriptorPool, nullptr);
 
 			// Since the framebuffers/attachments are referred in the descriptor sets, these need to be updated on resize
 			setupDescriptors();
@@ -200,20 +200,20 @@ public:
 
 		VkFramebufferCreateInfo frameBufferCI{};
 		frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		frameBufferCI.renderPass = renderPass;
+		frameBufferCI.renderPass = m_vkRenderPass;
 		frameBufferCI.attachmentCount = 3;
 		frameBufferCI.pAttachments = views;
 		frameBufferCI.width = m_drawAreaWidth;
 		frameBufferCI.height = m_drawAreaHeight;
 		frameBufferCI.layers = 1;
 
-		frameBuffers.resize(swapChain.images.size());
-		for (uint32_t i = 0; i < frameBuffers.size(); i++)
+		m_vkFrameBuffers.resize(swapChain.images.size());
+		for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++)
 		{
 			views[0] = swapChain.imageViews[i];
 			views[1] = attachments[i].color.view;
 			views[2] = attachments[i].depth.view;
-			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCI, nullptr, &frameBuffers[i]));
+			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCI, nullptr, &m_vkFrameBuffers[i]));
 		}
 	}
 
@@ -225,12 +225,12 @@ public:
 		attachments.resize(swapChain.images.size());
 		for (auto i = 0; i < attachments.size(); i++) {
 			createAttachment(colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments[i].color);
-			createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments[i].depth);
+			createAttachment(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments[i].depth);
 		}
 
 		std::array<VkAttachmentDescription, 3> attachments{};
 
-		// Swap chain image color attachment
+		// Swap chain m_vkImage color attachment
 		// Will be transitioned to present layout
 		attachments[0].format = swapChain.colorFormat;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -255,7 +255,7 @@ public:
 		attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		// Depth
-		attachments[2].format = depthFormat;
+		attachments[2].format = m_vkFormatDepth;
 		attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -337,7 +337,7 @@ public:
 		renderPassInfoCI.pSubpasses = subpassDescriptions.data();
 		renderPassInfoCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		renderPassInfoCI.pDependencies = dependencies.data();
-		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfoCI, nullptr, &renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfoCI, nullptr, &m_vkRenderPass));
 	}
 
 	void buildCommandBuffers()
@@ -350,7 +350,7 @@ public:
 		clearValues[2].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -359,7 +359,7 @@ public:
 		renderPassBeginInfo.pClearValues = clearValues;
 
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i) {
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -412,7 +412,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void updateAttachmentReadDescriptors(uint32_t index)
@@ -444,7 +444,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, static_cast<uint32_t>(attachments.size()) * 2 + 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), static_cast<uint32_t>(attachments.size()) + 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		/*
 			Attachment write
@@ -459,7 +459,7 @@ public:
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.attachmentWrite, 1);
 			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.attachmentWrite));
 
-			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.attachmentWrite, 1);
+			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.attachmentWrite, 1);
 			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.attachmentWrite));
 
 			VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSets.attachmentWrite, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.matrices.descriptor);
@@ -485,7 +485,7 @@ public:
 
 		descriptorSets.attachmentRead.resize(attachments.size());
 		for (auto i = 0; i < descriptorSets.attachmentRead.size(); i++) {
-			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayouts.attachmentRead, 1);
+			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.attachmentRead, 1);
 			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.attachmentRead[i]));
 			updateAttachmentReadDescriptors(i);
 		}
@@ -507,7 +507,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo();
 
-		pipelineCI.renderPass = renderPass;
+		pipelineCI.renderPass = m_vkRenderPass;
 		pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 		pipelineCI.pRasterizationState = &rasterizationStateCI;
 		pipelineCI.pColorBlendState = &colorBlendStateCI;
@@ -530,7 +530,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "inputattachments/attachmentwrite.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inputattachments/attachmentwrite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentWrite));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentWrite));
 
 		/*
 			Attachment read
@@ -550,7 +550,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "inputattachments/attachmentread.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inputattachments/attachmentread.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentRead));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentRead));
 	}
 
 	void prepareUniformBuffers()
@@ -574,9 +574,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

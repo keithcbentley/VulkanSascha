@@ -178,7 +178,7 @@ namespace vks
 			VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 			VkMemoryRequirements memReqs;
 
-			// Create image for this attachment
+			// Create m_vkImage for this attachment
 			VK_CHECK_RESULT(vkCreateImage(vulkanDevice->m_vkDevice, &image, nullptr, &attachment.image));
 			vkGetImageMemoryRequirements(vulkanDevice->m_vkDevice, attachment.image, &memReqs);
 			memAlloc.allocationSize = memReqs.size;

@@ -69,8 +69,8 @@ public:
 	// Resources for the compute part of the example
 	struct {
 		vks::Buffer lodLevelsBuffers;				// Contains index start and counts for the different lod levels
-		VkQueue queue;								// Separate queue for compute commands (queue family may differ from the one used for graphics)
-		VkCommandPool commandPool;					// Use a separate command pool (queue family may differ from the one used for graphics)
+		VkQueue queue;								// Separate m_vkQueue for compute commands (m_vkQueue family may differ from the one used for graphics)
+		VkCommandPool commandPool;					// Use a separate command pool (m_vkQueue family may differ from the one used for graphics)
 		VkCommandBuffer commandBuffer;				// Command buffer storing the dispatch commands and barriers
 		VkFence fence;								// Synchronization fence to avoid rewriting compute CB if still in use
 		VkSemaphore semaphore;						// Used as a wait semaphore for graphics submission
@@ -134,7 +134,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
 		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
@@ -143,7 +143,7 @@ public:
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{
 			// Set target frame buffer
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -241,7 +241,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		lodModel.loadFromFile(getAssetPath() + "models/suzanne_lods.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		lodModel.loadFromFile(getAssetPath() + "models/suzanne_lods.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void buildComputeCommandBuffer()
@@ -251,7 +251,7 @@ public:
 		VK_CHECK_RESULT(vkBeginCommandBuffer(compute.commandBuffer, &cmdBufInfo));
 
 		// Acquire barrier
-		// Add memory barrier to ensure that the indirect commands have been consumed before the compute shader updates them
+		// Add m_vkDeviceMemory barrier to ensure that the indirect commands have been consumed before the compute shader updates them
 		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
 		{
 			VkBufferMemoryBarrier buffer_barrier =
@@ -303,7 +303,7 @@ public:
 		vkCmdDispatch(compute.commandBuffer, objectCount / 16, 1, 1);
 
 		// Release barrier
-		// Add memory barrier to ensure that the compute shader has finished writing the indirect command buffer before it's consumed
+		// Add m_vkDeviceMemory barrier to ensure that the compute shader has finished writing the indirect command buffer before it's consumed
 		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
 		{
 			VkBufferMemoryBarrier buffer_barrier =
@@ -342,7 +342,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -353,7 +353,7 @@ public:
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
@@ -409,7 +409,7 @@ public:
 		VkPipelineMultisampleStateCreateInfo multisampleState = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
 		std::vector<VkDynamicState> dynamicStateEnables = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
 			loadShader(getShadersPath() + "computecullandlod/indirectdraw.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
 			loadShader(getShadersPath() + "computecullandlod/indirectdraw.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -424,7 +424,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 	}
 
 	void prepareBuffers()
@@ -466,7 +466,7 @@ public:
 			&indirectCommandsBuffer,
 			stagingBuffer.size));
 
-		vulkanDevice->copyBuffer(&stagingBuffer, &indirectCommandsBuffer, queue);
+		vulkanDevice->copyBuffer(&stagingBuffer, &indirectCommandsBuffer, m_vkQueue);
 
 		stagingBuffer.destroy();
 
@@ -511,7 +511,7 @@ public:
 		VkBufferCopy copyRegion = {};
 		copyRegion.size = stagingBuffer.size;
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, instanceBuffer.buffer, 1, &copyRegion);
-		// Add an initial release barrier to the graphics queue,
+		// Add an initial release barrier to the graphics m_vkQueue,
 		// so that when the compute command buffer executes for the first time
 		// it doesn't complain about a lack of a corresponding "release" to its "acquire"
 		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
@@ -537,7 +537,7 @@ public:
 				1, &buffer_barrier,
 				0, nullptr);
 		}
-		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 		stagingBuffer.destroy();
 
@@ -574,7 +574,7 @@ public:
 			&compute.lodLevelsBuffers,
 			stagingBuffer.size));
 
-		vulkanDevice->copyBuffer(&stagingBuffer, &compute.lodLevelsBuffers, queue);
+		vulkanDevice->copyBuffer(&stagingBuffer, &compute.lodLevelsBuffers, m_vkQueue);
 
 		stagingBuffer.destroy();
 
@@ -592,11 +592,11 @@ public:
 
 	void prepareCompute()
 	{
-		// Get a compute capable m_vkDevice queue
+		// Get a compute capable m_vkDevice m_vkQueue
 		vkGetDeviceQueue(m_vkDevice, vulkanDevice->queueFamilyIndices.compute, 0, &compute.queue);
 
 		// Create compute m_vkPipeline
-		// Compute pipelines are created separate from graphics pipelines even if they use the same queue (family index)
+		// Compute pipelines are created separate from graphics pipelines even if they use the same m_vkQueue (family index)
 
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0: Instance input data buffer
@@ -636,7 +636,7 @@ public:
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&compute.descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &compute.pipelineLayout));
 
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &compute.descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &compute.descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &compute.descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets =
@@ -695,9 +695,9 @@ public:
 
 		computePipelineCreateInfo.stage.pSpecializationInfo = &specializationInfo;
 
-		VK_CHECK_RESULT(vkCreateComputePipelines(m_vkDevice, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline));
+		VK_CHECK_RESULT(vkCreateComputePipelines(m_vkDevice, m_vkPipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline));
 
-		// Separate command pool as queue family for compute may be different than graphics
+		// Separate command pool as m_vkQueue family for compute may be different than graphics
 		VkCommandPoolCreateInfo cmdPoolInfo = {};
 		cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		cmdPoolInfo.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
@@ -769,8 +769,8 @@ public:
 
 		// Submit graphics command buffer
 
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
 
 		// Wait on present and compute semaphores
 		std::array<VkPipelineStageFlags, 2> stageFlags = {
@@ -778,16 +778,16 @@ public:
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		};
 		std::array<VkSemaphore, 2> waitSemaphores = {
-			semaphores.presentComplete,						// Wait for presentation to finished
+			semaphores.m_vkSemaphorePresentComplete,						// Wait for presentation to finished
 			compute.semaphore								// Wait for compute to finish
 		};
 
-		submitInfo.pWaitSemaphores = waitSemaphores.data();
-		submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
-		submitInfo.pWaitDstStageMask = stageFlags.data();
+		m_vkSubmitInfo.pWaitSemaphores = waitSemaphores.data();
+		m_vkSubmitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
+		m_vkSubmitInfo.pWaitDstStageMask = stageFlags.data();
 
-		// Submit to queue
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, compute.fence));
+		// Submit to m_vkQueue
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, compute.fence));
 
 		VulkanExampleBase::submitFrame();
 

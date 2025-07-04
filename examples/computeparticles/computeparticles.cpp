@@ -42,7 +42,7 @@ public:
 
 	// Resources for the graphics part of the example
 	struct Graphics {
-		uint32_t queueFamilyIndex;					// Used to check if compute and graphics queue families differ and require additional barriers
+		uint32_t queueFamilyIndex;					// Used to check if compute and graphics m_vkQueue families differ and require additional barriers
 		VkDescriptorSetLayout descriptorSetLayout;	// Particle system rendering shader binding layout
 		VkDescriptorSet descriptorSet;				// Particle system rendering shader bindings
 		VkPipelineLayout pipelineLayout;			// Layout of the graphics pipeline
@@ -52,9 +52,9 @@ public:
 
 	// Resources for the compute part of the example
 	struct Compute {
-		uint32_t queueFamilyIndex;					// Used to check if compute and graphics queue families differ and require additional barriers
-		VkQueue queue;								// Separate queue for compute commands (queue family may differ from the one used for graphics)
-		VkCommandPool commandPool;					// Use a separate command pool (queue family may differ from the one used for graphics)
+		uint32_t queueFamilyIndex;					// Used to check if compute and graphics m_vkQueue families differ and require additional barriers
+		VkQueue queue;								// Separate m_vkQueue for compute commands (m_vkQueue family may differ from the one used for graphics)
+		VkCommandPool commandPool;					// Use a separate command pool (m_vkQueue family may differ from the one used for graphics)
 		VkCommandBuffer commandBuffer;				// Command buffer storing the dispatch commands and barriers
 		VkSemaphore semaphore;                      // Execution dependency between compute & graphic submission
 		VkDescriptorSetLayout descriptorSetLayout;	// Compute shader binding layout
@@ -100,8 +100,8 @@ public:
 
 	void loadAssets()
 	{
-		textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue);
-		textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue);
+		textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
+		textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
 	}
 
 	void buildCommandBuffers()
@@ -109,11 +109,11 @@ public:
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
 		VkClearValue clearValues[2];
-		clearValues[0].color = defaultClearColor;
+		clearValues[0].color = m_vkClearColorValueDefault;
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -124,7 +124,7 @@ public:
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{
 			// Set target frame buffer
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -213,7 +213,7 @@ public:
 
 		// Compute particle movement
 
-		// Add memory barrier to ensure that the (graphics) vertex shader has fetched attributes before compute starts to write to the buffer
+		// Add m_vkDeviceMemory barrier to ensure that the (graphics) vertex shader has fetched attributes before compute starts to write to the buffer
 		if (graphics.queueFamilyIndex != compute.queueFamilyIndex)
 		{
 			VkBufferMemoryBarrier buffer_barrier =
@@ -291,7 +291,7 @@ public:
 		VkDeviceSize storageBufferSize = particleBuffer.size() * sizeof(Particle);
 
 		// Staging
-		// SSBO won't be changed on the host after upload so copy to m_vkDevice local memory
+		// SSBO won't be changed on the host after upload so copy to m_vkDevice local m_vkDeviceMemory
 
 		vks::Buffer stagingBuffer;
 
@@ -314,7 +314,7 @@ public:
 		VkBufferCopy copyRegion = {};
 		copyRegion.size = storageBufferSize;
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, storageBuffer.buffer, 1, &copyRegion);
-		// Execute a transfer barrier to the compute queue, if necessary
+		// Execute a transfer barrier to the compute m_vkQueue, if necessary
 		if (graphics.queueFamilyIndex != compute.queueFamilyIndex)
 		{
 			VkBufferMemoryBarrier buffer_barrier =
@@ -339,7 +339,7 @@ public:
 				1, &buffer_barrier,
 				0, nullptr);
 		}
-		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 		stagingBuffer.destroy();
 	}
@@ -353,7 +353,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 	}
 
 	void prepareGraphics()
@@ -372,7 +372,7 @@ public:
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &graphics.descriptorSetLayout));
 
 		// Descriptor set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &graphics.descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &graphics.descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &graphics.descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets;
@@ -426,7 +426,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "computeparticles/particle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "computeparticles/particle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(graphics.pipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(graphics.pipelineLayout, m_vkRenderPass, 0);
 		pipelineCreateInfo.pVertexInputState = &vertexInputState;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;
@@ -437,7 +437,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		pipelineCreateInfo.renderPass = renderPass;
+		pipelineCreateInfo.renderPass = m_vkRenderPass;
 
 		// Additive blending
 		blendAttachmentState.colorWriteMask = 0xF;
@@ -449,7 +449,7 @@ public:
 		blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
 
 		// Semaphore for compute & graphics sync
 		VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
@@ -459,20 +459,20 @@ public:
 		VkSubmitInfo submitInfo = vks::initializers::submitInfo();
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = &graphics.semaphore;
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-		VK_CHECK_RESULT(vkQueueWaitIdle(queue));
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, VK_NULL_HANDLE));
+		VK_CHECK_RESULT(vkQueueWaitIdle(m_vkQueue));
 	}
 
 	void prepareCompute()
 	{
-		// Create a compute capable m_vkDevice queue
-		// The VulkanDevice::createLogicalDevice functions finds a compute capable queue and prefers queue families that only support compute
-		// Depending on the implementation this may result in different queue family indices for graphics and computes,
-		// requiring proper synchronization (see the memory and pipeline barriers)
+		// Create a compute capable m_vkDevice m_vkQueue
+		// The VulkanDevice::createLogicalDevice functions finds a compute capable m_vkQueue and prefers m_vkQueue families that only support compute
+		// Depending on the implementation this may result in different m_vkQueue family indices for graphics and computes,
+		// requiring proper synchronization (see the m_vkDeviceMemory and pipeline barriers)
 		vkGetDeviceQueue(m_vkDevice, compute.queueFamilyIndex, 0, &compute.queue);
 
 		// Create compute pipeline
-		// Compute pipelines are created separate from graphics pipelines even if they use the same queue (family index)
+		// Compute pipelines are created separate from graphics pipelines even if they use the same m_vkQueue (family index)
 
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0 : Particle position storage buffer
@@ -489,7 +489,7 @@ public:
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice,	&descriptorLayout, nullptr,	&compute.descriptorSetLayout));
 
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &compute.descriptorSetLayout,1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &compute.descriptorSetLayout,1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &compute.descriptorSet));
 		std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
 			// Binding 0 : Particle position storage buffer
@@ -512,9 +512,9 @@ public:
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &compute.pipelineLayout));
 		VkComputePipelineCreateInfo computePipelineCreateInfo = vks::initializers::computePipelineCreateInfo(compute.pipelineLayout, 0);
 		computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computeparticles/particle.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
-		VK_CHECK_RESULT(vkCreateComputePipelines(m_vkDevice, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline));
+		VK_CHECK_RESULT(vkCreateComputePipelines(m_vkDevice, m_vkPipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline));
 
-		// Separate command pool as queue family for compute may be different than graphics
+		// Separate command pool as m_vkQueue family for compute may be different than graphics
 		VkCommandPoolCreateInfo cmdPoolInfo = {};
 		cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		cmdPoolInfo.queueFamilyIndex = compute.queueFamilyIndex;
@@ -581,18 +581,18 @@ public:
 		VulkanExampleBase::prepareFrame();
 
 		VkPipelineStageFlags graphicsWaitStageMasks[] = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		VkSemaphore graphicsWaitSemaphores[] = { compute.semaphore, semaphores.presentComplete };
-		VkSemaphore graphicsSignalSemaphores[] = { graphics.semaphore, semaphores.renderComplete };
+		VkSemaphore graphicsWaitSemaphores[] = { compute.semaphore, semaphores.m_vkSemaphorePresentComplete };
+		VkSemaphore graphicsSignalSemaphores[] = { graphics.semaphore, semaphores.m_vkSemaphoreRenderComplete };
 
 		// Submit graphics commands
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		submitInfo.waitSemaphoreCount = 2;
-		submitInfo.pWaitSemaphores = graphicsWaitSemaphores;
-		submitInfo.pWaitDstStageMask = graphicsWaitStageMasks;
-		submitInfo.signalSemaphoreCount = 2;
-		submitInfo.pSignalSemaphores = graphicsSignalSemaphores;
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		m_vkSubmitInfo.waitSemaphoreCount = 2;
+		m_vkSubmitInfo.pWaitSemaphores = graphicsWaitSemaphores;
+		m_vkSubmitInfo.pWaitDstStageMask = graphicsWaitStageMasks;
+		m_vkSubmitInfo.signalSemaphoreCount = 2;
+		m_vkSubmitInfo.pSignalSemaphores = graphicsSignalSemaphores;
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 
 		VulkanExampleBase::submitFrame();
 	}
@@ -600,7 +600,7 @@ public:
 	void prepare()
 	{
 		VulkanExampleBase::prepare();
-		// We will be using the queue family indices to check if graphics and compute queue families differ
+		// We will be using the m_vkQueue family indices to check if graphics and compute m_vkQueue families differ
 		// If that's the case, we need additional barriers for acquiring and releasing resources
 		graphics.queueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
 		compute.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;

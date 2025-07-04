@@ -1,7 +1,7 @@
 /*
 * Vulkan Example - Runtime mip map generation
 * 
-* This samples shows how to generate a full mip-chain from a top-level image and how different sampling modes compare
+* This samples shows how to generate a full mip-chain from a top-level m_vkImage and how different sampling modes compare
 *
 * Copyright (C) 2016-2023 by Sascha Willems - www.saschawillems.de
 *
@@ -79,7 +79,7 @@ public:
 		}
 	}
 
-	// Loads a full sized image from disk, generates a Vulkan image (texture) from it and creates a full mip chain using blits
+	// Loads a full sized m_vkImage from disk, generates a Vulkan m_vkImage (texture) from it and creates a full mip chain using blits
 	void loadTextureAndGenerateMips(std::string filename, VkFormat format)
 	{
 		ktxResult result;
@@ -128,7 +128,7 @@ public:
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs = {};
 
-		// Create a host-visible staging buffer that contains the raw image data
+		// Create a host-visible staging buffer that contains the raw m_vkImage data
 		VkBuffer stagingBuffer;
 		VkDeviceMemory stagingMemory;
 
@@ -150,7 +150,7 @@ public:
 		memcpy(data, ktxTextureData, ktxTextureSize);
 		vkUnmapMemory(m_vkDevice, stagingMemory);
 
-		// Create optimal tiled target image
+		// Create optimal tiled target m_vkImage
 		VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageCreateInfo.format = format;
@@ -176,7 +176,7 @@ public:
 		subresourceRange.levelCount = 1;
 		subresourceRange.layerCount = 1;
 
-		// Optimal image will be used as destination for the copy, so we must transfer from our initial undefined image layout to the transfer destination layout
+		// Optimal m_vkImage will be used as destination for the copy, so we must transfer from our initial undefined m_vkImage layout to the transfer destination layout
 		vks::tools::insertImageMemoryBarrier(
 			copyCmd,
 			texture.image,
@@ -212,7 +212,7 @@ public:
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			subresourceRange);
 
-		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 		// Clean up staging resources
 		vkFreeMemory(m_vkDevice, stagingMemory, nullptr);
@@ -252,7 +252,7 @@ public:
 			mipSubRange.levelCount = 1;
 			mipSubRange.layerCount = 1;
 
-			// Prepare current mip level as image blit destination
+			// Prepare current mip level as m_vkImage blit destination
 			vks::tools::insertImageMemoryBarrier(
 				blitCmd,
 				texture.image,
@@ -275,7 +275,7 @@ public:
 				&imageBlit,
 				VK_FILTER_LINEAR);
 
-			// Prepare current mip level as image blit source for next level
+			// Prepare current mip level as m_vkImage blit source for next level
 			vks::tools::insertImageMemoryBarrier(
 				blitCmd,
 				texture.image,
@@ -301,7 +301,7 @@ public:
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			subresourceRange);
 
-		vulkanDevice->flushCommandBuffer(blitCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(blitCmd, m_vkQueue, true);
 		// ---------------------------------------------------------------
 
 		// Create some samplers with different settings that can be selected via the UI
@@ -337,7 +337,7 @@ public:
 		}
 		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &samplers[2]));
 
-		// Create image view
+		// Create m_vkImage m_vkImageView
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
 		view.image = texture.image;
 		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -363,11 +363,11 @@ public:
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
 		VkClearValue clearValues[2];
-		clearValues[0].color = defaultClearColor;
+		clearValues[0].color = m_vkClearColorValueDefault;
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -377,7 +377,7 @@ public:
 
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -404,7 +404,7 @@ public:
 
 	void loadAssets()
 	{
-		model.loadFromFile(getAssetPath() + "models/tunnel_cylinder.gltf", vulkanDevice, queue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
+		model.loadFromFile(getAssetPath() + "models/tunnel_cylinder.gltf", vulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
 		loadTextureAndGenerateMips(getAssetPath() + "textures/metalplate_nomips_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM);
 	}
 
@@ -417,13 +417,13 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, 3),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0: Vertex shader uniform buffer
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0),
-			// Binding 1: Sampled image
+			// Binding 1: Sampled m_vkImage
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
 			// Binding 2: Array with 3 samplers
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 2, 3),
@@ -432,14 +432,14 @@ public:
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Sets
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 
 		VkDescriptorImageInfo textureDescriptor = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, texture.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
-			// Binding 1: Sampled image
+			// Binding 1: Sampled m_vkImage
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, &textureDescriptor)
 		};
 
@@ -481,7 +481,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "texturemipmapgen/texture.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "texturemipmapgen/texture.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -492,7 +492,7 @@ public:
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Normal });
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -514,9 +514,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

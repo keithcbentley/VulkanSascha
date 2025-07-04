@@ -187,7 +187,7 @@ public:
 	};
 
 	// Update camera passing separate axis data (gamepad)
-	// Returns true if view or position has been changed
+	// Returns true if m_vkImageView or position has been changed
 	bool updatePad(glm::vec2 axisLeft, glm::vec2 axisRight, float deltaTime)
 	{
 		bool retVal = false;
@@ -195,7 +195,7 @@ public:
 		if (type == CameraType::firstperson)
 		{
 			// Use the common console thumbstick layout		
-			// Left = view, right = move
+			// Left = m_vkImageView, right = move
 
 			const float deadZone = 0.0015f;
 			const float range = 1.0f - deadZone;

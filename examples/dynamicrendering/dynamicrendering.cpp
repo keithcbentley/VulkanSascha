@@ -69,7 +69,7 @@ public:
 	void setupRenderPass()
 	{
 		// With VK_KHR_dynamic_rendering we no longer need a render pass, so skip the sample base render pass setup
-		renderPass = VK_NULL_HANDLE;
+		m_vkRenderPass = VK_NULL_HANDLE;
 	}
 
 	void setupFrameBuffer()
@@ -89,7 +89,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void buildCommandBuffers()
@@ -114,7 +114,7 @@ public:
 				VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 			vks::tools::insertImageMemoryBarrier(
 				drawCmdBuffers[i],
-				depthStencil.image,
+				m_defaultDepthStencil.m_vkImage,
 				0,
 				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED,
@@ -133,10 +133,10 @@ public:
 			colorAttachment.clearValue.color = { 0.0f,0.0f,0.0f,0.0f };
 
 			// A single depth stencil attachment info can be used, but they can also be specified separately.
-			// When both are specified separately, the only requirement is that the image view is identical.			
+			// When both are specified separately, the only requirement is that the m_vkImage m_vkImageView is identical.			
 			VkRenderingAttachmentInfoKHR depthStencilAttachment{};
 			depthStencilAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-			depthStencilAttachment.imageView = depthStencil.view;
+			depthStencilAttachment.imageView = m_defaultDepthStencil.m_vkImageView;
 			depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -170,7 +170,7 @@ public:
 			// End dynamic rendering
 			vkCmdEndRenderingKHR(drawCmdBuffers[i]);
 
-			// This set of barriers prepares the color image for presentation, we don't need to care for the depth image
+			// This set of barriers prepares the color m_vkImage for presentation, we don't need to care for the depth m_vkImage
 			vks::tools::insertImageMemoryBarrier(
 				drawCmdBuffers[i],
 				swapChain.images[i],
@@ -193,7 +193,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 		// Layout
 		const std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -202,7 +202,7 @@ public:
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -253,14 +253,14 @@ public:
 		pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
 		pipelineRenderingCreateInfo.colorAttachmentCount = 1;
 		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain.colorFormat;
-		pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat;
-		pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat;
+		pipelineRenderingCreateInfo.depthAttachmentFormat = m_vkFormatDepth;
+		pipelineRenderingCreateInfo.stencilAttachmentFormat = m_vkFormatDepth;
 		// Chain into the m_vkPipeline creat einfo
 		pipelineCI.pNext = &pipelineRenderingCreateInfo;
 
 		shaderStages[0] = loadShader(getShadersPath() + "dynamicrendering/texture.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "dynamicrendering/texture.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -298,9 +298,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

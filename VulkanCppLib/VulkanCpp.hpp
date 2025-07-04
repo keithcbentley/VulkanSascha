@@ -924,7 +924,7 @@ public:
         }
         //	IMPORTANT: this is crazy.  If we don't call
         //	vkGetPhysicalDeviceQueueFamilyProperties to get the number
-        //	of queue families, we can't create m_vkDevice queues later without
+        //	of m_vkQueue families, we can't create m_vkDevice queues later without
         //	the validation layer spitting out an error.  Just calling the function
         //	(and throwing away the value) seems to be sufficient.
         for (VkPhysicalDevice vkPhysicalDevice : vkPhysicalDevices) {
@@ -1075,8 +1075,8 @@ public:
     DeviceQueueCreateInfo(uint32_t queueFamilyIndexArg, int queueCountArg)
         : VkDeviceQueueCreateInfo {}
     {
-        //  TODO: need to range check the queue count arg.
-        //  TODO: increase queue count to 16.
+        //  TODO: need to range check the m_vkQueue count arg.
+        //  TODO: increase m_vkQueue count to 16.
         sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueFamilyIndex = queueFamilyIndexArg;
         queueCount = static_cast<uint32_t>(queueCountArg);
@@ -1092,7 +1092,7 @@ class DeviceCreateInfo {
     std::vector<std::string> m_extensionNames {};
     std::vector<const char*> m_extensionStringPtrs {};
 
-    //  TODO: doesn't m_vkBuffer the full queue create options.
+    //  TODO: doesn't m_vkBuffer the full m_vkQueue create options.
     //  Maybe make that info into a separate structure.
     // static constexpr int MAX_DEVICE_QUEUE_FAMILIES = 8;
     // std::array<int, MAX_DEVICE_QUEUE_FAMILIES> m_deviceQueueCounts {};
@@ -1135,7 +1135,7 @@ public:
     {
         //  Always up to date.
         //  Vulkan doesn't allow multiple requests for the same
-        //  queue family.  If we get a request for more queues
+        //  m_vkQueue family.  If we get a request for more queues
         //  in the same family, we need to add it to any existing request.
         //  TODO: need to check args.
         bool foundEntry = false;
@@ -2022,7 +2022,7 @@ class ImageView : public HandleWithOwner<VkImageView> {
     }
 
 public:
-    //	TODO: need to start remembering some info about the image and how the
+    //	TODO: need to start remembering some info about the m_vkImage and how the
     //	imageview was created to make things easier to use later.
     ImageView() = default;
 
@@ -2123,7 +2123,7 @@ public:
         subresourceRange.baseArrayLayer = 0;
         subresourceRange.layerCount = 1;
 
-        //	If the image m_vkDeviceMemory barrier is to be used in a sequence
+        //	If the m_vkImage m_vkDeviceMemory barrier is to be used in a sequence
         //	of command buffer commands, then the access masks will need
         //	to be set according to usage.  (To the best of my current knowledge.)
     }
@@ -2181,7 +2181,7 @@ public:
     }
 };
 
-//	TODO: should we make some object that has contains a queue and command pool
+//	TODO: should we make some object that has contains a m_vkQueue and command pool
 //	and whatever else needed so we don't have to pass the info around as pairs?
 class CommandPool : public HandleWithOwner<VkCommandPool> {
 
@@ -2481,6 +2481,16 @@ public:
     }
 };
 
+class SubmitInfo : public VkSubmitInfo {
+
+public:
+    SubmitInfo()
+        : VkSubmitInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    }
+};
+
 class SubmitInfo2 : public VkSubmitInfo2 {
 
     std::vector<VkSemaphoreSubmitInfo> m_waitSemaphoreInfos;
@@ -2554,8 +2564,8 @@ class PresentInfo : public VkPresentInfoKHR {
 
     //	TODO: modify to m_vkBuffer more semaphores?
     VkSemaphore m_vkSemaphoreWait = nullptr;
-    VkSwapchainKHR m_vkSwapchain = nullptr;
-    uint32_t m_swapchainImageIndex = 0;
+    VkSwapchainKHR m_vkSwapChain = nullptr;
+    uint32_t m_swapChainImageIndex = 0;
 
 public:
     PresentInfo()
@@ -2564,41 +2574,24 @@ public:
         sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     }
 
-    PresentInfo* operator&() = delete;
-
-    void addWaitSemaphore(vkcpp::Semaphore semaphore)
+    void addWaitSemaphore(VkSemaphore vkSemaphore)
     {
-        m_vkSemaphoreWait = semaphore;
+        m_vkSemaphoreWait = vkSemaphore;
+        waitSemaphoreCount = 1;
+        pWaitSemaphores = &m_vkSemaphoreWait;
     }
 
     void addSwapchain(
-        VkSwapchainKHR vkSwapchain,
-        int swapchainImageIndex)
+        VkSwapchainKHR vkSwapChain,
+        uint32_t swapChainImageIndex)
     {
-        m_vkSwapchain = vkSwapchain;
-        m_swapchainImageIndex = static_cast<uint32_t>(swapchainImageIndex);
+        m_vkSwapChain = vkSwapChain;
+        m_swapChainImageIndex = swapChainImageIndex;
+        swapchainCount = 1;
+        pSwapchains = &m_vkSwapChain;
+        pImageIndices = &m_swapChainImageIndex;
     }
 
-    VkPresentInfoKHR* assemble()
-    {
-        pWaitSemaphores = nullptr; //	Hygiene
-        if (m_vkSemaphoreWait) {
-            waitSemaphoreCount = 1;
-            pWaitSemaphores = &m_vkSemaphoreWait;
-        }
-
-        pSwapchains = nullptr;
-        pImageIndices = nullptr;
-        if (m_vkSwapchain) {
-            swapchainCount = 1;
-            pSwapchains = &m_vkSwapchain;
-            pImageIndices = &m_swapchainImageIndex;
-        }
-
-        pResults = nullptr;
-
-        return this;
-    }
 };
 
 class Queue : public HandleWithOwner<VkQueue, Device> {
@@ -2609,31 +2602,24 @@ public:
     Queue() = default;
 
     //	Queues always come from the m_vkDevice and are never (explicitly) destroyed
-    Queue(VkQueue vkQueue, uint32_t queueFamilyIndex, Device device)
+    Queue(VkQueue vkQueue, uint32_t queueFamilyIndex, const Device& device)
         : HandleWithOwner(vkQueue, device, nullptr)
         , m_queueFamilyIndex(queueFamilyIndex)
     {
     }
 
-    Queue(const Queue& other)
-        : HandleWithOwner(other)
-        , m_queueFamilyIndex(other.m_queueFamilyIndex)
-    {
-    }
-
-    Queue& operator=(const Queue& other)
-    {
-        HandleWithOwner::operator=(other);
-        m_queueFamilyIndex = other.m_queueFamilyIndex;
-        return *this;
-    }
+    ~Queue() = default;
+    Queue(const Queue&) = default;
+    Queue& operator=(const Queue&) = default;
+    Queue(Queue&&) noexcept = default;
+    Queue& operator=(Queue&&) noexcept = default;
 
     void waitIdle() const
     {
         vkQueueWaitIdle(*this);
     }
 
-    void submit2(CommandBuffer commandBuffer) const
+    void submit2(const CommandBuffer& commandBuffer) const
     {
         SubmitInfo2 submitInfo2;
         submitInfo2.addCommandBuffer(commandBuffer);
@@ -2643,7 +2629,7 @@ public:
         }
     }
 
-    void submit2(CommandBuffer commandBuffer, Fence fence) const
+    void submit2(const CommandBuffer& commandBuffer, Fence fence) const
     {
         SubmitInfo2 submitInfo2;
         submitInfo2.addCommandBuffer(commandBuffer);
@@ -2653,7 +2639,7 @@ public:
         }
     }
 
-    void submit2(SubmitInfo2& submitInfo2, Fence fence) const
+    void submit2(SubmitInfo2& submitInfo2, const Fence& fence) const
     {
         VkResult vkResult = vkQueueSubmit2(*this, 1, submitInfo2.assemble(), fence);
         if (vkResult != VK_SUCCESS) {
@@ -2661,7 +2647,7 @@ public:
         }
     }
 
-    void submit2Fenced(CommandBuffer commandBuffer) const
+    void submit2Fenced(const CommandBuffer& commandBuffer) const
     {
         SubmitInfo2 submitInfo2;
         submitInfo2.addCommandBuffer(commandBuffer);
@@ -2673,9 +2659,9 @@ public:
         completedFence.wait();
     }
 
-    VkResult present(PresentInfo& presentInfo) const
+    VkResult present(const PresentInfo& presentInfo) const
     {
-        VkResult vkResult = vkQueuePresentKHR(*this, presentInfo.assemble());
+        VkResult vkResult = vkQueuePresentKHR(*this, &presentInfo);
         if (vkResult == VK_SUCCESS) {
             return vkResult;
         }
@@ -2872,7 +2858,7 @@ public:
 class DescriptorSetUpdater {
 
     //	TODO: Need to add VkBufferView.  Looks like
-    //	image, buffer, and bufferview are the only kinds of
+    //	m_vkImage, buffer, and bufferview are the only kinds of
     //	data that are described by descriptors and that
     //	can need to be written/updated.
 
@@ -2951,7 +2937,7 @@ public:
             .pImageInfo = marker
         };
 
-        //	TODO: image layout should probably be a parameter.
+        //	TODO: m_vkImage layout should probably be a parameter.
         VkDescriptorImageInfo vkDescriptorImageInfo {
             .sampler = sampler,
             .imageView = imageView,
@@ -3746,11 +3732,11 @@ private:
         std::vector<VkImage> m_swapchainImages = m_swapchain.getImages();
 
         for (VkImage vkImage : m_swapchainImages) {
-            //	The renderpass image view and the depth buffer are "passed"
+            //	The renderpass m_vkImage m_vkImageView and the depth buffer are "passed"
             //	to the renderpass via attachments to the framebuffer.  This
             //	means that was don't need to actually pass them through code.
             //	All we need to do is create them and make sure they don't disappear.
-            //	We just have the framebuffer take ownership of the image view and
+            //	We just have the framebuffer take ownership of the m_vkImage m_vkImageView and
             //	depth buffer.
             Image_Memory_View depthBuffer(createDepthBuffer(m_swapchain.imageExtent(), s_device));
 
@@ -3761,7 +3747,7 @@ private:
                 VK_IMAGE_ASPECT_COLOR_BIT);
             ImageView imageView(imageViewCreateInfo, m_swapchain.getOwner());
 
-            //	Note that attachments here are image views.  When a
+            //	Note that attachments here are m_vkImage views.  When a
             //	Renderpass adds attachments, the attachments are descriptions
             //	of these attachments.
             FramebufferCreateInfo framebufferCreateInfo(m_renderPass, m_swapchain.imageExtent());
@@ -3783,7 +3769,7 @@ private:
         const VkSurfaceCapabilitiesKHR vkSurfaceCapabilities = surface.getSurfaceCapabilities();
         const VkExtent2D surfaceExtent = vkSurfaceCapabilities.currentExtent;
         //	Can't make "real" swapchains with 0 m_drawAreaWidth or m_drawAreaHeight, e.g.,
-        //	the window is minimized.  Return a "null" swapChain if
+        //	the m_hwnd is minimized.  Return a "null" swapChain if
         //	this occurs.
         if (surfaceExtent.width == 0 || surfaceExtent.height == 0) {
             return Swapchain {};

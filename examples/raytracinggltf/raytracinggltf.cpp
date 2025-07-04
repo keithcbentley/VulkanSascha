@@ -210,7 +210,7 @@ public:
 			&geometryNodesBuffer,
 			static_cast<uint32_t>(geometryNodes.size()) * sizeof(GeometryNode)));
 
-		vulkanDevice->copyBuffer(&stagingBuffer, &geometryNodesBuffer, queue);
+		vulkanDevice->copyBuffer(&stagingBuffer, &geometryNodesBuffer, m_vkQueue);
 
 		stagingBuffer.destroy();
 	
@@ -257,7 +257,7 @@ public:
 			1,
 			&accelerationStructureBuildGeometryInfo,
 			pBuildRangeInfos.data());
-		vulkanDevice->flushCommandBuffer(commandBuffer, queue);
+		vulkanDevice->flushCommandBuffer(commandBuffer, m_vkQueue);
 
 		VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
 		accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -365,7 +365,7 @@ public:
 			1,
 			&accelerationBuildGeometryInfo,
 			accelerationBuildStructureRangeInfos.data());
-		vulkanDevice->flushCommandBuffer(commandBuffer, queue);
+		vulkanDevice->flushCommandBuffer(commandBuffer, m_vkQueue);
 
 		VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
 		accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -419,11 +419,11 @@ public:
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0: Top level acceleration structure
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 0),
-			// Binding 1: Ray tracing result image
+			// Binding 1: Ray tracing result m_vkImage
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 1),
 			// Binding 2: Uniform buffer
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, 2),
-			// Binding 3: Texture image
+			// Binding 3: Texture m_vkImage
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 3),
 			// Binding 4: Geometry node information SSBO
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 4),
@@ -531,7 +531,7 @@ public:
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(model.textures.size()) }
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCreateInfo, nullptr, &m_vkDescriptorPool));
 
 		VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
 		uint32_t variableDescCounts[] = { imageCount };
@@ -539,7 +539,7 @@ public:
 		variableDescriptorCountAllocInfo.descriptorSetCount = 1;
 		variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
 
-		VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		descriptorSetAllocateInfo.pNext = &variableDescriptorCountAllocInfo;
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &descriptorSetAllocateInfo, &descriptorSet));
 
@@ -561,7 +561,7 @@ public:
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0: Top level acceleration structure
 			accelerationStructureWrite,
-			// Binding 1: Ray tracing result image
+			// Binding 1: Ray tracing result m_vkImage
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, &storageImageDescriptor),
 			// Binding 2: Uniform data
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffer.descriptor),
@@ -569,7 +569,7 @@ public:
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, &geometryNodesBuffer.descriptor),
 		};
 
-		// Image descriptors for the image array
+		// Image descriptors for the m_vkImage array
 		std::vector<VkDescriptorImageInfo> textureDescriptors{};
 		for (auto texture : model.textures) {
 			VkDescriptorImageInfo descriptor{};
@@ -608,11 +608,11 @@ public:
 	}
 
 	/*
-		If the window has been resized, we need to recreate the storage image and it's descriptor
+		If the m_hwnd has been resized, we need to recreate the storage m_vkImage and it's descriptor
 	*/
 	void handleResize()
 	{
-		// Recreate image
+		// Recreate m_vkImage
 		createStorageImage(swapChain.colorFormat, { m_drawAreaWidth, m_drawAreaHeight, 1 });
 		// Update descriptor
 		VkDescriptorImageInfo storageImageDescriptor{ VK_NULL_HANDLE, storageImage.view, VK_IMAGE_LAYOUT_GENERAL };
@@ -657,10 +657,10 @@ public:
 				1);
 
 			/*
-				Copy ray tracing output to swap chain image
+				Copy ray tracing output to swap chain m_vkImage
 			*/
 
-			// Prepare current swap chain image as transfer destination
+			// Prepare current swap chain m_vkImage as transfer destination
 			vks::tools::setImageLayout(
 				drawCmdBuffers[i],
 				swapChain.images[i],
@@ -668,7 +668,7 @@ public:
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				subresourceRange);
 
-			// Prepare ray tracing output image as transfer source
+			// Prepare ray tracing output m_vkImage as transfer source
 			vks::tools::setImageLayout(
 				drawCmdBuffers[i],
 				storageImage.image,
@@ -684,7 +684,7 @@ public:
 			copyRegion.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 			vkCmdCopyImage(drawCmdBuffers[i], storageImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapChain.images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-			// Transition swap chain image back for presentation
+			// Transition swap chain m_vkImage back for presentation
 			vks::tools::setImageLayout(
 				drawCmdBuffers[i],
 				swapChain.images[i],
@@ -692,7 +692,7 @@ public:
 				VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 				subresourceRange);
 
-			// Transition ray tracing output image back to general layout
+			// Transition ray tracing output m_vkImage back to general layout
 			vks::tools::setImageLayout(
 				drawCmdBuffers[i],
 				storageImage.image,
@@ -700,7 +700,7 @@ public:
 				VK_IMAGE_LAYOUT_GENERAL,
 				subresourceRange);
 
-			drawUI(drawCmdBuffers[i], frameBuffers[i]);
+			drawUI(drawCmdBuffers[i], m_vkFrameBuffers[i]);
 
 			VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
 		}
@@ -746,7 +746,7 @@ public:
 	void loadAssets()
 	{
 		vkglTF::memoryPropertyFlags = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		model.loadFromFile(getAssetPath() + "models/FlightHelmet/glTF/FlightHelmet.gltf", vulkanDevice, queue);
+		model.loadFromFile(getAssetPath() + "models/FlightHelmet/glTF/FlightHelmet.gltf", vulkanDevice, m_vkQueue);
 	}
 
 	void prepare()
@@ -771,9 +771,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 
@@ -783,7 +783,7 @@ public:
 			return;
 		updateUniformBuffers();
 		if (camera.updated) {
-			// If the camera's view has been updated we reset the frame accumulation
+			// If the camera's m_vkImageView has been updated we reset the frame accumulation
 			uniformData.frame = -1;
 		}
 		draw();

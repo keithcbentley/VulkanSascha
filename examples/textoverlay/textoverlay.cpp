@@ -27,7 +27,7 @@ class TextOverlay
 {
 private:
 	// Created by this class
-	// Font image
+	// Font m_vkImage
 	VkSampler sampler;
 	VkImage image;
 	VkImageView view;
@@ -162,11 +162,11 @@ public:
 
 		VK_CHECK_RESULT(vkCreateBuffer(vulkanDevice->m_vkDevice, &bufferCreateInfo, nullptr, &stagingBuffer.buffer));
 
-		// Get memory requirements for the staging buffer (alignment, memory type bits)
+		// Get m_vkDeviceMemory requirements for the staging buffer (alignment, m_vkDeviceMemory type bits)
 		vkGetBufferMemoryRequirements(vulkanDevice->m_vkDevice, stagingBuffer.buffer, &memReqs);
 
 		allocInfo.allocationSize = memReqs.size;
-		// Get memory type index for a host visible buffer
+		// Get m_vkDeviceMemory type index for a host visible buffer
 		allocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 		VK_CHECK_RESULT(vkAllocateMemory(vulkanDevice->m_vkDevice, &allocInfo, nullptr, &stagingBuffer.memory));
@@ -178,7 +178,7 @@ public:
 		memcpy(data, &font24pixels[0][0], fontWidth * fontHeight);
 		vkUnmapMemory(vulkanDevice->m_vkDevice, stagingBuffer.memory);
 
-		// Copy to image
+		// Copy to m_vkImage
 
 		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
@@ -266,7 +266,7 @@ public:
 		VkDescriptorSetAllocateInfo descriptorSetAllocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(vulkanDevice->m_vkDevice, &descriptorSetAllocInfo, &descriptorSet));
 
-		// Descriptor for the font image
+		// Descriptor for the font m_vkImage
 		VkDescriptorImageInfo texDescriptor = vks::initializers::descriptorImageInfo(sampler, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	
 		std::array<VkWriteDescriptorSet, 1> writeDescriptorSets;
@@ -491,7 +491,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
 		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
 		renderPassBeginInfo.clearValueCount = 2;
@@ -500,7 +500,7 @@ public:
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{
 			// Set target frame buffer
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -525,7 +525,7 @@ public:
 			VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
 		}
 
-		vkQueueWaitIdle(queue);
+		vkQueueWaitIdle(m_vkQueue);
 	}
 
 	// Update the text buffer displayed by the text overlay
@@ -543,8 +543,8 @@ public:
 
 		textOverlay->addText(m_vkPhysicalDeviceProperties.deviceName, 5.0f * m_UIOverlay.scale, 45.0f * m_UIOverlay.scale, TextOverlay::alignLeft);
 
-		// Display current model view matrix
-		textOverlay->addText("model view matrix", (float)m_drawAreaWidth - 5.0f * m_UIOverlay.scale, 5.0f * m_UIOverlay.scale, TextOverlay::alignRight);
+		// Display current model m_vkImageView matrix
+		textOverlay->addText("model m_vkImageView matrix", (float)m_drawAreaWidth - 5.0f * m_UIOverlay.scale, 5.0f * m_UIOverlay.scale, TextOverlay::alignRight);
 
 		for (uint32_t i = 0; i < 4; i++)
 		{
@@ -574,7 +574,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		model.loadFromFile(getAssetPath() + "models/torusknot.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		model.loadFromFile(getAssetPath() + "models/torusknot.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -584,7 +584,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -595,7 +595,7 @@ public:
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 		
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
@@ -622,7 +622,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -636,7 +636,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "textoverlay/mesh.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "textoverlay/mesh.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -662,8 +662,8 @@ public:
 
 		textOverlay = new TextOverlay(
 			vulkanDevice,
-			queue,
-			renderPass,
+			m_vkQueue,
+			m_vkRenderPass,
 			&m_drawAreaWidth,
 			&m_drawAreaHeight,
 			m_UIOverlay.scale,
@@ -687,9 +687,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

@@ -52,7 +52,7 @@ public:
 
 	void loadAssets()
 	{
-		model.loadFromFile(getAssetPath() + "models/chinesedragon.gltf", vulkanDevice, queue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
+		model.loadFromFile(getAssetPath() + "models/chinesedragon.gltf", vulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
 	}
 
 	void buildCommandBuffers()
@@ -60,11 +60,11 @@ public:
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
 		VkClearValue clearValues[2];
-		clearValues[0].color = defaultClearColor;
+		clearValues[0].color = m_vkClearColorValueDefault;
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -75,7 +75,7 @@ public:
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{
 			// Set target frame buffer
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -106,7 +106,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -116,7 +116,7 @@ public:
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),	// Binding 0: Vertex shader uniform buffer
@@ -146,7 +146,7 @@ public:
 			loadShader(getShadersPath() + "screenshot/mesh.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
 		};
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -157,7 +157,7 @@ public:
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Color});
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	void prepareUniformBuffers()
@@ -175,9 +175,9 @@ public:
 		uniformBuffer.copyTo(&uniformData, sizeof(UniformData));
 	}
 
-	// Take a screenshot from the current swapchain image
-	// This is done using a blit from the swapchain image to a linear image whose memory content is then saved as a ppm image
-	// Getting the image date directly from a swapchain image wouldn't work as they're usually stored in an implementation dependent optimal tiling format
+	// Take a screenshot from the current swapchain m_vkImage
+	// This is done using a blit from the swapchain m_vkImage to a linear m_vkImage whose m_vkDeviceMemory content is then saved as a ppm m_vkImage
+	// Getting the m_vkImage date directly from a swapchain m_vkImage wouldn't work as they're usually stored in an implementation dependent optimal tiling format
 	// Note: This requires the swapchain images to be created with the VK_IMAGE_USAGE_TRANSFER_SRC_BIT flag (see VulkanSwapChain::create)
 	void saveScreenshot(const char *filename)
 	{
@@ -201,10 +201,10 @@ public:
 			supportsBlit = false;
 		}
 
-		// Source for the copy is the last rendered swapchain image
-		VkImage srcImage = swapChain.images[currentBuffer];
+		// Source for the copy is the last rendered swapchain m_vkImage
+		VkImage srcImage = swapChain.images[m_currentBufferIndex];
 
-		// Create the linear tiled destination image to copy to and to read the memory from
+		// Create the linear tiled destination m_vkImage to copy to and to read the m_vkDeviceMemory from
 		VkImageCreateInfo imageCreateCI(vks::initializers::imageCreateInfo());
 		imageCreateCI.imageType = VK_IMAGE_TYPE_2D;
 		// Note that vkCmdBlitImage (if supported) will also do format conversions if the swapchain color format would differ
@@ -218,10 +218,10 @@ public:
 		imageCreateCI.samples = VK_SAMPLE_COUNT_1_BIT;
 		imageCreateCI.tiling = VK_IMAGE_TILING_LINEAR;
 		imageCreateCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		// Create the image
+		// Create the m_vkImage
 		VkImage dstImage;
 		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateCI, nullptr, &dstImage));
-		// Create memory to back up the image
+		// Create m_vkDeviceMemory to back up the m_vkImage
 		VkMemoryRequirements memRequirements;
 		VkMemoryAllocateInfo memAllocInfo(vks::initializers::memoryAllocateInfo());
 		VkDeviceMemory dstImageMemory;
@@ -232,10 +232,10 @@ public:
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &dstImageMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, dstImage, dstImageMemory, 0));
 
-		// Do the actual blit from the swapchain image to our host visible destination image
+		// Do the actual blit from the swapchain m_vkImage to our host visible destination m_vkImage
 		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
-		// Transition destination image to transfer destination layout
+		// Transition destination m_vkImage to transfer destination layout
 		vks::tools::insertImageMemoryBarrier(
 			copyCmd,
 			dstImage,
@@ -247,7 +247,7 @@ public:
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 
-		// Transition swapchain image from present to transfer source layout
+		// Transition swapchain m_vkImage from present to transfer source layout
 		vks::tools::insertImageMemoryBarrier(
 			copyCmd,
 			srcImage,
@@ -262,7 +262,7 @@ public:
 		// If source and destination support blit we'll blit as this also does automatic format conversion (e.g. from BGR to RGB)
 		if (supportsBlit)
 		{
-			// Define the region to blit (we will blit the whole swapchain image)
+			// Define the region to blit (we will blit the whole swapchain m_vkImage)
 			VkOffset3D blitSize;
 			blitSize.x = m_drawAreaWidth;
 			blitSize.y = m_drawAreaHeight;
@@ -286,7 +286,7 @@ public:
 		}
 		else
 		{
-			// Otherwise use image copy (requires us to manually flip components)
+			// Otherwise use m_vkImage copy (requires us to manually flip components)
 			VkImageCopy imageCopyRegion{};
 			imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			imageCopyRegion.srcSubresource.layerCount = 1;
@@ -305,7 +305,7 @@ public:
 				&imageCopyRegion);
 		}
 
-		// Transition destination image to general layout, which is the required layout for mapping the image memory later on
+		// Transition destination m_vkImage to general layout, which is the required layout for mapping the m_vkImage m_vkDeviceMemory later on
 		vks::tools::insertImageMemoryBarrier(
 			copyCmd,
 			dstImage,
@@ -317,7 +317,7 @@ public:
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 
-		// Transition back the swap chain image after the blit is done
+		// Transition back the swap chain m_vkImage after the blit is done
 		vks::tools::insertImageMemoryBarrier(
 			copyCmd,
 			srcImage,
@@ -329,14 +329,14 @@ public:
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 
-		vulkanDevice->flushCommandBuffer(copyCmd, queue);
+		vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue);
 
-		// Get layout of the image (including row pitch)
+		// Get layout of the m_vkImage (including row pitch)
 		VkImageSubresource subResource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
 		VkSubresourceLayout subResourceLayout;
 		vkGetImageSubresourceLayout(m_vkDevice, dstImage, &subResource, &subResourceLayout);
 
-		// Map image memory so we can start copying from it
+		// Map m_vkImage m_vkDeviceMemory so we can start copying from it
 		const char* data;
 		vkMapMemory(m_vkDevice, dstImageMemory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
 		data += subResourceLayout.offset;
@@ -402,9 +402,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

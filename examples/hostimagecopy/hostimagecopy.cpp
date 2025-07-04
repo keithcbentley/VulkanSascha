@@ -1,7 +1,7 @@
 /*
-* Vulkan Example - Host image copy using VK_EXT_host_image_copy
+* Vulkan Example - Host m_vkImage copy using VK_EXT_host_image_copy
 * 
-* This sample shows how to use host image copies to directly upload an image to the devic without having to use staging
+* This sample shows how to use host m_vkImage copies to directly upload an m_vkImage to the devic without having to use staging
 
 * Copyright (C) 2024 by Sascha Willems - www.saschawillems.de
 *
@@ -16,10 +16,10 @@
 class VulkanExample : public VulkanExampleBase
 {
 public:
-	// Pointers for functions added by the host image copy extension;
+	// Pointers for functions added by the host m_vkImage copy extension;
 	PFN_vkCopyMemoryToImageEXT vkCopyMemoryToImageEXT{ nullptr };
 	PFN_vkTransitionImageLayoutEXT vkTransitionImageLayoutEXT{ nullptr };
-	// Used to check feature image format support for host image copies
+	// Used to check feature m_vkImage format support for host m_vkImage copies
 	PFN_vkGetPhysicalDeviceFormatProperties2 vkGetPhysicalDeviceFormatProperties2{ nullptr };
 
 	VkPhysicalDeviceHostImageCopyFeaturesEXT enabledPhysicalDeviceHostImageCopyFeaturesEXT{};
@@ -52,7 +52,7 @@ public:
 
 	VulkanExample() : VulkanExampleBase()
 	{
-		title = "Host image copy";
+		title = "Host m_vkImage copy";
 		camera.type = Camera::CameraType::lookat;
 		camera.setPosition(glm::vec3(0.0f, 0.0f, -1.5f));
 		camera.setRotation(glm::vec3(0.0f, 15.0f, 0.0f));
@@ -64,7 +64,7 @@ public:
 		enabledDeviceExtensions.push_back(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
 		enabledDeviceExtensions.push_back(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
 
-		// Enable host image copy feature
+		// Enable host m_vkImage copy feature
 		enabledPhysicalDeviceHostImageCopyFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES_EXT;
 		enabledPhysicalDeviceHostImageCopyFeaturesEXT.hostImageCopy = VK_TRUE;
 		deviceCreatepNextChain = &enabledPhysicalDeviceHostImageCopyFeaturesEXT;
@@ -91,12 +91,12 @@ public:
 	}
 
 	/*
-		Upload texture image data to the GPU
+		Upload texture m_vkImage data to the GPU
 
 		Unlike the texture(3d/array/etc) samples, this one uses the VK_EXT_host_image_copy to drasticly simplify the process 
-		of uploading an image from the host to the GPU. This new extension adds a way of directly uploading image data from
-		host memory to an optimal tiled image on the m_vkDevice (GPU). This no longer requires a staging buffer in between, as we can
-		now directly copy data stored in host memory to the image. The extension also adds new functionality to simplfy image barriers
+		of uploading an m_vkImage from the host to the GPU. This new extension adds a way of directly uploading m_vkImage data from
+		host m_vkDeviceMemory to an optimal tiled m_vkImage on the m_vkDevice (GPU). This no longer requires a staging buffer in between, as we can
+		now directly copy data stored in host m_vkDeviceMemory to the m_vkImage. The extension also adds new functionality to simplfy m_vkImage barriers
 	*/
 	void loadTexture()
 	{
@@ -137,7 +137,7 @@ public:
 
 		const VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
 
-		// Check if the image format supports the host image copy flag
+		// Check if the m_vkImage format supports the host m_vkImage copy flag
 		// Note: All formats that support sampling are required to support this flag
 		// So for the format used here (R8G8B8A8_UNORM) we could skip this check
 		// The flag we need to check is an extension flag, so we need to go through VkFormatProperties3 
@@ -150,10 +150,10 @@ public:
 		vkGetPhysicalDeviceFormatProperties2(m_vkPhysicalDevice, imageFormat, &formatProperties2);
 
 		if ((formatProperties3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_HOST_IMAGE_TRANSFER_BIT_EXT) == 0) {
-			vks::tools::exitFatal("The selected image format does not support the required host transfer bit.", -1);
+			vks::tools::exitFatal("The selected m_vkImage format does not support the required host transfer bit.", -1);
 		}
 
-		// Create optimal tiled target image on the m_vkDevice
+		// Create optimal tiled target m_vkImage on the m_vkDevice
 		VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageCreateInfo.format = imageFormat;
@@ -164,7 +164,7 @@ public:
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		imageCreateInfo.extent = { texture.width, texture.height, 1 };
-		// For images that use host image copy we need to specify the VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT usage flag
+		// For images that use host m_vkImage copy we need to specify the VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT usage flag
 		imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT;
 		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &texture.image));
 
@@ -176,14 +176,14 @@ public:
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &texture.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, texture.image, texture.deviceMemory, 0));
 
-		// With host image copy we can directly copy from the KTX image in host memory to the m_vkDevice
-		// This is pretty straight forward, as the KTX image is already tightly packed, doesn't need and swizzle and as such matches
+		// With host m_vkImage copy we can directly copy from the KTX m_vkImage in host m_vkDeviceMemory to the m_vkDevice
+		// This is pretty straight forward, as the KTX m_vkImage is already tightly packed, doesn't need and swizzle and as such matches
 		// what the m_vkDevice expects 
 
-		// Set up copy information for all mip levels stored in the image
+		// Set up copy information for all mip levels stored in the m_vkImage
 		std::vector<VkMemoryToImageCopyEXT> memoryToImageCopies{};
 		for (uint32_t i = 0; i < texture.mipLevels; i++) {
-			// Setup a buffer image copy structure for the current mip level
+			// Setup a buffer m_vkImage copy structure for the current mip level
 			VkMemoryToImageCopyEXT memoryToImageCopy = {};
 			memoryToImageCopy.sType = VK_STRUCTURE_TYPE_MEMORY_TO_IMAGE_COPY_EXT;
 			memoryToImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -210,7 +210,7 @@ public:
 		subresourceRange.levelCount = texture.mipLevels;
 		subresourceRange.layerCount = 1;
 
-		// VK_EXT_host_image_copy als introduces a simplified way of doing the required image transition on the host
+		// VK_EXT_host_image_copy als introduces a simplified way of doing the required m_vkImage transition on the host
 		// This no longer requires a dedicated command buffer to submit the barrier
 		// We also no longer need multiple transitions, and only have to do one for the final layout
 		VkHostImageLayoutTransitionInfoEXT hostImageLayoutTransitionInfo{};
@@ -222,7 +222,7 @@ public:
 
 		vkTransitionImageLayoutEXT(m_vkDevice, 1, &hostImageLayoutTransitionInfo);
 
-		// With the image in the correct layout and copy information for all mip levels setup, we can now issue the copy to our taget image from the host
+		// With the m_vkImage in the correct layout and copy information for all mip levels setup, we can now issue the copy to our taget m_vkImage from the host
 		// The implementation will then convert this to an implementation specific optimal tiling layout
 		VkCopyMemoryToImageInfoEXT copyMemoryInfo{};
 		copyMemoryInfo.sType = VK_STRUCTURE_TYPE_COPY_MEMORY_TO_IMAGE_INFO_EXT;
@@ -252,7 +252,7 @@ public:
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &texture.sampler));
 
-		// Create image view
+		// Create m_vkImage m_vkImageView
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
 		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		view.format = imageFormat;
@@ -275,11 +275,11 @@ public:
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
 		VkClearValue clearValues[2];
-		clearValues[0].color = defaultClearColor;
+		clearValues[0].color = m_vkClearColorValueDefault;
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -290,7 +290,7 @@ public:
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{
 			// Set target frame buffer
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -323,23 +323,23 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0 : Vertex shader uniform buffer
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
-			// Binding 1 : Fragment shader image sampler
+			// Binding 1 : Fragment shader m_vkImage sampler
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 
-		// Setup a descriptor image info for the current texture to be used as a combined image sampler
+		// Setup a descriptor m_vkImage info for the current texture to be used as a combined m_vkImage sampler
 		VkDescriptorImageInfo textureDescriptor;
 		textureDescriptor.imageView = texture.view;
 		textureDescriptor.sampler = texture.sampler;
@@ -376,7 +376,7 @@ public:
 		    loadShader(getShadersPath() + "texture/texture.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)
         };
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;
 		pipelineCreateInfo.pColorBlendState = &colorBlendState;
@@ -387,7 +387,7 @@ public:
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
 		pipelineCreateInfo.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Normal });
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -409,14 +409,14 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		plane.loadFromFile(getAssetPath() + "models/plane_z.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		plane.loadFromFile(getAssetPath() + "models/plane_z.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void prepare() override
 	{
 		VulkanExampleBase::prepare();
 
-		// Get the function pointers required host image copies
+		// Get the function pointers required host m_vkImage copies
 		vkCopyMemoryToImageEXT = reinterpret_cast<PFN_vkCopyMemoryToImageEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkCopyMemoryToImageEXT"));
 		vkTransitionImageLayoutEXT = reinterpret_cast<PFN_vkTransitionImageLayoutEXT>(vkGetDeviceProcAddr(m_vkDevice, "vkTransitionImageLayoutEXT"));
 		vkGetPhysicalDeviceFormatProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceFormatProperties2>(vkGetInstanceProcAddr(m_vulkanInstance, "vkGetPhysicalDeviceFormatProperties2KHR"));
@@ -433,9 +433,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

@@ -14,13 +14,13 @@
 #include "VulkanglTFModel.h"
 
 // Virtual texture page as a part of the partially resident texture
-// Contains memory bindings, offsets and status information
+// Contains m_vkDeviceMemory bindings, offsets and status information
 struct VirtualTexturePage
 {
 	VkOffset3D offset;
 	VkExtent3D extent;
-	VkSparseImageMemoryBind imageMemoryBind;							// Sparse image memory bind for this page
-	VkDeviceSize size;													// Page (memory) size in bytes
+	VkSparseImageMemoryBind imageMemoryBind;							// Sparse m_vkImage m_vkDeviceMemory bind for this page
+	VkDeviceSize size;													// Page (m_vkDeviceMemory) size in bytes
 	uint32_t mipLevel;													// Mip level that this page belongs to
 	uint32_t layer;														// Array layer that this page belongs to
 	uint32_t index;
@@ -36,13 +36,13 @@ struct VirtualTexturePage
 struct VirtualTexture
 {
 	VkDevice device;
-	VkImage image;														// Texture image handle
-	VkBindSparseInfo bindSparseInfo;									// Sparse queue binding information
+	VkImage image;														// Texture m_vkImage handle
+	VkBindSparseInfo bindSparseInfo;									// Sparse m_vkQueue binding information
 	std::vector<VirtualTexturePage> pages;								// Contains all virtual pages of the texture
-	std::vector<VkSparseImageMemoryBind> sparseImageMemoryBinds;		// Sparse image memory bindings of all memory-backed virtual tables
-	std::vector<VkSparseMemoryBind>	opaqueMemoryBinds;					// Sparse opaque memory bindings for the mip tail (if present)
-	VkSparseImageMemoryBindInfo imageMemoryBindInfo;					// Sparse image memory bind info
-	VkSparseImageOpaqueMemoryBindInfo opaqueMemoryBindInfo;				// Sparse image opaque memory bind info (mip tail)
+	std::vector<VkSparseImageMemoryBind> sparseImageMemoryBinds;		// Sparse m_vkImage m_vkDeviceMemory bindings of all m_vkDeviceMemory-backed virtual tables
+	std::vector<VkSparseMemoryBind>	opaqueMemoryBinds;					// Sparse opaque m_vkDeviceMemory bindings for the mip tail (if present)
+	VkSparseImageMemoryBindInfo imageMemoryBindInfo;					// Sparse m_vkImage m_vkDeviceMemory bind info
+	VkSparseImageOpaqueMemoryBindInfo opaqueMemoryBindInfo;				// Sparse m_vkImage opaque m_vkDeviceMemory bind info (mip tail)
 	uint32_t mipTailStart;												// First mip level in mip tail
 	VkSparseImageMemoryRequirements sparseImageMemoryRequirements;		// @todo: Comment
 	uint32_t memoryTypeIndex;											// @todo: Comment

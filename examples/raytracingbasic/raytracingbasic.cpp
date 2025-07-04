@@ -206,7 +206,7 @@ public:
 	}
 
 	/*
-		Set up a storage image that the ray generation shader will be writing to
+		Set up a storage m_vkImage that the ray generation shader will be writing to
 	*/
 	void createStorageImage()
 	{
@@ -249,7 +249,7 @@ public:
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_GENERAL,
 			{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
-		vulkanDevice->flushCommandBuffer(cmdBuffer, queue);
+		vulkanDevice->flushCommandBuffer(cmdBuffer, m_vkQueue);
 	}
 
 	/*
@@ -279,7 +279,7 @@ public:
 		};
 
 		// Create buffers
-		// For the sake of simplicity we won't stage the vertex data to the GPU memory
+		// For the sake of simplicity we won't stage the vertex data to the GPU m_vkDeviceMemory
 		// Vertex buffer
 		VK_CHECK_RESULT(vulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -381,7 +381,7 @@ public:
 			1,
 			&accelerationBuildGeometryInfo,
 			accelerationBuildStructureRangeInfos.data());
-		vulkanDevice->flushCommandBuffer(commandBuffer, queue);
+		vulkanDevice->flushCommandBuffer(commandBuffer, m_vkQueue);
 
 		VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
 		accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -488,7 +488,7 @@ public:
 			1,
 			&accelerationBuildGeometryInfo,
 			accelerationBuildStructureRangeInfos.data());
-		vulkanDevice->flushCommandBuffer(commandBuffer, queue);
+		vulkanDevice->flushCommandBuffer(commandBuffer, m_vkQueue);
 
 		VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
 		accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -548,9 +548,9 @@ public:
 			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCreateInfo, nullptr, &m_vkDescriptorPool));
 
-		VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &descriptorSetAllocateInfo, &descriptorSet));
 
 		VkWriteDescriptorSetAccelerationStructureKHR descriptorAccelerationStructureInfo{};
@@ -698,7 +698,7 @@ public:
 	}
 
 	/*
-		If the window has been resized, we need to recreate the storage image and it's descriptor
+		If the m_hwnd has been resized, we need to recreate the storage m_vkImage and it's descriptor
 	*/
 	void handleResize()
 	{
@@ -706,7 +706,7 @@ public:
 		vkDestroyImageView(m_vkDevice, storageImage.view, nullptr);
 		vkDestroyImage(m_vkDevice, storageImage.image, nullptr);
 		vkFreeMemory(m_vkDevice, storageImage.memory, nullptr);
-		// Recreate image
+		// Recreate m_vkImage
 		createStorageImage();
 		// Update descriptor
 		VkDescriptorImageInfo storageImageDescriptor{ VK_NULL_HANDLE, storageImage.view, VK_IMAGE_LAYOUT_GENERAL };
@@ -773,10 +773,10 @@ public:
 				1);
 
 			/*
-				Copy ray tracing output to swap chain image
+				Copy ray tracing output to swap chain m_vkImage
 			*/
 
-			// Prepare current swap chain image as transfer destination
+			// Prepare current swap chain m_vkImage as transfer destination
 			vks::tools::setImageLayout(
 				drawCmdBuffers[i],
 				swapChain.images[i],
@@ -784,7 +784,7 @@ public:
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				subresourceRange);
 
-			// Prepare ray tracing output image as transfer source
+			// Prepare ray tracing output m_vkImage as transfer source
 			vks::tools::setImageLayout(
 				drawCmdBuffers[i],
 				storageImage.image,
@@ -800,7 +800,7 @@ public:
 			copyRegion.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 			vkCmdCopyImage(drawCmdBuffers[i], storageImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapChain.images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-			// Transition swap chain image back for presentation
+			// Transition swap chain m_vkImage back for presentation
 			vks::tools::setImageLayout(
 				drawCmdBuffers[i],
 				swapChain.images[i],
@@ -808,7 +808,7 @@ public:
 				VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 				subresourceRange);
 
-			// Transition ray tracing output image back to general layout
+			// Transition ray tracing output m_vkImage back to general layout
 			vks::tools::setImageLayout(
 				drawCmdBuffers[i],
 				storageImage.image,
@@ -890,9 +890,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

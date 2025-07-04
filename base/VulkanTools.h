@@ -90,7 +90,7 @@ namespace vks
 		// Returns true if a given format has a stencil part
 		VkBool32 formatHasStencil(VkFormat format);
 
-		// Put an image m_vkDeviceMemory barrier for setting an image layout on the sub resource into the given command buffer
+		// Put an m_vkImage m_vkDeviceMemory barrier for setting an m_vkImage layout on the sub resource into the given command buffer
 		void setImageLayout(
 			VkCommandBuffer cmdbuffer,
 			VkImage image,

@@ -85,19 +85,19 @@ public:
 	}
 
 	/*
-		Upload texture image data to the GPU
+		Upload texture m_vkImage data to the GPU
 
-		Vulkan offers two types of image tiling (memory layout):
+		Vulkan offers two types of m_vkImage tiling (m_vkDeviceMemory layout):
 
 		Linear tiled images:
 			These are stored as is and can be copied directly to. But due to the linear nature they're not a good match for GPUs and format and feature support is very limited.
 			It's not advised to use linear tiled images for anything else than copying from host to GPU if buffer copies are not an option.
-			Linear tiling is thus only implemented for learning purposes, one should always prefer optimal tiled image.
+			Linear tiling is thus only implemented for learning purposes, one should always prefer optimal tiled m_vkImage.
 
 		Optimal tiled images:
 			These are stored in an implementation specific layout matching the capability of the hardware. They usually support more formats and m_vkPhysicalDeviceFeatures and are much faster.
 			Optimal tiled images are stored on the m_vkDevice and not accessible by the host. So they can't be written directly to (like liner tiled images) and always require
-			some sort of data copy, either from a buffer or	a linear tiled image.
+			some sort of data copy, either from a buffer or	a linear tiled m_vkImage.
 
 		In Short: Always use optimal tiled images for rendering.
 	*/
@@ -141,7 +141,7 @@ public:
 		ktx_uint8_t *ktxTextureData = ktxTexture_GetData(ktxTexture);
 		ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
 
-		// We prefer using staging to copy the texture data to a m_vkDevice local optimal image
+		// We prefer using staging to copy the texture data to a m_vkDevice local optimal m_vkImage
 		VkBool32 useStaging = true;
 
 		// Only use linear tiling if forced
@@ -158,11 +158,11 @@ public:
 		VkMemoryRequirements memReqs = {};
 
 		if (useStaging) {
-			// Copy data to an optimal tiled image
-			// This loads the texture data into a host local buffer that is copied to the optimal tiled image on the m_vkDevice
+			// Copy data to an optimal tiled m_vkImage
+			// This loads the texture data into a host local buffer that is copied to the optimal tiled m_vkImage on the m_vkDevice
 
-			// Create a host-visible staging buffer that contains the raw image data
-			// This buffer will be the data source for copying texture data to the optimal tiled image on the m_vkDevice
+			// Create a host-visible staging buffer that contains the raw m_vkImage data
+			// This buffer will be the data source for copying texture data to the optimal tiled m_vkImage on the m_vkDevice
 			VkBuffer stagingBuffer;
 			VkDeviceMemory stagingMemory;
 
@@ -173,10 +173,10 @@ public:
 			bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
                         VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, &stagingBuffer));
 
-			// Get memory requirements for the staging buffer (alignment, memory type bits)
+			// Get m_vkDeviceMemory requirements for the staging buffer (alignment, m_vkDeviceMemory type bits)
                         vkGetBufferMemoryRequirements(m_vkDevice, stagingBuffer, &memReqs);
 			memAllocInfo.allocationSize = memReqs.size;
-			// Get memory type index for a host visible buffer
+			// Get m_vkDeviceMemory type index for a host visible buffer
 			memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
                         VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &stagingMemory));
                         VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, stagingBuffer, stagingMemory, 0));
@@ -196,7 +196,7 @@ public:
 				ktx_size_t offset;
 				KTX_error_code ret = ktxTexture_GetImageOffset(ktxTexture, i, 0, 0, &offset);
 				assert(ret == KTX_SUCCESS);
-				// Setup a buffer image copy structure for the current mip level
+				// Setup a buffer m_vkImage copy structure for the current mip level
 				VkBufferImageCopy bufferCopyRegion = {};
 				bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				bufferCopyRegion.imageSubresource.mipLevel = i;
@@ -209,7 +209,7 @@ public:
 				bufferCopyRegions.push_back(bufferCopyRegion);
 			}
 
-			// Create optimal tiled target image on the m_vkDevice
+			// Create optimal tiled target m_vkImage on the m_vkDevice
 			VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 			imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 			imageCreateInfo.format = format;
@@ -218,7 +218,7 @@ public:
 			imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 			imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 			imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			// Set initial layout of the image to undefined
+			// Set initial layout of the m_vkImage to undefined
 			imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageCreateInfo.extent = { texture.width, texture.height, 1 };
 			imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -232,9 +232,9 @@ public:
 
 			VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
-			// Image memory barriers for the texture image
+			// Image m_vkDeviceMemory barriers for the texture m_vkImage
 
-			// The sub resource range describes the regions of the image that will be transitioned using the memory barriers below
+			// The sub resource range describes the regions of the m_vkImage that will be transitioned using the m_vkDeviceMemory barriers below
 			VkImageSubresourceRange subresourceRange = {};
 			// Image only contains color data
 			subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -245,7 +245,7 @@ public:
 			// The 2D texture only has one layer
 			subresourceRange.layerCount = 1;
 
-			// Transition the texture image layout to transfer target, so we can safely copy our buffer data to it.
+			// Transition the texture m_vkImage layout to transfer target, so we can safely copy our buffer data to it.
 			VkImageMemoryBarrier imageMemoryBarrier = vks::initializers::imageMemoryBarrier();;
 			imageMemoryBarrier.image = texture.image;
 			imageMemoryBarrier.subresourceRange = subresourceRange;
@@ -254,7 +254,7 @@ public:
 			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
-			// Insert a memory dependency at the proper m_vkPipeline stages that will execute the image layout transition
+			// Insert a m_vkDeviceMemory dependency at the proper m_vkPipeline stages that will execute the m_vkImage layout transition
 			// Source m_vkPipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
 			// Destination m_vkPipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
 			vkCmdPipelineBarrier(
@@ -275,13 +275,13 @@ public:
 				static_cast<uint32_t>(bufferCopyRegions.size()),
 				bufferCopyRegions.data());
 
-			// Once the data has been uploaded we transfer to the texture image to the shader read layout, so it can be sampled from
+			// Once the data has been uploaded we transfer to the texture m_vkImage to the shader read layout, so it can be sampled from
 			imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-			// Insert a memory dependency at the proper m_vkPipeline stages that will execute the image layout transition
+			// Insert a m_vkDeviceMemory dependency at the proper m_vkPipeline stages that will execute the m_vkImage layout transition
 			// Source m_vkPipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
 			// Destination m_vkPipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 			vkCmdPipelineBarrier(
@@ -296,18 +296,18 @@ public:
 			// Store current layout for later reuse
 			texture.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-			vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+			vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 			// Clean up staging resources
 			vkFreeMemory(m_vkDevice, stagingMemory, nullptr);
 			vkDestroyBuffer(m_vkDevice, stagingBuffer, nullptr);
 		} else {
-			// Copy data to a linear tiled image
+			// Copy data to a linear tiled m_vkImage
 
 			VkImage mappableImage;
 			VkDeviceMemory mappableMemory;
 
-			// Load mip map level 0 to linear tiling image
+			// Load mip map level 0 to linear tiling m_vkImage
 			VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 			imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 			imageCreateInfo.format = format;
@@ -321,19 +321,19 @@ public:
 			imageCreateInfo.extent = { texture.width, texture.height, 1 };
                         VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &mappableImage));
 
-			// Get memory requirements for this image like size and alignment
+			// Get m_vkDeviceMemory requirements for this m_vkImage like size and alignment
                         vkGetImageMemoryRequirements(m_vkDevice, mappableImage, &memReqs);
-			// Set memory allocation size to required memory size
+			// Set m_vkDeviceMemory allocation size to required m_vkDeviceMemory size
 			memAllocInfo.allocationSize = memReqs.size;
-			// Get memory type that can be mapped to host memory
+			// Get m_vkDeviceMemory type that can be mapped to host m_vkDeviceMemory
 			memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
                         VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &mappableMemory));
                         VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, mappableImage, mappableMemory, 0));
 
-			// Map image memory
+			// Map m_vkImage m_vkDeviceMemory
 			void *data;
                         VK_CHECK_RESULT(vkMapMemory(m_vkDevice, mappableMemory, 0, memReqs.size, 0, &data));
-			// Copy image data of the first mip level into memory
+			// Copy m_vkImage data of the first mip level into m_vkDeviceMemory
 			memcpy(data, ktxTextureData, memReqs.size);
                         vkUnmapMemory(m_vkDevice, mappableMemory);
 
@@ -342,17 +342,17 @@ public:
 			texture.deviceMemory = mappableMemory;
 			texture.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-			// Setup image memory barrier transfer image to shader read layout
+			// Setup m_vkImage m_vkDeviceMemory barrier transfer m_vkImage to shader read layout
 			VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
-			// The sub resource range describes the regions of the image we will be transition
+			// The sub resource range describes the regions of the m_vkImage we will be transition
 			VkImageSubresourceRange subresourceRange = {};
 			subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			subresourceRange.baseMipLevel = 0;
 			subresourceRange.levelCount = 1;
 			subresourceRange.layerCount = 1;
 
-			// Transition the texture image layout to shader read, so it can be sampled from
+			// Transition the texture m_vkImage layout to shader read, so it can be sampled from
 			VkImageMemoryBarrier imageMemoryBarrier = vks::initializers::imageMemoryBarrier();;
 			imageMemoryBarrier.image = texture.image;
 			imageMemoryBarrier.subresourceRange = subresourceRange;
@@ -361,7 +361,7 @@ public:
 			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-			// Insert a memory dependency at the proper m_vkPipeline stages that will execute the image layout transition
+			// Insert a m_vkDeviceMemory dependency at the proper m_vkPipeline stages that will execute the m_vkImage layout transition
 			// Source m_vkPipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
 			// Destination m_vkPipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 			vkCmdPipelineBarrier(
@@ -373,7 +373,7 @@ public:
 				0, nullptr,
 				1, &imageMemoryBarrier);
 
-			vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+			vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 		}
 
 		ktxTexture_Destroy(ktxTexture);
@@ -408,15 +408,15 @@ public:
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
                 VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &texture.sampler));
 
-		// Create image view
+		// Create m_vkImage m_vkImageView
 		// Textures are not directly accessed by the shaders and
-		// are abstracted by image views containing additional
+		// are abstracted by m_vkImage views containing additional
 		// information and sub resource ranges
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
 		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		view.format = format;
-		// The subresource range describes the set of mip levels (and array layers) that can be accessed through this image view
-		// It's possible to create multiple image views for a single image referring to different (and/or overlapping) ranges of the image
+		// The subresource range describes the set of mip levels (and array layers) that can be accessed through this m_vkImage m_vkImageView
+		// It's possible to create multiple m_vkImage views for a single m_vkImage referring to different (and/or overlapping) ranges of the m_vkImage
 		view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		view.subresourceRange.baseMipLevel = 0;
 		view.subresourceRange.baseArrayLayer = 0;
@@ -424,7 +424,7 @@ public:
 		// Linear tiling usually won't support mip maps
 		// Only set mip map count if optimal tiling is used
 		view.subresourceRange.levelCount = (useStaging) ? texture.mipLevels : 1;
-		// The view will be based on the texture's image
+		// The m_vkImageView will be based on the texture's m_vkImage
 		view.image = texture.image;
                 VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &view, nullptr, &texture.view));
 	}
@@ -443,11 +443,11 @@ public:
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
 		VkClearValue clearValues[2];
-		clearValues[0].color = defaultClearColor;
+		clearValues[0].color = m_vkClearColorValueDefault;
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -458,7 +458,7 @@ public:
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{
 			// Set target frame buffer
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -519,8 +519,8 @@ public:
 		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &indexBuffer, indices.size() * sizeof(uint32_t)));
 
 		// Copy from host do m_vkDevice
-		vulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, queue);
-		vulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, queue);
+		vulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_vkQueue);
+		vulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, m_vkQueue);
 
 		// Clean up
 		stagingBuffers.vertices.destroy();
@@ -532,33 +532,33 @@ public:
 		// Pool
 		std::vector<VkDescriptorPoolSize> poolSizes = {
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-			// The sample uses a combined image + sampler descriptor to sample the texture in the fragment shader
+			// The sample uses a combined m_vkImage + sampler descriptor to sample the texture in the fragment shader
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-                VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+                VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			// Binding 0 : Vertex shader uniform buffer
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
-			// Binding 1 : Fragment shader image sampler
+			// Binding 1 : Fragment shader m_vkImage sampler
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 
-		// Setup a descriptor image info for the current texture to be used as a combined image sampler
+		// Setup a descriptor m_vkImage info for the current texture to be used as a combined m_vkImage sampler
 		VkDescriptorImageInfo textureDescriptor;
-		// The image's view (images are never directly accessed by the shader, but rather through views defining subresources)
+		// The m_vkImage's m_vkImageView (images are never directly accessed by the shader, but rather through views defining subresources)
 		textureDescriptor.imageView = texture.view;
 		// The sampler (Telling the m_vkPipeline how to sample the texture, including repeat, border, etc.)
 		textureDescriptor.sampler = texture.sampler;
-		// The current layout of the image(Note: Should always fit the actual use, e.g.shader read)
+		// The current layout of the m_vkImage(Note: Should always fit the actual use, e.g.shader read)
 		textureDescriptor.imageLayout = texture.imageLayout;
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
@@ -567,9 +567,9 @@ public:
 			// Binding 1 : Fragment shader texture sampler
 			//	Fragment shader: layout (binding = 1) uniform sampler2D samplerColor;
 			vks::initializers::writeDescriptorSet(descriptorSet,
-				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,		// The descriptor set will use a combined image sampler (as opposed to splitting image and sampler)
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,		// The descriptor set will use a combined m_vkImage sampler (as opposed to splitting m_vkImage and sampler)
 				1,												// Shader binding point 1
-				&textureDescriptor)								// Pointer to the descriptor image for our texture
+				&textureDescriptor)								// Pointer to the descriptor m_vkImage for our texture
 		};
 		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
@@ -611,7 +611,7 @@ public:
 		vertexInputState.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributes.size());
 		vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
 		pipelineCreateInfo.pVertexInputState = &vertexInputState;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;
@@ -622,7 +622,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -656,9 +656,9 @@ public:
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

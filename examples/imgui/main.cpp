@@ -157,7 +157,7 @@ public:
 			vkGetPhysicalDeviceProperties2(device->m_vkPhysicalDevice, &deviceProperties2);
 		}
 
-		// Create target image for copy
+		// Create target m_vkImage for copy
 		VkImageCreateInfo imageInfo = vks::initializers::imageCreateInfo();
 		imageInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -180,7 +180,7 @@ public:
 		VK_CHECK_RESULT(vkAllocateMemory(device->m_vkDevice, &memAllocInfo, nullptr, &fontMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device->m_vkDevice, fontImage, fontMemory, 0));
 
-		// Image view
+		// Image m_vkImageView
 		VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
 		viewInfo.image = fontImage;
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -203,7 +203,7 @@ public:
 		memcpy(stagingBuffer.mapped, fontData, uploadSize);
 		stagingBuffer.unmap();
 
-		// Copy buffer data to font image
+		// Copy buffer data to font m_vkImage
 		VkCommandBuffer copyCmd = device->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Prepare for transfer
@@ -379,7 +379,7 @@ public:
 
 		// Init imGui windows and elements
 
-		// Debug window
+		// Debug m_hwnd
 		ImGui::SetWindowPos(ImVec2(20 * example->m_UIOverlay.scale, 20 * example->m_UIOverlay.scale), ImGuiSetCond_FirstUseEver);
         ImGui::SetWindowSize(ImVec2(300 * example->m_UIOverlay.scale, 300 * example->m_UIOverlay.scale), ImGuiSetCond_Always);
 		ImGui::TextUnformatted(example->title.c_str());
@@ -408,7 +408,7 @@ public:
 		ImGui::InputFloat3("position", &example->camera.position.x, 2);
 		ImGui::InputFloat3("rotation", &example->camera.rotation.x, 2);
 
-		// Example settings window
+		// Example settings m_hwnd
 		ImGui::SetNextWindowPos(ImVec2(20 * example->m_UIOverlay.scale, 360 * example->m_UIOverlay.scale), ImGuiSetCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(300 * example->m_UIOverlay.scale, 200 * example->m_UIOverlay.scale), ImGuiSetCond_FirstUseEver);
 		ImGui::Begin("Example settings");
@@ -600,7 +600,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderPass = m_vkRenderPass;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -614,7 +614,7 @@ public:
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
 		{
 			// Set target frame buffer
-			renderPassBeginInfo.framebuffer = frameBuffers[i];
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
 			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
@@ -662,7 +662,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Set layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -677,7 +677,7 @@ public:
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Descriptor set
-		VkDescriptorSetAllocateInfo allocInfo =	vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo =	vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferVS.descriptor),
@@ -700,7 +700,7 @@ public:
 
 		std::array<VkPipelineShaderStageCreateInfo,2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, renderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -714,7 +714,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "imgui/scene.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "imgui/scene.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, pipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -753,25 +753,25 @@ public:
 	{
 		VulkanExampleBase::prepareFrame();
 		buildCommandBuffers();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+		m_vkSubmitInfo.commandBufferCount = 1;
+		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models.models.loadFromFile(getAssetPath() + "models/vulkanscenemodels.gltf", vulkanDevice, queue, glTFLoadingFlags);
-		models.background.loadFromFile(getAssetPath() + "models/vulkanscenebackground.gltf", vulkanDevice, queue, glTFLoadingFlags);
-		models.logos.loadFromFile(getAssetPath() + "models/vulkanscenelogos.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		models.models.loadFromFile(getAssetPath() + "models/vulkanscenemodels.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.background.loadFromFile(getAssetPath() + "models/vulkanscenebackground.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.logos.loadFromFile(getAssetPath() + "models/vulkanscenelogos.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void prepareImGui()
 	{
 		imGui = new ImGUI(this);
 		imGui->init((float)m_drawAreaWidth, (float)m_drawAreaHeight);
-		imGui->initResources(renderPass, queue, getShadersPath());
+		imGui->initResources(m_vkRenderPass, m_vkQueue, getShadersPath());
 	}
 
 	void prepare()
