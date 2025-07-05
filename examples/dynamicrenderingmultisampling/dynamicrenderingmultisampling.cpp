@@ -31,7 +31,7 @@ public:
 	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 
 	// Intermediate images used for multi sampling
 	struct Image {
@@ -50,20 +50,20 @@ public:
 		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
                 m_exampleSettings.m_showUIOverlay = false;
 
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		m_requestedInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 		// The sample uses the extension (instead of Vulkan 1.2, where dynamic rendering is core)
-		enabledDeviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_MAINTENANCE2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_MAINTENANCE2_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME);
 
 		// in addition to the extension, the feature needs to be explicitly enabled too by chaining the extension structure into m_vkDevice creation
 		enabledDynamicRenderingFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
 		enabledDynamicRenderingFeaturesKHR.dynamicRendering = VK_TRUE;
 
-		deviceCreatepNextChain = &enabledDynamicRenderingFeaturesKHR;
+		m_deviceCreatepNextChain = &enabledDynamicRenderingFeaturesKHR;
 	}
 
 	~VulkanExample() override
@@ -71,7 +71,7 @@ public:
 		if (m_vkDevice) {
 			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
 			vkDestroyImage(m_vkDevice, renderImage.image, nullptr);
 			vkDestroyImageView(m_vkDevice, renderImage.view, nullptr);
@@ -94,7 +94,7 @@ public:
 		vkFreeMemory(m_vkDevice, renderImage.memory, nullptr);
 		VkImageCreateInfo renderImageCI = vks::initializers::imageCreateInfo();
 		renderImageCI.imageType = VK_IMAGE_TYPE_2D;
-		renderImageCI.format = swapChain.colorFormat;
+		renderImageCI.format = m_swapChain.colorFormat;
 		renderImageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 		renderImageCI.mipLevels = 1;
 		renderImageCI.arrayLayers = 1;
@@ -108,13 +108,13 @@ public:
 		VkMemoryAllocateInfo memAllloc{};
 		memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memAllloc.allocationSize = memReqs.size;
-		memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllloc, nullptr, &renderImage.memory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, renderImage.image, renderImage.memory, 0));
 		VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
 		imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		imageViewCI.image = renderImage.image;
-		imageViewCI.format = swapChain.colorFormat;
+		imageViewCI.format = m_swapChain.colorFormat;
 		imageViewCI.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewCI, nullptr, &renderImage.view));
 	}
@@ -138,7 +138,7 @@ public:
 		VkMemoryAllocateInfo memAllloc{};
 		memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memAllloc.allocationSize = memReqs.size;
-		memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllloc, nullptr, &m_defaultDepthStencil.m_vkDeviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, m_defaultDepthStencil.m_vkImage, m_defaultDepthStencil.m_vkDeviceMemory, 0));
 		VkImageViewCreateInfo depthImageViewCI{};
@@ -162,15 +162,15 @@ public:
 	void getEnabledFeatures() override
 	{
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+			m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
 		};
 	}
 
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		model.loadFromFile(getAssetPath() + "models/voyager.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void buildCommandBuffers() override
@@ -214,7 +214,7 @@ public:
 			// When multi sampling is used, we use intermediate images to render and resolve to the swap chain images
 			colorAttachment.imageView = renderImage.view;
 			colorAttachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-			colorAttachment.resolveImageView = swapChain.imageViews[i];
+			colorAttachment.resolveImageView = m_swapChain.imageViews[i];
 			colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 			// A single depth stencil attachment info can be used, but they can also be specified separately.
@@ -258,7 +258,7 @@ public:
 			// This set of barriers prepares the color m_vkImage for presentation, we don't need to care for the depth m_vkImage
 			vks::tools::insertImageMemoryBarrier(
 				drawCmdBuffers[i],
-				swapChain.images[i],
+				m_swapChain.images[i],
 				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				0,
 				VK_IMAGE_LAYOUT_UNDEFINED,
@@ -285,9 +285,9 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -301,7 +301,7 @@ public:
 		// Layout
 		// Uses set 0 for passing vertex shader ubo and set 1 for fragment shader images (taken from glTF model)
 		const std::vector<VkDescriptorSetLayout> setLayouts = {
-			descriptorSetLayout,
+			m_vkDescriptorSetLayout,
 			vkglTF::descriptorSetLayoutImage,
 		};
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), 2);
@@ -337,7 +337,7 @@ public:
 		VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo{};
 		pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
 		pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain.colorFormat;
+		pipelineRenderingCreateInfo.pColorAttachmentFormats = &m_swapChain.colorFormat;
 		pipelineRenderingCreateInfo.depthAttachmentFormat = m_vkFormatDepth;
 		pipelineRenderingCreateInfo.stencilAttachmentFormat = m_vkFormatDepth;
 		// Chain into the m_vkPipeline creat einfo
@@ -351,7 +351,7 @@ public:
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(uniformData), &uniformData));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(uniformData), &uniformData));
 		VK_CHECK_RESULT(uniformBuffer.map());
 		updateUniformBuffers();
 	}
@@ -377,7 +377,7 @@ public:
 		setupDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -391,7 +391,7 @@ public:
 
 	void render() override
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();

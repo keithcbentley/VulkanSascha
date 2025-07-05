@@ -100,8 +100,8 @@ public:
 
 	void loadAssets()
 	{
-		textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
-		textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
+		textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
+		textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
 	}
 
 	void buildCommandBuffers()
@@ -277,7 +277,7 @@ public:
 	// Setup and fill the compute shader storage buffers containing the particles
 	void prepareStorageBuffers()
 	{
-		std::default_random_engine rndEngine(benchmark.active ? 0 : (unsigned)time(nullptr));
+		std::default_random_engine rndEngine(m_benchmark.active ? 0 : (unsigned)time(nullptr));
 		std::uniform_real_distribution<float> rndDist(-1.0f, 1.0f);
 
 		// Initial particle positions
@@ -295,14 +295,14 @@ public:
 
 		vks::Buffer stagingBuffer;
 
-		vulkanDevice->createBuffer(
+		m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&stagingBuffer,
 			storageBufferSize,
 			particleBuffer.data());
 
-		vulkanDevice->createBuffer(
+		m_pVulkanDevice->createBuffer(
 			// The SSBO will be used as a storage buffer for the compute pipeline and as a vertex buffer in the graphics pipeline
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -310,7 +310,7 @@ public:
 			storageBufferSize);
 
 		// Copy from staging buffer to storage buffer
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = {};
 		copyRegion.size = storageBufferSize;
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, storageBuffer.buffer, 1, &copyRegion);
@@ -339,7 +339,7 @@ public:
 				1, &buffer_barrier,
 				0, nullptr);
 		}
-		vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+		m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 		stagingBuffer.destroy();
 	}
@@ -522,7 +522,7 @@ public:
 		VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &cmdPoolInfo, nullptr, &compute.commandPool));
 
 		// Create a command buffer for compute operations
-		compute.commandBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute.commandPool);
+		compute.commandBuffer = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute.commandPool);
 
 		// Semaphore for compute & graphics sync
 		VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
@@ -536,7 +536,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Compute shader uniform buffer block
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &compute.uniformBuffer, sizeof(Compute::UniformData));
+		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &compute.uniformBuffer, sizeof(Compute::UniformData));
 		// Map for host access
 		VK_CHECK_RESULT(compute.uniformBuffer.map());
 
@@ -545,7 +545,7 @@ public:
 
 	void updateUniformBuffers()
 	{
-		compute.uniformData.deltaT = paused ? 0.0f : frameTimer * 2.5f;
+		compute.uniformData.deltaT = paused ? 0.0f : m_frameTimer * 2.5f;
 		if (!attachToCursor)
 		{
 			compute.uniformData.destX = sin(glm::radians(timer * 360.0f)) * 0.75f;
@@ -602,19 +602,19 @@ public:
 		VulkanExampleBase::prepare();
 		// We will be using the m_vkQueue family indices to check if graphics and compute m_vkQueue families differ
 		// If that's the case, we need additional barriers for acquiring and releasing resources
-		graphics.queueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
-		compute.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+		graphics.queueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.graphics;
+		compute.queueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
 		loadAssets();
 		setupDescriptorPool();
 		prepareGraphics();
 		prepareCompute();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		draw();
 
@@ -622,11 +622,11 @@ public:
 		{
 			if (animStart > 0.0f)
 			{
-				animStart -= frameTimer * 5.0f;
+				animStart -= m_frameTimer * 5.0f;
 			}
 			else if (animStart <= 0.0f)
 			{
-				timer += frameTimer * 0.04f;
+				timer += m_frameTimer * 0.04f;
 				if (timer > 1.f)
 					timer = 0.f;
 			}

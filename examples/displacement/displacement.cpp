@@ -39,7 +39,7 @@ public:
 
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 
 	VulkanExample() : VulkanExampleBase()
 	{
@@ -58,7 +58,7 @@ public:
 				vkDestroyPipeline(m_vkDevice, pipelines.wireframe, nullptr);
 			};
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
 			colorHeightMap.destroy();
 		}
@@ -68,15 +68,15 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Tessellation shader support is required for this example
-		if (deviceFeatures.tessellationShader) {
-			enabledFeatures.tessellationShader = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.tessellationShader) {
+			m_vkPhysicalDeviceFeatures10.tessellationShader = VK_TRUE;
 		}
 		else {
 			vks::tools::exitFatal("Selected GPU does not support tessellation shaders!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
 		// Fill mode non solid is required for wireframe display
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.fillModeNonSolid) {
+			m_vkPhysicalDeviceFeatures10.fillModeNonSolid = VK_TRUE;
 		}
 		else {
 			splitScreen = false;
@@ -86,8 +86,8 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		plane.loadFromFile(getAssetPath() + "models/displacement_plane.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		colorHeightMap.loadFromFile(getAssetPath() + "textures/stonefloor03_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
+		plane.loadFromFile(getAssetPath() + "models/displacement_plane.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		colorHeightMap.loadFromFile(getAssetPath() + "textures/stonefloor03_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
 	}
 
 	void buildCommandBuffers()
@@ -165,10 +165,10 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 1),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Tessellation shader ubo
@@ -182,7 +182,7 @@ public:
 	void preparePipelines()
 	{
 		// Layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipelines
@@ -220,7 +220,7 @@ public:
 		// Tessellation pipelines
 		// Solid pipeline
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.solid));
-		if (deviceFeatures.fillModeNonSolid) {
+		if (m_vkPhysicalDeviceFeatures.fillModeNonSolid) {
 			// Wireframe pipeline
 			rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
 			rasterizationState.cullMode = VK_CULL_MODE_NONE;
@@ -232,7 +232,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Tessellation evaluation shader uniform buffer
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffer.map());
 	}
@@ -262,7 +262,7 @@ public:
 		setupDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -276,7 +276,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();
@@ -294,7 +294,7 @@ public:
 			if (overlay->inputFloat("Level", &uniformData.tessLevel, 0.5f, 2)) {
 				updateUniformBuffers();
 			}
-			if (deviceFeatures.fillModeNonSolid) {
+			if (m_vkPhysicalDeviceFeatures.fillModeNonSolid) {
 				if (overlay->checkBox("Splitscreen", &splitScreen)) {
 					buildCommandBuffers();
 					updateUniformBuffers();

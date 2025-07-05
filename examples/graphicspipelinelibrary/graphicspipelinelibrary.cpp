@@ -27,7 +27,7 @@ public:
 
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 
 	VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT graphicsPipelineLibraryFeatures{};
 
@@ -65,14 +65,14 @@ public:
 		camera.setRotationSpeed(0.5f);
 
 		// Enable required extensions
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+		m_requestedInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
 
 		// Enable required extension m_vkPhysicalDeviceFeatures
 		graphicsPipelineLibraryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
 		graphicsPipelineLibraryFeatures.graphicsPipelineLibrary = VK_TRUE;
-		deviceCreatepNextChain = &graphicsPipelineLibraryFeatures;
+		m_deviceCreatepNextChain = &graphicsPipelineLibraryFeatures;
 	}
 
 	~VulkanExample()
@@ -89,7 +89,7 @@ public:
 			vkDestroyPipeline(m_vkDevice, pipelineLibrary.vertexInputInterface, nullptr);
 			vkDestroyPipelineCache(m_vkDevice, threadPipelineCache, nullptr);
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
 		}
 	}
@@ -164,7 +164,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		scene.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -181,10 +181,10 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
@@ -232,7 +232,7 @@ public:
 	void preparePipelineLibrary()
 	{
 		// Shared layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Create a pipeline library for the vertex input interface
@@ -375,7 +375,7 @@ public:
 		shaderStageCI.pName = "main";
 
 		// Select lighting model using a specialization constant
-		srand(benchmark.active ? 0 : ((unsigned int)time(NULL)));
+		srand(m_benchmark.active ? 0 : ((unsigned int)time(NULL)));
 		uint32_t lighting_model = (int)(rand() % 4);
 
 		// Each shader constant of a shader stage corresponds to one map entry
@@ -447,7 +447,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Create the vertex shader uniform buffer block
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBuffer,
@@ -462,7 +462,7 @@ public:
 	void updateUniformBuffers()
 	{
 		if (!paused) {
-			rotation += frameTimer * 0.1f;
+			rotation += m_frameTimer * 0.1f;
 		}
 		camera.setPerspective(45.0f, ((float)m_drawAreaWidth / (float)splitX) / ((float)m_drawAreaHeight / (float)splitY), 0.1f, 256.0f);
 		uniformData.projection = camera.matrices.perspective;
@@ -497,12 +497,12 @@ public:
 		std::thread pipelineGenerationThread(&VulkanExample::threadFn, this);
 		pipelineGenerationThread.detach();
 
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		if (newPipelineCreated)
 		{

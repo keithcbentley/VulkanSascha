@@ -59,7 +59,7 @@ public:
 		VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
 		bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
 		bufferDeviceAI.buffer = buffer;
-		return vkGetBufferDeviceAddressKHR(vulkanDevice->m_vkDevice, &bufferDeviceAI);
+		return vkGetBufferDeviceAddressKHR(m_pVulkanDevice->m_vkDevice, &bufferDeviceAI);
 	}
 
 	VulkanExample() : VulkanExampleBase()
@@ -70,16 +70,16 @@ public:
 		camera.setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
 		camera.setTranslation(glm::vec3(0.0f, 0.0f, -5.0f));
 
-		apiVersion = VK_API_VERSION_1_1;
+		m_requestedApiVersion = VK_API_VERSION_1_1;
 
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		m_requestedInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 		
-		enabledDeviceExtensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
 
-		enabledDeviceExtensions.push_back(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
 
 		enabledBufferDeviceAddresFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
 		enabledBufferDeviceAddresFeatures.bufferDeviceAddress = VK_TRUE;
@@ -88,7 +88,7 @@ public:
 		enabledDeviceDescriptorBufferFeaturesEXT.descriptorBuffer = VK_TRUE;
 		enabledDeviceDescriptorBufferFeaturesEXT.pNext = &enabledBufferDeviceAddresFeatures;
 		
-		deviceCreatepNextChain = &enabledDeviceDescriptorBufferFeaturesEXT;
+		m_deviceCreatepNextChain = &enabledDeviceDescriptorBufferFeaturesEXT;
 	}
 
 	~VulkanExample()
@@ -108,8 +108,8 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+			m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
 		};
 	}
 
@@ -212,7 +212,7 @@ public:
 		combinedImageDescriptor.layoutSize = vks::tools::alignedVkSize(combinedImageDescriptor.layoutSize, descriptorBufferProperties.descriptorBufferOffsetAlignment);
 
 		// This buffer will contain resource descriptors for all the uniform buffers (one per cube and one with global matrices)
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformDescriptor.buffer,
@@ -220,7 +220,7 @@ public:
 		uniformDescriptor.buffer.map();
 
 		// This buffer contains resource descriptors for the combined images (one per cube)
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, // Flags 1 & 2 are required for combined images
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&combinedImageDescriptor.buffer,
@@ -348,15 +348,15 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		model.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		cubes[0].texture.loadFromFile(getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
-		cubes[1].texture.loadFromFile(getAssetPath() + "textures/crate02_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
+		model.loadFromFile(getAssetPath() + "models/cube.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		cubes[0].texture.loadFromFile(getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
+		cubes[1].texture.loadFromFile(getAssetPath() + "textures/crate02_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
 	}
 
 	void prepareUniformBuffers()
 	{
 		// UBO for camera matrices
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBufferCamera,
@@ -365,7 +365,7 @@ public:
 
 		// UBOs for model matrices
 		for (uint32_t i = 0; i < static_cast<uint32_t>(cubes.size()); i++) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(
+			VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				&cubes[i].uniformBuffer,
@@ -420,19 +420,19 @@ public:
 		prepareDescriptorBuffer();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		draw();
 		if (animate && !paused) {
-			cubes[0].rotation.x += 2.5f * frameTimer;
+			cubes[0].rotation.x += 2.5f * m_frameTimer;
 			if (cubes[0].rotation.x > 360.0f)
 				cubes[0].rotation.x -= 360.0f;
-			cubes[1].rotation.y += 2.0f * frameTimer;
+			cubes[1].rotation.y += 2.0f * m_frameTimer;
 			if (cubes[1].rotation.y > 360.0f)
 				cubes[1].rotation.y -= 360.0f;
 		}

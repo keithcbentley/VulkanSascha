@@ -24,7 +24,7 @@ public:
 
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 
 	VkShaderEXT shaders[2];
 
@@ -72,21 +72,21 @@ public:
 		camera.setRotationSpeed(0.5f);
 		camera.setPerspective(60.0f, (float)(m_drawAreaWidth) / (float)m_drawAreaHeight, 0.1f, 256.0f);
 
-		enabledDeviceExtensions.push_back(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
 
-		enabledDeviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
 
 		// With VK_EXT_shader_object all baked pipeline state is set dynamically at command buffer creation, so we need to enable additional extensions
-		enabledDeviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
 
 		// Since we are not requiring Vulkan 1.2, we need to enable some additional extensios for dynamic rendering
-		enabledDeviceExtensions.push_back(VK_KHR_MAINTENANCE2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_MAINTENANCE2_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME);
 
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		m_requestedInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 		enabledShaderObjectFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT;
 		enabledShaderObjectFeaturesEXT.shaderObject = VK_TRUE;
@@ -95,14 +95,14 @@ public:
 		enabledDynamicRenderingFeaturesKHR.dynamicRendering = VK_TRUE;
 		enabledDynamicRenderingFeaturesKHR.pNext = &enabledShaderObjectFeaturesEXT;
 
-		deviceCreatepNextChain = &enabledDynamicRenderingFeaturesKHR;
+		m_deviceCreatepNextChain = &enabledDynamicRenderingFeaturesKHR;
 	}
 
 	~VulkanExample()
 	{
 		if (m_vkDevice) {
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
 			vkDestroyShaderEXT(m_vkDevice, shaders[0], nullptr);
 			vkDestroyShaderEXT(m_vkDevice, shaders[1], nullptr);
@@ -112,7 +112,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -129,11 +129,11 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
-		VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 		// Sets
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -184,7 +184,7 @@ public:
 			shaderCreateInfos[0].codeSize = shaderCodeSizes[0];
 			shaderCreateInfos[0].pName = "main";
 			shaderCreateInfos[0].setLayoutCount = 1;
-			shaderCreateInfos[0].pSetLayouts = &descriptorSetLayout;
+			shaderCreateInfos[0].pSetLayouts = &m_vkDescriptorSetLayout;
 
 			// FS
 			_loadShader(getShadersPath() + "shaderobjects/phong.frag.bin", shaderCodes[1], shaderCodeSizes[1]);
@@ -197,7 +197,7 @@ public:
 			shaderCreateInfos[1].codeSize = shaderCodeSizes[1];
 			shaderCreateInfos[1].pName = "main";
 			shaderCreateInfos[1].setLayoutCount = 1;
-			shaderCreateInfos[1].pSetLayouts = &descriptorSetLayout;
+			shaderCreateInfos[1].pSetLayouts = &m_vkDescriptorSetLayout;
 
 			VkResult result = vkCreateShadersEXT(m_vkDevice, 2, shaderCreateInfos, nullptr, shaders);
 			// If the function returns e.g. VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT, the binary file is no longer (or not at all) compatible with the current implementation
@@ -221,7 +221,7 @@ public:
 			shaderCreateInfos[0].codeSize = shaderCodeSizes[0];
 			shaderCreateInfos[0].pName = "main";
 			shaderCreateInfos[0].setLayoutCount = 1;
-			shaderCreateInfos[0].pSetLayouts = &descriptorSetLayout;
+			shaderCreateInfos[0].pSetLayouts = &m_vkDescriptorSetLayout;
 
 			// FS
 			_loadShader(getShadersPath() + "shaderobjects/phong.frag.spv", shaderCodes[1], shaderCodeSizes[1]);
@@ -234,7 +234,7 @@ public:
 			shaderCreateInfos[1].codeSize = shaderCodeSizes[1];
 			shaderCreateInfos[1].pName = "main";
 			shaderCreateInfos[1].setLayoutCount = 1;
-			shaderCreateInfos[1].pSetLayouts = &descriptorSetLayout;
+			shaderCreateInfos[1].pSetLayouts = &m_vkDescriptorSetLayout;
 
 			VK_CHECK_RESULT(vkCreateShadersEXT(m_vkDevice, 2, shaderCreateInfos, nullptr, shaders));
 
@@ -272,7 +272,7 @@ public:
 			// Transition color and depth images for drawing
 			vks::tools::insertImageMemoryBarrier(
 				drawCmdBuffers[i],
-				swapChain.images[i],
+				m_swapChain.images[i],
 				0,
 				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED,
@@ -294,7 +294,7 @@ public:
 			// New structures are used to define the attachments used in dynamic rendering
 			VkRenderingAttachmentInfoKHR colorAttachment{};
 			colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-			colorAttachment.imageView = swapChain.imageViews[i];
+			colorAttachment.imageView = m_swapChain.imageViews[i];
 			colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -385,7 +385,7 @@ public:
 			// Transition color m_vkImage for presentation
 			vks::tools::insertImageMemoryBarrier(
 				drawCmdBuffers[i],
-				swapChain.images[i],
+				m_swapChain.images[i],
 				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				0,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -402,7 +402,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Create the vertex shader uniform buffer block
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
 		VK_CHECK_RESULT(uniformBuffer.map());
 		updateUniformBuffers();
 	}
@@ -462,12 +462,12 @@ public:
 		setupDescriptors();
 		createShaderObjects();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		draw();
 		updateUniformBuffers();

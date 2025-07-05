@@ -172,7 +172,7 @@ public:
 
 	void getEnabledFeatures()
 	{
-		enabledFeatures.samplerAnisotropy = deviceFeatures.samplerAnisotropy;
+		m_vkPhysicalDeviceFeatures10.samplerAnisotropy = m_vkPhysicalDeviceFeatures.samplerAnisotropy;
 	}
 
 	// Create a frame buffer attachment
@@ -218,7 +218,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &image, nullptr, &attachment->image));
 		vkGetImageMemoryRequirements(m_vkDevice, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &attachment->mem));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, attachment->image, attachment->mem, 0));
 
@@ -484,7 +484,7 @@ public:
 	{
 		vkglTF::descriptorBindingFlags  = vkglTF::DescriptorBindingFlags::ImageBaseColor;
 		const uint32_t gltfLoadingFlags = vkglTF::FileLoadingFlags::FlipY | vkglTF::FileLoadingFlags::PreTransformVertices;
-		scene.loadFromFile(getAssetPath() + "models/sponza/sponza.gltf", vulkanDevice, m_vkQueue, gltfLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/sponza/sponza.gltf", m_pVulkanDevice, m_vkQueue, gltfLoadingFlags);
 	}
 
 	void buildCommandBuffers()
@@ -839,14 +839,14 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Scene matrices
-		vulkanDevice->createBuffer(
+		m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBuffers.sceneParams,
 			sizeof(uboSceneParams));
 
 		// SSAO parameters
-		vulkanDevice->createBuffer(
+		m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBuffers.ssaoParams,
@@ -857,7 +857,7 @@ public:
 		updateUniformBufferSSAOParams();
 
 		// SSAO
-		std::default_random_engine rndEngine(benchmark.active ? 0 : (unsigned)time(nullptr));
+		std::default_random_engine rndEngine(m_benchmark.active ? 0 : (unsigned)time(nullptr));
 		std::uniform_real_distribution<float> rndDist(0.0f, 1.0f);
 
 		// Sample kernel
@@ -873,7 +873,7 @@ public:
 		}
 
 		// Upload as UBO
-		vulkanDevice->createBuffer(
+		m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBuffers.ssaoKernel,
@@ -886,7 +886,7 @@ public:
 			noiseValues[i] = glm::vec4(rndDist(rndEngine) * 2.0f - 1.0f, rndDist(rndEngine) * 2.0f - 1.0f, 0.0f, 0.0f);
 		}
 		// Upload as texture
-		ssaoNoise.fromBuffer(noiseValues.data(), noiseValues.size() * sizeof(glm::vec4), VK_FORMAT_R32G32B32A32_SFLOAT, SSAO_NOISE_DIM, SSAO_NOISE_DIM, vulkanDevice, m_vkQueue, VK_FILTER_NEAREST);
+		ssaoNoise.fromBuffer(noiseValues.data(), noiseValues.size() * sizeof(glm::vec4), VK_FORMAT_R32G32B32A32_SFLOAT, SSAO_NOISE_DIM, SSAO_NOISE_DIM, m_pVulkanDevice, m_vkQueue, VK_FILTER_NEAREST);
 	}
 
 	void updateUniformBufferMatrices()
@@ -918,7 +918,7 @@ public:
 		setupDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -932,7 +932,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared) {
+		if (!m_prepared) {
 			return;
 		}
 		updateUniformBufferMatrices();

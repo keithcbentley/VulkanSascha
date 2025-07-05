@@ -149,17 +149,17 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &storageImage.image));
 		vkGetImageMemoryRequirements(m_vkDevice, storageImage.image, &memReqs);
 		memAllocInfo.allocationSize = memReqs.size;
-		memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &storageImage.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, storageImage.image, storageImage.deviceMemory, 0));
 
-		VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer layoutCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		storageImage.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 		vks::tools::setImageLayout(layoutCmd, storageImage.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, storageImage.imageLayout);
 		// Add an initial release barrier to the graphics m_vkQueue,
 		// so that when the compute command buffer executes for the first time
 		// it doesn't complain about a lack of a corresponding "release" to its "acquire"
-		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+		if (m_pVulkanDevice->queueFamilyIndices.graphics != m_pVulkanDevice->queueFamilyIndices.compute)
 		{
 			VkImageMemoryBarrier imageMemoryBarrier = {};
 			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -169,8 +169,8 @@ public:
 			imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 			imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 			imageMemoryBarrier.dstAccessMask = 0;
-			imageMemoryBarrier.srcQueueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
-			imageMemoryBarrier.dstQueueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+			imageMemoryBarrier.srcQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.graphics;
+			imageMemoryBarrier.dstQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
 			vkCmdPipelineBarrier(
 				layoutCmd,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -180,7 +180,7 @@ public:
 				0, nullptr,
 				1, &imageMemoryBarrier);
 		}
-		vulkanDevice->flushCommandBuffer(layoutCmd, m_vkQueue, true);
+		m_pVulkanDevice->flushCommandBuffer(layoutCmd, m_vkQueue, true);
 
 		// Create sampler
 		VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
@@ -210,7 +210,7 @@ public:
 		storageImage.descriptor.imageLayout = storageImage.imageLayout;
 		storageImage.descriptor.imageView = storageImage.view;
 		storageImage.descriptor.sampler = storageImage.sampler;
-		storageImage.device = vulkanDevice;
+		storageImage.device = m_pVulkanDevice;
 	}
 
 	void buildCommandBuffers()
@@ -244,13 +244,13 @@ public:
 			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 			imageMemoryBarrier.image = storageImage.image;
 			imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-			if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+			if (m_pVulkanDevice->queueFamilyIndices.graphics != m_pVulkanDevice->queueFamilyIndices.compute)
 			{
 				// Acquire barrier for graphics m_vkQueue
 				imageMemoryBarrier.srcAccessMask = 0;
 				imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				imageMemoryBarrier.srcQueueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
-				imageMemoryBarrier.dstQueueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
+				imageMemoryBarrier.srcQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
+				imageMemoryBarrier.dstQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.graphics;
 				vkCmdPipelineBarrier(
 					drawCmdBuffers[i],
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -295,13 +295,13 @@ public:
 
 			vkCmdEndRenderPass(drawCmdBuffers[i]);
 
-			if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+			if (m_pVulkanDevice->queueFamilyIndices.graphics != m_pVulkanDevice->queueFamilyIndices.compute)
 			{
 				// Release barrier from graphics m_vkQueue
 				imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 				imageMemoryBarrier.dstAccessMask = 0;
-				imageMemoryBarrier.srcQueueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
-				imageMemoryBarrier.dstQueueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+				imageMemoryBarrier.srcQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.graphics;
+				imageMemoryBarrier.dstQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
 				vkCmdPipelineBarrier(
 					drawCmdBuffers[i],
 					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -329,13 +329,13 @@ public:
 		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 		imageMemoryBarrier.image = storageImage.image;
 		imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+		if (m_pVulkanDevice->queueFamilyIndices.graphics != m_pVulkanDevice->queueFamilyIndices.compute)
 		{
 			// Acquire barrier for compute m_vkQueue
 			imageMemoryBarrier.srcAccessMask = 0;
 			imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-			imageMemoryBarrier.srcQueueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
-			imageMemoryBarrier.dstQueueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+			imageMemoryBarrier.srcQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.graphics;
+			imageMemoryBarrier.dstQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
 			vkCmdPipelineBarrier(
 				compute.commandBuffer,
 				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -351,13 +351,13 @@ public:
 
 		vkCmdDispatch(compute.commandBuffer, storageImage.width / 16, storageImage.height / 16, 1);
 
-		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+		if (m_pVulkanDevice->queueFamilyIndices.graphics != m_pVulkanDevice->queueFamilyIndices.compute)
 		{
 			// Release barrier from compute m_vkQueue
 			imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 			imageMemoryBarrier.dstAccessMask = 0;
-			imageMemoryBarrier.srcQueueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
-			imageMemoryBarrier.dstQueueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
+			imageMemoryBarrier.srcQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
+			imageMemoryBarrier.dstQueueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.graphics;
 			vkCmdPipelineBarrier(
 				compute.commandBuffer,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -418,12 +418,12 @@ public:
 
 		// Copy the data to the m_vkDevice
 		vks::Buffer stagingBuffer;
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, storageBufferSize, sceneObjects.data());
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &compute.objectStorageBuffer, storageBufferSize);
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, storageBufferSize, sceneObjects.data());
+		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &compute.objectStorageBuffer, storageBufferSize);
+		VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = { 0, 0, storageBufferSize};
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, compute.objectStorageBuffer.buffer, 1, &copyRegion);
-		vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+		m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 		stagingBuffer.destroy();
 	}
@@ -509,9 +509,9 @@ public:
 		VkDeviceQueueCreateInfo queueCreateInfo = {};
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queueCreateInfo.pNext = NULL;
-		queueCreateInfo.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+		queueCreateInfo.queueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
 		queueCreateInfo.queueCount = 1;
-		vkGetDeviceQueue(m_vkDevice, vulkanDevice->queueFamilyIndices.compute, 0, &compute.queue);
+		vkGetDeviceQueue(m_vkDevice, m_pVulkanDevice->queueFamilyIndices.compute, 0, &compute.queue);
 
 		// Setup descriptors
 
@@ -548,7 +548,7 @@ public:
 		// Separate command pool as m_vkQueue family for compute may be different from the graphics one
 		VkCommandPoolCreateInfo cmdPoolInfo = {};
 		cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		cmdPoolInfo.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+		cmdPoolInfo.queueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
 		cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &cmdPoolInfo, nullptr, &compute.commandPool));
 
@@ -567,7 +567,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Compute shader parameter uniform buffer block
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &compute.uniformBuffer, sizeof(Compute::UniformDataCompute));
+		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &compute.uniformBuffer, sizeof(Compute::UniformDataCompute));
 	}
 
 	void updateUniformBuffers()
@@ -592,7 +592,7 @@ public:
 		prepareGraphics();
 		prepareCompute();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -620,7 +620,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();

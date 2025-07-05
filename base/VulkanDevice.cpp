@@ -17,15 +17,12 @@
 
 namespace vks
 {	
-	/**
-	* Default constructor
-	*
-	* @param physicalDevice Physical device that is to be used
-	*/
-	VulkanDevice::VulkanDevice(VkPhysicalDevice physicalDevice)
+	VulkanDevice::VulkanDevice(
+		const vkcpp::PhysicalDevice& physicalDevice,
+		const vkcpp::Device& device)
 	{
-		assert(physicalDevice);
-		this->m_vkPhysicalDevice = physicalDevice;
+		m_physicalDevice = physicalDevice;
+		m_device = device;
 
 		// Store Properties m_vkPhysicalDeviceFeatures, limits and m_vkPhysicalDeviceProperties of the physical device for later use
 		// Device m_vkPhysicalDeviceProperties also contain limits and sparse m_vkPhysicalDeviceProperties
@@ -66,11 +63,7 @@ namespace vks
 	{
 		if (m_vkCommandPool)
 		{
-			vkDestroyCommandPool(m_vkDevice, m_vkCommandPool, nullptr);
-		}
-		if (m_vkDevice)
-		{
-			vkDestroyDevice(m_vkDevice, nullptr);
+			vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
 		}
 	}
 
@@ -176,6 +169,7 @@ namespace vks
 	*/
 	VkResult VulkanDevice::createLogicalDevice(VkPhysicalDeviceFeatures enabledFeatures, std::vector<const char*> enabledExtensions, void* pNextChain, bool useSwapChain, VkQueueFlags requestedQueueTypes)
 	{			
+		return VK_SUCCESS;
 		// Desired queues need to be requested upon logical device creation
 		// Due to differing queue family configurations of Vulkan implementations this can be a bit tricky, especially if the application
 		// requests different queue types
@@ -290,18 +284,18 @@ namespace vks
 			deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 		}
 
-		this->m_vkPhysicalDeviceFeaturesEnabled = enabledFeatures;
+		m_vkPhysicalDeviceFeaturesEnabled = enabledFeatures;
 
-		VkResult result = vkCreateDevice(m_vkPhysicalDevice, &deviceCreateInfo, nullptr, &m_vkDevice);
-		if (result != VK_SUCCESS) 
-		{
-			return result;
-		}
+		//VkResult result = vkCreateDevice(m_vkPhysicalDevice, &deviceCreateInfo, nullptr, &m_vkDevice);
+		//if (result != VK_SUCCESS) 
+		//{
+		//	return result;
+		//}
 
 		// Create a default command pool for graphics command buffers
 		m_vkCommandPool = createCommandPool(queueFamilyIndices.graphics);
 
-		return result;
+		return VK_SUCCESS;
 	}
 
 	/**
@@ -321,12 +315,12 @@ namespace vks
 		// Create the buffer handle
 		VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo(usageFlags, size);
 		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, buffer));
+		VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, buffer));
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements memReqs;
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
-		vkGetBufferMemoryRequirements(m_vkDevice, *buffer, &memReqs);
+		vkGetBufferMemoryRequirements(m_device, *buffer, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		// Find a memory type index that fits the m_vkPhysicalDeviceProperties of the buffer
 		memAlloc.memoryTypeIndex = getMemoryType(memReqs.memoryTypeBits, memoryPropertyFlags);
@@ -337,13 +331,13 @@ namespace vks
 			allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
 			memAlloc.pNext = &allocFlagsInfo;
 		}
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, memory));
+		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, memory));
 			
 		// If a pointer to the buffer data has been passed, map the buffer and copy over the data
 		if (data != nullptr)
 		{
 			void *mapped;
-			VK_CHECK_RESULT(vkMapMemory(m_vkDevice, *memory, 0, size, 0, &mapped));
+			VK_CHECK_RESULT(vkMapMemory(m_device, *memory, 0, size, 0, &mapped));
 			memcpy(mapped, data, size);
 			// If host coherency hasn't been requested, do a manual flush to make writes visible
 			if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
@@ -352,13 +346,13 @@ namespace vks
 				mappedRange.memory = *memory;
 				mappedRange.offset = 0;
 				mappedRange.size = size;
-				vkFlushMappedMemoryRanges(m_vkDevice, 1, &mappedRange);
+				vkFlushMappedMemoryRanges(m_device, 1, &mappedRange);
 			}
-			vkUnmapMemory(m_vkDevice, *memory);
+			vkUnmapMemory(m_device, *memory);
 		}
 
 		// Attach the memory to the buffer object
-		VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, *buffer, *memory, 0));
+		VK_CHECK_RESULT(vkBindBufferMemory(m_device, *buffer, *memory, 0));
 
 		return VK_SUCCESS;
 	}
@@ -376,16 +370,16 @@ namespace vks
 	*/
 	VkResult VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, vks::Buffer *buffer, VkDeviceSize size, void *data)
 	{
-		buffer->device = m_vkDevice;
+		buffer->device = m_device;
 
 		// Create the buffer handle
 		VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo(usageFlags, size);
-		VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, &buffer->buffer));
+		VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer->buffer));
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements memReqs;
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
-		vkGetBufferMemoryRequirements(m_vkDevice, buffer->buffer, &memReqs);
+		vkGetBufferMemoryRequirements(m_device, buffer->buffer, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		// Find a memory type index that fits the m_vkPhysicalDeviceProperties of the buffer
 		memAlloc.memoryTypeIndex = getMemoryType(memReqs.memoryTypeBits, memoryPropertyFlags);
@@ -396,7 +390,7 @@ namespace vks
 			allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
 			memAlloc.pNext = &allocFlagsInfo;
 		}
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &buffer->memory));
+		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &buffer->memory));
 
 		buffer->alignment = memReqs.alignment;
 		buffer->size = size;
@@ -468,7 +462,7 @@ namespace vks
 		cmdPoolInfo.queueFamilyIndex = queueFamilyIndex;
 		cmdPoolInfo.flags = createFlags;
 		VkCommandPool cmdPool;
-		VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &cmdPoolInfo, nullptr, &cmdPool));
+		VK_CHECK_RESULT(vkCreateCommandPool(m_device, &cmdPoolInfo, nullptr, &cmdPool));
 		return cmdPool;
 	}
 
@@ -485,7 +479,7 @@ namespace vks
 	{
 		VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(pool, level, 1);
 		VkCommandBuffer cmdBuffer;
-		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, &cmdBuffer));
+		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &cmdBufAllocateInfo, &cmdBuffer));
 		// If requested, also start recording for the new command buffer
 		if (begin)
 		{
@@ -526,15 +520,15 @@ namespace vks
 		// Create fence to ensure that the command buffer has finished executing
 		VkFenceCreateInfo fenceInfo = vks::initializers::fenceCreateInfo(VK_FLAGS_NONE);
 		VkFence fence;
-		VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceInfo, nullptr, &fence));
+		VK_CHECK_RESULT(vkCreateFence(m_device, &fenceInfo, nullptr, &fence));
 		// Submit to the queue
 		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
 		// Wait for the fence to signal that command buffer has finished executing
-		VK_CHECK_RESULT(vkWaitForFences(m_vkDevice, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
-		vkDestroyFence(m_vkDevice, fence, nullptr);
+		VK_CHECK_RESULT(vkWaitForFences(m_device, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
+		vkDestroyFence(m_device, fence, nullptr);
 		if (free)
 		{
-			vkFreeCommandBuffers(m_vkDevice, pool, 1, &commandBuffer);
+			vkFreeCommandBuffers(m_device, pool, 1, &commandBuffer);
 		}
 	}
 
@@ -571,7 +565,7 @@ namespace vks
 		for (auto& format : depthFormats)
 		{
 			VkFormatProperties formatProperties;
-			vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, format, &formatProperties);
+			vkGetPhysicalDeviceFormatProperties(m_physicalDevice, format, &formatProperties);
 			// Format must support depth stencil attachment for optimal tiling
 			if (formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
 			{

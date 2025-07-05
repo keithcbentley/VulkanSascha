@@ -42,7 +42,7 @@ public:
 	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 
 	VkPipeline viewDisplayPipelines[2]{};
 
@@ -64,15 +64,15 @@ public:
 		camera.movementSpeed = 5.0f;
 
 		// Enable extension required for multiview
-		enabledDeviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
 
 		// Reading m_vkDevice m_vkPhysicalDeviceProperties and m_vkPhysicalDeviceFeatures for multiview requires VK_KHR_get_physical_device_properties2 to be enabled
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		m_requestedInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 		// Enable required extension m_vkPhysicalDeviceFeatures
 		physicalDeviceMultiviewFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR;
 		physicalDeviceMultiviewFeatures.multiview = VK_TRUE;
-		deviceCreatepNextChain = &physicalDeviceMultiviewFeatures;
+		m_deviceCreatepNextChain = &physicalDeviceMultiviewFeatures;
 	}
 
 	~VulkanExample()
@@ -80,7 +80,7 @@ public:
 		if (m_vkDevice) {
 			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 			vkDestroyImageView(m_vkDevice, multiviewPass.color.view, nullptr);
 			vkDestroyImage(m_vkDevice, multiviewPass.color.image, nullptr);
 			vkFreeMemory(m_vkDevice, multiviewPass.color.memory, nullptr);
@@ -153,7 +153,7 @@ public:
 			depthStencilView.image = multiviewPass.depth.image;
 
 			memAllocInfo.allocationSize = memReqs.size;
-			memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &multiviewPass.depth.memory));
 			VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, multiviewPass.depth.image, multiviewPass.depth.memory, 0));
 			VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &depthStencilView, nullptr, &multiviewPass.depth.view));
@@ -165,7 +165,7 @@ public:
 		{
 			VkImageCreateInfo imageCI = vks::initializers::imageCreateInfo();
 			imageCI.imageType = VK_IMAGE_TYPE_2D;
-			imageCI.format = swapChain.colorFormat;
+			imageCI.format = m_swapChain.colorFormat;
 			imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
 			imageCI.mipLevels = 1;
 			imageCI.arrayLayers = multiviewLayerCount;
@@ -179,13 +179,13 @@ public:
 
 			VkMemoryAllocateInfo memoryAllocInfo = vks::initializers::memoryAllocateInfo();
 			memoryAllocInfo.allocationSize = memReqs.size;
-			memoryAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memoryAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memoryAllocInfo, nullptr, &multiviewPass.color.memory));
 			VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, multiviewPass.color.image, multiviewPass.color.memory, 0));
 
 			VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
 			imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			imageViewCI.format = swapChain.colorFormat;
+			imageViewCI.format = m_swapChain.colorFormat;
 			imageViewCI.flags = 0;
 			imageViewCI.subresourceRange = {};
 			imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -223,7 +223,7 @@ public:
 		{
 			std::array<VkAttachmentDescription, 2> attachments = {};
 			// Color attachment
-			attachments[0].format = swapChain.colorFormat;
+			attachments[0].format = m_swapChain.colorFormat;
 			attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 			attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -332,7 +332,7 @@ public:
 
 	void buildCommandBuffers()
 	{
-		if (resized)
+		if (m_resized)
 			return;
 
 		/*
@@ -428,7 +428,7 @@ public:
 
 	void loadAssets()
 	{
-		scene.loadFromFile(getAssetPath() + "models/sampleroom.gltf", vulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
+		scene.loadFromFile(getAssetPath() + "models/sampleroom.gltf", m_pVulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
 	}
 
 	void prepareDescriptors()
@@ -451,14 +451,14 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		/*
 			Descriptors
 		*/
-		VkDescriptorSetAllocateInfo allocateInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocateInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocateInfo, &descriptorSet));
 		updateDescriptors();
 	}
@@ -577,7 +577,7 @@ public:
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
 		VK_CHECK_RESULT(uniformBuffer.map());
 	}
 
@@ -650,7 +650,7 @@ public:
 			VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceCreateInfo, nullptr, &fence));
 		}
 
-		prepared = true;
+		m_prepared = true;
 	}
 
 	// SRS - Recreate and update Multiview resources when m_hwnd size has changed
@@ -677,7 +677,7 @@ public:
 		multiviewPass.commandBuffers.resize(drawCmdBuffers.size());
 		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, multiviewPass.commandBuffers.data()));
 
-		resized = false;
+		m_resized = false;
 		buildCommandBuffers();
 		
 		// SRS - Recreate Multiview fences in case number of swapchain images has changed on resize
@@ -719,7 +719,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();

@@ -97,21 +97,21 @@ public:
 
 	// The descriptor set layout describes the shader binding layout (without actually referencing descriptor)
 	// Like the m_vkPipeline layout it's pretty much a blueprint and can be used with different descriptor sets as long as their layout matches
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 
 	// Synchronization primitives
 	// Synchronization is an important concept of Vulkan that OpenGL mostly hid away. Getting this right is crucial to using Vulkan.
 
 	// Semaphores are used to coordinate operations within the graphics m_vkQueue and ensure correct command ordering
-	std::vector<VkSemaphore> presentCompleteSemaphores{};
-	std::vector<VkSemaphore> renderCompleteSemaphores{};
+	std::vector<VkSemaphore> m_presentCompleteSemaphores{};
+	std::vector<VkSemaphore> m_renderCompleteSemaphores{};
 
-	VkCommandPool commandPool{ VK_NULL_HANDLE };
-	std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> commandBuffers{};
-	std::array<VkFence, MAX_CONCURRENT_FRAMES> waitFences{};
+	VkCommandPool m_vkCommandPool{ VK_NULL_HANDLE };
+	std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> m_commandBuffers{};
+	std::array<VkFence, MAX_CONCURRENT_FRAMES> m_waitFences{};
 
 	// To select the correct sync and command objects, we need to keep track of the current frame
-	uint32_t currentFrame{ 0 };
+	uint32_t m_currentFrameIndex{ 0 };
 
 	VulkanExample() : VulkanExampleBase()
 	{
@@ -133,20 +133,20 @@ public:
 		if (m_vkDevice) {
 			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 			vkDestroyBuffer(m_vkDevice, vertices.buffer, nullptr);
 			vkFreeMemory(m_vkDevice, vertices.memory, nullptr);
 			vkDestroyBuffer(m_vkDevice, indices.buffer, nullptr);
 			vkFreeMemory(m_vkDevice, indices.memory, nullptr);
-			vkDestroyCommandPool(m_vkDevice, commandPool, nullptr);
-			for (size_t i = 0; i < presentCompleteSemaphores.size(); i++) {
-				vkDestroySemaphore(m_vkDevice, presentCompleteSemaphores[i], nullptr);
+			vkDestroyCommandPool(m_vkDevice, m_vkCommandPool, nullptr);
+			for (size_t i = 0; i < m_presentCompleteSemaphores.size(); i++) {
+				vkDestroySemaphore(m_vkDevice, m_presentCompleteSemaphores[i], nullptr);
 			}
-			for (size_t i = 0; i < renderCompleteSemaphores.size(); i++) {
-				vkDestroySemaphore(m_vkDevice, renderCompleteSemaphores[i], nullptr);
+			for (size_t i = 0; i < m_renderCompleteSemaphores.size(); i++) {
+				vkDestroySemaphore(m_vkDevice, m_renderCompleteSemaphores[i], nullptr);
 			}
 			for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-				vkDestroyFence(m_vkDevice, waitFences[i], nullptr);
+				vkDestroyFence(m_vkDevice, m_waitFences[i], nullptr);
 				vkDestroyBuffer(m_vkDevice, uniformBuffers[i].buffer, nullptr);
 				vkFreeMemory(m_vkDevice, uniformBuffers[i].memory, nullptr);
 			}
@@ -161,11 +161,11 @@ public:
 	uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties)
 	{
 		// Iterate over all m_vkDeviceMemory types available for the m_vkDevice used in this example
-		for (uint32_t i = 0; i < deviceMemoryProperties.memoryTypeCount; i++)
+		for (uint32_t i = 0; i < m_vkPhysicalDeviceMemoryProperties.memoryTypeCount; i++)
 		{
 			if ((typeBits & 1) == 1)
 			{
-				if ((deviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				if ((m_vkPhysicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
 				{
 					return i;
 				}
@@ -186,19 +186,19 @@ public:
 			// Create the fences in signaled state (so we don't wait on first render of each command buffer)
 			fenceCI.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 			// Fence used to ensure that command buffer has completed exection before using it again
-			VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceCI, nullptr, &waitFences[i]));
+			VK_CHECK_RESULT(vkCreateFence(m_vkDevice, &fenceCI, nullptr, &m_waitFences[i]));
 		}
 		// Semaphores are used for correct command ordering within a m_vkQueue
 		// Used to ensure that m_vkImage presentation is complete before starting to submit again
-		presentCompleteSemaphores.resize(MAX_CONCURRENT_FRAMES);
-		for (auto& semaphore : presentCompleteSemaphores) {
+		m_presentCompleteSemaphores.resize(MAX_CONCURRENT_FRAMES);
+		for (auto& semaphore : m_presentCompleteSemaphores) {
 			VkSemaphoreCreateInfo semaphoreCI{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 			VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCI, nullptr, &semaphore));
 		}
 		// Render completion
 		// Semaphore used to ensure that all commands submitted have been finished before submitting the m_vkImage to the m_vkQueue
-		renderCompleteSemaphores.resize(swapChain.images.size());
-		for (auto& semaphore : renderCompleteSemaphores) {
+		m_renderCompleteSemaphores.resize(m_swapChain.images.size());
+		for (auto& semaphore : m_renderCompleteSemaphores) {
 			VkSemaphoreCreateInfo semaphoreCI{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 			VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCI, nullptr, &semaphore));
 		}
@@ -209,13 +209,13 @@ public:
 		// All command buffers are allocated from a command pool
 		VkCommandPoolCreateInfo commandPoolCI{};
 		commandPoolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		commandPoolCI.queueFamilyIndex = swapChain.queueNodeIndex;
+		commandPoolCI.queueFamilyIndex = m_swapChain.queueNodeIndex;
 		commandPoolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &commandPoolCI, nullptr, &commandPool));
+		VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &commandPoolCI, nullptr, &m_vkCommandPool));
 
 		// Allocate one command buffer per max. concurrent frame from above pool
-		VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, MAX_CONCURRENT_FRAMES);
-		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, commandBuffers.data()));
+		VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, MAX_CONCURRENT_FRAMES);
+		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, m_commandBuffers.data()));
 	}
 
 	// Prepare vertex and index buffers for an indexed triangle
@@ -328,7 +328,7 @@ public:
 
 		VkCommandBufferAllocateInfo cmdBufAllocateInfo{};
 		cmdBufAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		cmdBufAllocateInfo.commandPool = commandPool;
+		cmdBufAllocateInfo.commandPool = m_vkCommandPool;
 		cmdBufAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		cmdBufAllocateInfo.commandBufferCount = 1;
 		VK_CHECK_RESULT(vkAllocateCommandBuffers(m_vkDevice, &cmdBufAllocateInfo, &copyCmd));
@@ -364,7 +364,7 @@ public:
                 VK_CHECK_RESULT(vkWaitForFences(m_vkDevice, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
 
 		vkDestroyFence(m_vkDevice, fence, nullptr);
-                vkFreeCommandBuffers(m_vkDevice, commandPool, 1, &copyCmd);
+                vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool, 1, &copyCmd);
 
 		// Destroy staging buffers
 		// Note: Staging buffer must not be deleted before the copies have been submitted and executed
@@ -418,7 +418,7 @@ public:
 		descriptorLayoutCI.pNext = nullptr;
 		descriptorLayoutCI.bindingCount = 1;
 		descriptorLayoutCI.pBindings = &layoutBinding;
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &m_vkDescriptorSetLayout));
 	}
 
 	// Shaders access data using descriptor sets that "point" at our uniform buffers
@@ -431,7 +431,7 @@ public:
 			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 			allocInfo.descriptorPool = m_vkDescriptorPool;
 			allocInfo.descriptorSetCount = 1;
-			allocInfo.pSetLayouts = &descriptorSetLayout;
+			allocInfo.pSetLayouts = &m_vkDescriptorSetLayout;
 			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &uniformBuffers[i].descriptorSet));
 
 			// Update the descriptor set determining the shader binding points
@@ -510,12 +510,12 @@ public:
 	void setupFrameBuffer() override
 	{
 		// Create a frame buffer for every m_vkImage in the swapchain
-		m_vkFrameBuffers.resize(swapChain.images.size());
+		m_vkFrameBuffers.resize(m_swapChain.images.size());
 		for (size_t i = 0; i < m_vkFrameBuffers.size(); i++)
 		{
 			std::array<VkImageView, 2> attachments{};
 			// Color attachment is the m_vkImageView of the swapchain m_vkImage
-			attachments[0] = swapChain.imageViews[i];
+			attachments[0] = m_swapChain.imageViews[i];
 			// Depth/Stencil attachment is the same for all frame buffers due to how depth works with current GPUs
 			attachments[1] = m_defaultDepthStencil.m_vkImageView;         
 
@@ -546,7 +546,7 @@ public:
 		std::array<VkAttachmentDescription, 2> attachments{};
 
 		// Color attachment
-		attachments[0].format = swapChain.colorFormat;                                  // Use the color format selected by the swapchain
+		attachments[0].format = m_swapChain.colorFormat;                                  // Use the color format selected by the swapchain
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;                                 // We don't use multi sampling in this example
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;                            // Clear this attachment at the start of the render pass
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;                          // Keep its contents after the render pass is finished (for displaying it)
@@ -686,7 +686,7 @@ public:
 		pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutCI.pNext = nullptr;
 		pipelineLayoutCI.setLayoutCount = 1;
-		pipelineLayoutCI.pSetLayouts = &descriptorSetLayout;
+		pipelineLayoutCI.pSetLayouts = &m_vkDescriptorSetLayout;
                 VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 		// Create the graphics m_vkPipeline used in this example
@@ -902,22 +902,22 @@ public:
 		createDescriptorPool();
 		createDescriptorSets();
 		createPipelines();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void render() override
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 
 		// Use a fence to wait until the command buffer has finished execution before using it again
-		vkWaitForFences(m_vkDevice, 1, &waitFences[currentFrame], VK_TRUE, UINT64_MAX);
-		VK_CHECK_RESULT(vkResetFences(m_vkDevice, 1, &waitFences[currentFrame]));
+		vkWaitForFences(m_vkDevice, 1, &m_waitFences[m_currentFrameIndex], VK_TRUE, UINT64_MAX);
+		VK_CHECK_RESULT(vkResetFences(m_vkDevice, 1, &m_waitFences[m_currentFrameIndex]));
 
 		// Get the next swap chain m_vkImage from the implementation
 		// Note that the implementation is free to return the images in any order, so we must use the acquire function and can't just cycle through the images/imageIndex on our own
 		uint32_t imageIndex;
-		VkResult result = vkAcquireNextImageKHR(m_vkDevice, swapChain.swapChain, UINT64_MAX, presentCompleteSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+		VkResult result = vkAcquireNextImageKHR(m_vkDevice, m_swapChain.swapChain, UINT64_MAX, m_presentCompleteSemaphores[m_currentFrameIndex], VK_NULL_HANDLE, &imageIndex);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 			windowResize();
 			return;
@@ -934,14 +934,14 @@ public:
 
 		// Copy the current matrices to the current frame's uniform buffer
 		// Note: Since we requested a host coherent m_vkDeviceMemory type for the uniform buffer, the write is instantly visible to the GPU
-		memcpy(uniformBuffers[currentFrame].mapped, &shaderData, sizeof(ShaderData));
+		memcpy(uniformBuffers[m_currentFrameIndex].mapped, &shaderData, sizeof(ShaderData));
 
 		// Build the command buffer
 		// Unlike in OpenGL all rendering commands are recorded into command buffers that are then submitted to the m_vkQueue
 		// This allows to generate work upfront in a separate thread
 		// For basic command buffers (like in this sample), recording is so fast that there is no need to offload this
 
-		vkResetCommandBuffer(commandBuffers[currentFrame], 0);
+		vkResetCommandBuffer(m_commandBuffers[m_currentFrameIndex], 0);
 
 		VkCommandBufferBeginInfo cmdBufInfo{};
 		cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -964,7 +964,7 @@ public:
 		renderPassBeginInfo.pClearValues = clearValues;
 		renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
 
-		const VkCommandBuffer commandBuffer = commandBuffers[currentFrame];
+		const VkCommandBuffer commandBuffer = m_commandBuffers[m_currentFrameIndex];
 		VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffer, &cmdBufInfo));
 
 		// Start the first sub pass specified in our default render pass setup by the base class
@@ -985,7 +985,7 @@ public:
 		scissor.offset.y = 0;
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 		// Bind descriptor set for the current frame's uniform buffer, so the shader uses the data from that buffer for this draw
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &uniformBuffers[currentFrame].descriptorSet, 0, nullptr);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &uniformBuffers[m_currentFrameIndex].descriptorSet, 0, nullptr);
 		// Bind the rendering m_vkPipeline
 		// The m_vkPipeline (state object) contains all states of the rendering m_vkPipeline, binding it will set all the states specified at m_vkPipeline creation time
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
@@ -1013,14 +1013,14 @@ public:
 		submitInfo.commandBufferCount = 1;                  // We submit a single command buffer
 
 		// Semaphore to wait upon before the submitted command buffer starts executing
-		submitInfo.pWaitSemaphores = &presentCompleteSemaphores[currentFrame];
+		submitInfo.pWaitSemaphores = &m_presentCompleteSemaphores[m_currentFrameIndex];
 		submitInfo.waitSemaphoreCount = 1;
 		// Semaphore to be signaled when command buffers have completed
-		submitInfo.pSignalSemaphores = &renderCompleteSemaphores[imageIndex];
+		submitInfo.pSignalSemaphores = &m_renderCompleteSemaphores[imageIndex];
 		submitInfo.signalSemaphoreCount = 1;
 
 		// Submit to the graphics m_vkQueue passing a wait fence
-		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, waitFences[currentFrame]));
+		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, m_waitFences[m_currentFrameIndex]));
 
 		// Present the current frame buffer to the swap chain
 		// Pass the semaphore signaled by the command buffer submission from the submit info as the wait semaphore for swap chain presentation
@@ -1029,9 +1029,9 @@ public:
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &renderCompleteSemaphores[imageIndex];
+		presentInfo.pWaitSemaphores = &m_renderCompleteSemaphores[imageIndex];
 		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &swapChain.swapChain;
+		presentInfo.pSwapchains = &m_swapChain.swapChain;
 		presentInfo.pImageIndices = &imageIndex;
 		result = vkQueuePresentKHR(m_vkQueue, &presentInfo);
 
@@ -1043,7 +1043,7 @@ public:
 		}
 
 		// Select the next frame to render to, based on the max. no. of concurrent frames
-		currentFrame = (currentFrame + 1) % MAX_CONCURRENT_FRAMES;
+		m_currentFrameIndex = (m_currentFrameIndex + 1) % MAX_CONCURRENT_FRAMES;
 	}
 };
 

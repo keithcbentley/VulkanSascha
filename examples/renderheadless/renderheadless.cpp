@@ -76,9 +76,9 @@ public:
 	uint32_t queueFamilyIndex;
 	VkPipelineCache pipelineCache;
 	VkQueue queue;
-	VkCommandPool commandPool;
+	VkCommandPool m_vkCommandPool;
 	VkCommandBuffer commandBuffer;
-	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSetLayout m_vkDescriptorSetLayout;
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkPipeline;
 	std::vector<VkShaderModule> shaderModules;
@@ -339,7 +339,7 @@ public:
 		cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		cmdPoolInfo.queueFamilyIndex = queueFamilyIndex;
 		cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &commandPool));
+		VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &m_vkCommandPool));
 
 		/*
 			Prepare vertex and index buffers
@@ -363,7 +363,7 @@ public:
 			VkDeviceMemory stagingMemory;
 
 			// Command buffer for copy commands (reused)
-			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 			VkCommandBuffer copyCmd;
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &copyCmd));
 			VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
@@ -580,7 +580,7 @@ public:
 			std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {};
 			VkDescriptorSetLayoutCreateInfo descriptorLayout =
 				vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
 				vks::initializers::pipelineLayoutCreateInfo(nullptr, 0);
@@ -688,7 +688,7 @@ public:
 		{
 			VkCommandBuffer commandBuffer;
 			VkCommandBufferAllocateInfo cmdBufAllocateInfo =
-				vks::initializers::commandBufferAllocateInfo(commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+				vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &commandBuffer));
 
 			VkCommandBufferBeginInfo cmdBufInfo =
@@ -785,7 +785,7 @@ public:
 			VK_CHECK_RESULT(vkBindImageMemory(device, dstImage, dstImageMemory, 0));
 
 			// Do the actual blit from the offscreen image to our host visible destination image
-			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 			VkCommandBuffer copyCmd;
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &copyCmd));
 			VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
@@ -911,10 +911,10 @@ public:
 		vkDestroyRenderPass(device, renderPass, nullptr);
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
 		vkDestroyPipelineLayout(device, m_vkPipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(device, m_vkDescriptorSetLayout, nullptr);
 		vkDestroyPipeline(device, m_vkPipeline, nullptr);
 		vkDestroyPipelineCache(device, pipelineCache, nullptr);
-		vkDestroyCommandPool(device, commandPool, nullptr);
+		vkDestroyCommandPool(device, m_vkCommandPool, nullptr);
 		for (auto shadermodule : shaderModules) {
 			vkDestroyShaderModule(device, shadermodule, nullptr);
 		}

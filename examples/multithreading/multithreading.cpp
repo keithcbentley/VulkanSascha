@@ -109,7 +109,7 @@ public:
 #endif
 		threadPool.setThreadCount(numThreads);
 		numObjectsPerThread = 512 / numThreads;
-		rndEngine.seed(benchmark.active ? 0 : (unsigned)time(nullptr));
+		rndEngine.seed(m_benchmark.active ? 0 : (unsigned)time(nullptr));
 	}
 
 	~VulkanExample()
@@ -161,7 +161,7 @@ public:
 
 			// Create one command pool for each thread
 			VkCommandPoolCreateInfo cmdPoolInfo = vks::initializers::commandPoolCreateInfo();
-			cmdPoolInfo.queueFamilyIndex = swapChain.queueNodeIndex;
+			cmdPoolInfo.queueFamilyIndex = m_swapChain.queueNodeIndex;
 			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 			VK_CHECK_RESULT(vkCreateCommandPool(m_vkDevice, &cmdPoolInfo, nullptr, &thread->commandPool));
 
@@ -227,11 +227,11 @@ public:
 
 		// Update
 		if (!paused) {
-			objectData->rotation.y += 2.5f * objectData->rotationSpeed * frameTimer;
+			objectData->rotation.y += 2.5f * objectData->rotationSpeed * m_frameTimer;
 			if (objectData->rotation.y > 360.0f) {
 				objectData->rotation.y -= 360.0f;
 			}
-			objectData->deltaT += 0.15f * frameTimer;
+			objectData->deltaT += 0.15f * m_frameTimer;
 			if (objectData->deltaT > 1.0f)
 				objectData->deltaT -= 1.0f;
 			objectData->pos.y = sin(glm::radians(objectData->deltaT * 360.0f)) * 2.5f;
@@ -403,8 +403,8 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models.ufo.loadFromFile(getAssetPath() + "models/retroufo_red_lowpoly.gltf",vulkanDevice, m_vkQueue,glTFLoadingFlags);
-		models.starSphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.ufo.loadFromFile(getAssetPath() + "models/retroufo_red_lowpoly.gltf",m_pVulkanDevice, m_vkQueue,glTFLoadingFlags);
+		models.starSphere.loadFromFile(getAssetPath() + "models/sphere.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void preparePipelines()
@@ -472,7 +472,7 @@ public:
 		preparePipelines();
 		prepareMultiThreadedRenderer();
 		updateMatrices();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -499,7 +499,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateMatrices();
 		draw();

@@ -34,7 +34,7 @@ public:
 	} pipelines{};
 
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
 
 	// Framebuffer for offscreen rendering
@@ -79,10 +79,10 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Fill mode non solid is required for wireframe display
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.fillModeNonSolid) {
+			m_vkPhysicalDeviceFeatures10.fillModeNonSolid = VK_TRUE;
 		};
-		wireframe = deviceFeatures.fillModeNonSolid;
+		wireframe = m_vkPhysicalDeviceFeatures.fillModeNonSolid;
 	}
 
 	~VulkanExample()
@@ -96,7 +96,7 @@ public:
 			}
 
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 
 			uniformBuffer.destroy();
 
@@ -278,7 +278,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &image, nullptr, &offscreenPass.color.image));
 		vkGetImageMemoryRequirements(m_vkDevice, offscreenPass.color.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &offscreenPass.color.memory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, offscreenPass.color.image, offscreenPass.color.memory, 0));
 
@@ -316,7 +316,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &image, nullptr, &offscreenPass.depth.image));
 		vkGetImageMemoryRequirements(m_vkDevice, offscreenPass.depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &offscreenPass.depth.memory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, offscreenPass.depth.image, offscreenPass.depth.memory, 0));
 
@@ -418,8 +418,8 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models.scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		models.sceneGlow.loadFromFile(getAssetPath() + "models/treasure_glow.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.sceneGlow.loadFromFile(getAssetPath() + "models/treasure_glow.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	// We use a custom draw function so we can insert debug labels with the names of the glTF nodes
@@ -582,10 +582,10 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -599,7 +599,7 @@ public:
 	void preparePipelines()
 	{
 		// Layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipelines
@@ -638,7 +638,7 @@ public:
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.color));
 
 		// Wire frame rendering pipeline
-		if (deviceFeatures.fillModeNonSolid)
+		if (m_vkPhysicalDeviceFeatures.fillModeNonSolid)
 		{
 			rasterizationStateCI.polygonMode = VK_POLYGON_MODE_LINE;
 			pipelineCI.renderPass = m_vkRenderPass;
@@ -689,12 +689,12 @@ public:
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)m_vkPipelineLayout, "Shared pipeline layout");
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelines.toonshading, "Toon shading pipeline");
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelines.color, "Color only pipeline");
-		if (deviceFeatures.fillModeNonSolid) {
+		if (m_vkPhysicalDeviceFeatures.fillModeNonSolid) {
 			setObjectName(m_vkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelines.wireframe, "Wireframe rendering pipeline");
 		}
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelines.postprocess, "Post processing pipeline");
 
-		setObjectName(m_vkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, (uint64_t)descriptorSetLayout, "Shared descriptor set layout");
+		setObjectName(m_vkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, (uint64_t)m_vkDescriptorSetLayout, "Shared descriptor set layout");
 		setObjectName(m_vkDevice, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSet, "Shared descriptor set");
 	}
 
@@ -702,7 +702,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Vertex shader uniform buffer block
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBuffer,
@@ -743,12 +743,12 @@ public:
 		preparePipelines();
 		buildCommandBuffers();
 		nameDebugObjects();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();
@@ -763,7 +763,7 @@ public:
 			if (overlay->checkBox("Glow", &glow)) {
 				buildCommandBuffers();
 			}
-			if (deviceFeatures.fillModeNonSolid) {
+			if (m_vkPhysicalDeviceFeatures.fillModeNonSolid) {
 				if (overlay->checkBox("Wireframe", &wireframe)) {
 					buildCommandBuffers();
 				}

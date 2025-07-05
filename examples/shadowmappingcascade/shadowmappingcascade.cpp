@@ -73,7 +73,7 @@ public:
 		VkPipeline sceneShadowPCF;
 	} pipelines;
 
-	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSetLayout m_vkDescriptorSetLayout;
 	VkDescriptorSet descriptorSet;
 
 	// For simplicity all pipelines use the same push constant block layout
@@ -147,7 +147,7 @@ public:
 		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 		vkDestroyPipelineLayout(m_vkDevice, depthPass.pipelineLayout, nullptr);
 
-		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 
 		cascadeViewProjMatricesBuffer.destroy();
 		uniformBuffers.VS.destroy();
@@ -156,9 +156,9 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		enabledFeatures.samplerAnisotropy = deviceFeatures.samplerAnisotropy;
+		m_vkPhysicalDeviceFeatures10.samplerAnisotropy = m_vkPhysicalDeviceFeatures.samplerAnisotropy;
 		// Depth clamp to avoid near plane clipping
-		enabledFeatures.depthClamp = deviceFeatures.depthClamp;
+		m_vkPhysicalDeviceFeatures10.depthClamp = m_vkPhysicalDeviceFeatures.depthClamp;
 	}
 
 	/*
@@ -199,7 +199,7 @@ public:
 	*/
 	void prepareDepthPass()
 	{
-		VkFormat depthFormat = vulkanDevice->getSupportedDepthFormat(true);
+		VkFormat depthFormat = m_pVulkanDevice->getSupportedDepthFormat(true);
 
 		/*
 			Depth map renderpass
@@ -273,7 +273,7 @@ public:
 		VkMemoryRequirements memReqs;
 		vkGetImageMemoryRequirements(m_vkDevice, depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &depth.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, depth.image, depth.mem, 0));
 		// Full depth map m_vkImageView (all layers)
@@ -431,8 +431,8 @@ public:
 	void loadAssets()
 	{
 		uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY;
-		models.terrain.loadFromFile(getAssetPath() + "models/terrain_gridlines.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		models.tree.loadFromFile(getAssetPath() + "models/oaktree.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.terrain.loadFromFile(getAssetPath() + "models/terrain_gridlines.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.tree.loadFromFile(getAssetPath() + "models/oaktree.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void setupLayoutsAndDescriptors()
@@ -460,7 +460,7 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 3),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		/*
 			Descriptor sets
@@ -470,7 +470,7 @@ public:
 			vks::initializers::descriptorImageInfo(depth.sampler, depth.view, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
 		VkDescriptorSetAllocateInfo allocInfo =
-			vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+			vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 
 		// Scene rendering / debug display
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
@@ -489,7 +489,7 @@ public:
 		// Shared pipeline layout (scene and depth map debug display)
 		{
 			VkPushConstantRange pushConstantRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(PushConstBlock), 0);
-			std::array<VkDescriptorSetLayout, 2> setLayouts = { descriptorSetLayout, vkglTF::descriptorSetLayoutImage };
+			std::array<VkDescriptorSetLayout, 2> setLayouts = { m_vkDescriptorSetLayout, vkglTF::descriptorSetLayoutImage };
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
@@ -499,7 +499,7 @@ public:
 		// Depth pass pipeline layout
 		{
 			VkPushConstantRange pushConstantRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(PushConstBlock), 0);
-			std::array<VkDescriptorSetLayout, 2> setLayouts = { descriptorSetLayout, vkglTF::descriptorSetLayoutImage };
+			std::array<VkDescriptorSetLayout, 2> setLayouts = { m_vkDescriptorSetLayout, vkglTF::descriptorSetLayoutImage };
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
@@ -565,7 +565,7 @@ public:
 		colorBlendState.attachmentCount = 0;
 		depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 		// Enable depth clamp (if available)
-		rasterizationState.depthClampEnable = deviceFeatures.depthClamp;
+		rasterizationState.depthClampEnable = m_vkPhysicalDeviceFeatures.depthClamp;
 		pipelineCI.layout = depthPass.pipelineLayout;
 		pipelineCI.renderPass = depthPass.renderPass;
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &depthPass.pipeline));
@@ -574,19 +574,19 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Cascade matrices
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&cascadeViewProjMatricesBuffer,
 			sizeof(glm::mat4) * SHADOW_MAP_CASCADE_COUNT));
 
 		// Scene uniform buffer blocks
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBuffers.VS,
 			sizeof(uboVS)));
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBuffers.FS,
@@ -742,12 +742,12 @@ public:
 		setupLayoutsAndDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		draw();
 		if (!paused || camera.updated) {

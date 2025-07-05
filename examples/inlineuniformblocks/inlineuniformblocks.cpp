@@ -72,16 +72,16 @@ public:
 		/*
 			[POI] Enable extensions required for inline uniform blocks
 		*/
-		enabledDeviceExtensions.push_back(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_MAINTENANCE1_EXTENSION_NAME);
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
+		m_requestedDeviceExtensions.push_back(VK_KHR_MAINTENANCE1_EXTENSION_NAME);
+		m_requestedInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 		/*
 			[POI] We also need to enable the inline uniform block feature (using the dedicated physical m_vkDevice structure)
 		*/
 		enabledInlineUniformBlockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT;
 		enabledInlineUniformBlockFeatures.inlineUniformBlock = VK_TRUE;
-		deviceCreatepNextChain = &enabledInlineUniformBlockFeatures;
+		m_deviceCreatepNextChain = &enabledInlineUniformBlockFeatures;
 	}
 
 	~VulkanExample()
@@ -157,11 +157,11 @@ public:
 
 	void loadAssets()
 	{
-		model.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, m_vkQueue);
+		model.loadFromFile(getAssetPath() + "models/sphere.gltf", m_pVulkanDevice, m_vkQueue);
 
 		// Setup random materials for every object in the scene
 		for (uint32_t i = 0; i < objects.size(); i++) {
-			objects[i].setRandomMaterial(!benchmark.active);
+			objects[i].setRandomMaterial(!m_benchmark.active);
 		}
 	}
 
@@ -294,7 +294,7 @@ public:
 
 	void prepareUniformBuffers()
 	{
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
 		VK_CHECK_RESULT(uniformBuffer.map());
 		updateUniformBuffers();
 	}
@@ -316,7 +316,7 @@ public:
 		setupDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -330,7 +330,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();
@@ -342,7 +342,7 @@ public:
 	void updateMaterials() {
 		// Setup random materials for every object in the scene
 		for (uint32_t i = 0; i < objects.size(); i++) {
-			objects[i].setRandomMaterial(!benchmark.active);
+			objects[i].setRandomMaterial(!m_benchmark.active);
 		}
 
 		for (auto &object : objects) {

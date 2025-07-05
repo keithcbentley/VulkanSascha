@@ -70,11 +70,11 @@ public:
 	uint32_t queueFamilyIndex;
 	VkPipelineCache pipelineCache;
 	VkQueue queue;
-	VkCommandPool commandPool;
+	VkCommandPool m_vkCommandPool;
 	VkCommandBuffer commandBuffer;
 	VkFence fence;
 	VkDescriptorPool descriptorPool;
-	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSetLayout m_vkDescriptorSetLayout;
 	VkDescriptorSet descriptorSet;
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkPipeline;
@@ -309,7 +309,7 @@ public:
 		cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		cmdPoolInfo.queueFamilyIndex = queueFamilyIndex;
 		cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &commandPool));
+		VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &m_vkCommandPool));
 
 		/*
 			Prepare storage buffers
@@ -354,7 +354,7 @@ public:
 				bufferSize);
 
 			// Copy to staging buffer
-			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 			VkCommandBuffer copyCmd;
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &copyCmd));
 			VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
@@ -377,7 +377,7 @@ public:
 			VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX));
 
 			vkDestroyFence(device, fence, nullptr);
-			vkFreeCommandBuffers(device, commandPool, 1, &copyCmd);
+			vkFreeCommandBuffers(device, m_vkCommandPool, 1, &copyCmd);
 		}
 
 		/*
@@ -397,14 +397,14 @@ public:
 			};
 			VkDescriptorSetLayoutCreateInfo descriptorLayout =
 				vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout));
+			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
-				vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+				vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 			VkDescriptorSetAllocateInfo allocInfo =
-				vks::initializers::descriptorSetAllocateInfo(descriptorPool, &descriptorSetLayout, 1);
+				vks::initializers::descriptorSetAllocateInfo(descriptorPool, &m_vkDescriptorSetLayout, 1);
 			VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
 
 			VkDescriptorBufferInfo bufferDescriptor = { deviceBuffer, 0, VK_WHOLE_SIZE };
@@ -447,7 +447,7 @@ public:
 
 			// Create a command buffer for compute operations
 			VkCommandBufferAllocateInfo cmdBufAllocateInfo =
-				vks::initializers::commandBufferAllocateInfo(commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+				vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &commandBuffer));
 
 			// Fence for compute CB sync
@@ -576,12 +576,12 @@ public:
 	~VulkanExample()
 	{
 		vkDestroyPipelineLayout(device, m_vkPipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(device, m_vkDescriptorSetLayout, nullptr);
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 		vkDestroyPipeline(device, m_vkPipeline, nullptr);
 		vkDestroyPipelineCache(device, pipelineCache, nullptr);
 		vkDestroyFence(device, fence, nullptr);
-		vkDestroyCommandPool(device, commandPool, nullptr);
+		vkDestroyCommandPool(device, m_vkCommandPool, nullptr);
 		vkDestroyShaderModule(device, shaderModule, nullptr);
 		vkDestroyDevice(device, nullptr);
 #if DEBUG

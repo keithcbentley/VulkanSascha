@@ -149,7 +149,7 @@ public:
 		VkMemoryRequirements memReqs;
 		vkGetImageMemoryRequirements(m_vkDevice, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &attachment->memory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, attachment->image, attachment->memory, 0));
 
@@ -169,7 +169,7 @@ public:
 	// Override framebuffer setup from base class
 	void setupFrameBuffer()
 	{
-		// If the m_hwnd is resized, all the framebuffers/attachments used in our composition passes need to be recreated
+		// If the m_hwnd is m_resized, all the framebuffers/attachments used in our composition passes need to be recreated
 		if (attachmentSize.width != m_drawAreaWidth || attachmentSize.height != m_drawAreaHeight)
 		{
 			attachmentSize = { m_drawAreaWidth, m_drawAreaHeight };
@@ -180,7 +180,7 @@ public:
 			}
 
 			// SRS - Recreate attachments and descriptors in case number of swapchain images has changed on resize
-			attachments.resize(swapChain.images.size());
+			attachments.resize(m_swapChain.images.size());
 			for (auto i = 0; i < attachments.size(); i++) {
 				createAttachment(colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments[i].color);
 				createAttachment(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments[i].depth);
@@ -207,10 +207,10 @@ public:
 		frameBufferCI.height = m_drawAreaHeight;
 		frameBufferCI.layers = 1;
 
-		m_vkFrameBuffers.resize(swapChain.images.size());
+		m_vkFrameBuffers.resize(m_swapChain.images.size());
 		for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++)
 		{
-			views[0] = swapChain.imageViews[i];
+			views[0] = m_swapChain.imageViews[i];
 			views[1] = attachments[i].color.view;
 			views[2] = attachments[i].depth.view;
 			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCI, nullptr, &m_vkFrameBuffers[i]));
@@ -222,7 +222,7 @@ public:
 	{
 		attachmentSize = { m_drawAreaWidth, m_drawAreaHeight };		
 
-		attachments.resize(swapChain.images.size());
+		attachments.resize(m_swapChain.images.size());
 		for (auto i = 0; i < attachments.size(); i++) {
 			createAttachment(colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments[i].color);
 			createAttachment(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments[i].depth);
@@ -232,7 +232,7 @@ public:
 
 		// Swap chain m_vkImage color attachment
 		// Will be transitioned to present layout
-		attachments[0].format = swapChain.colorFormat;
+		attachments[0].format = m_swapChain.colorFormat;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -412,7 +412,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void updateAttachmentReadDescriptors(uint32_t index)
@@ -555,8 +555,8 @@ public:
 
 	void prepareUniformBuffers()
 	{
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffers.matrices, sizeof(uboMatrices));
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffers.params, sizeof(uboParams));
+		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffers.matrices, sizeof(uboMatrices));
+		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffers.params, sizeof(uboParams));
 		VK_CHECK_RESULT(uniformBuffers.matrices.map());
 		VK_CHECK_RESULT(uniformBuffers.params.map());
 		updateUniformBuffers();
@@ -588,12 +588,12 @@ public:
 		setupDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();

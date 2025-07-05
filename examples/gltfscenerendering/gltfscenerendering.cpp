@@ -306,7 +306,7 @@ VulkanExample::~VulkanExample()
 
 void VulkanExample::getEnabledFeatures()
 {
-	enabledFeatures.samplerAnisotropy = deviceFeatures.samplerAnisotropy;
+	m_vkPhysicalDeviceFeatures10.samplerAnisotropy = m_vkPhysicalDeviceFeatures.samplerAnisotropy;
 }
 
 void VulkanExample::buildCommandBuffers()
@@ -365,7 +365,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 	bool fileLoaded = gltfContext.LoadASCIIFromFile(&glTFInput, &error, &warning, filename);
 
 	// Pass some Vulkan resources required for setup and rendering to the glTF model loading class
-	glTFScene.vulkanDevice = vulkanDevice;
+	glTFScene.vulkanDevice = m_pVulkanDevice;
 	glTFScene.copyQueue    = m_vkQueue;
 
 	size_t pos = filename.find_last_of('/');
@@ -403,7 +403,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 	} vertexStaging, indexStaging;
 
 	// Create host visible staging buffers (source)
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		vertexBufferSize,
@@ -411,7 +411,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 		&vertexStaging.memory,
 		vertexBuffer.data()));
 	// Index data
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		indexBufferSize,
@@ -420,13 +420,13 @@ void VulkanExample::loadglTFFile(std::string filename)
 		indexBuffer.data()));
 
 	// Create m_vkDevice local buffers (target)
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		vertexBufferSize,
 		&glTFScene.vertices.buffer,
 		&glTFScene.vertices.memory));
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		indexBufferSize,
@@ -434,7 +434,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 		&glTFScene.indices.memory));
 
 	// Copy data from staging buffers (host) do m_vkDevice local buffer (gpu)
-	VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	VkBufferCopy copyRegion = {};
 
 	copyRegion.size = vertexBufferSize;
@@ -453,7 +453,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 		1,
 		&copyRegion);
 
-	vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 	// Free staging resources
 	vkDestroyBuffer(m_vkDevice, vertexStaging.buffer, nullptr);
@@ -603,7 +603,7 @@ void VulkanExample::preparePipelines()
 
 void VulkanExample::prepareUniformBuffers()
 {
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &shaderData.buffer, sizeof(shaderData.values)));
+	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &shaderData.buffer, sizeof(shaderData.values)));
 	VK_CHECK_RESULT(shaderData.buffer.map());
 }
 
@@ -623,7 +623,7 @@ void VulkanExample::prepare()
 	setupDescriptors();
 	preparePipelines();
 	buildCommandBuffers();
-	prepared = true;
+	m_prepared = true;
 }
 
 void VulkanExample::render()

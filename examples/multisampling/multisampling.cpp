@@ -34,7 +34,7 @@ public:
 
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 	VkExtent2D attachmentSize{};
 
 	// Holds the Vulkan resources required for the final multi sample output target
@@ -67,7 +67,7 @@ public:
 			vkDestroyPipeline(m_vkDevice, pipelines.MSAASampleShading, nullptr);
 
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 
 			// Destroy MSAA target
 			vkDestroyImage(m_vkDevice, multisampleTarget.color.image, nullptr);
@@ -85,12 +85,12 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable sample rate shading filtering if supported
-		if (deviceFeatures.sampleRateShading) {
-			enabledFeatures.sampleRateShading = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.sampleRateShading) {
+			m_vkPhysicalDeviceFeatures10.sampleRateShading = VK_TRUE;
 		}
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+			m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
 		}
 	}
 
@@ -104,7 +104,7 @@ public:
 		// Color target
 		VkImageCreateInfo info = vks::initializers::imageCreateInfo();
 		info.imageType = VK_IMAGE_TYPE_2D;
-		info.format = swapChain.colorFormat;
+		info.format = m_swapChain.colorFormat;
 		info.extent.width = m_drawAreaWidth;
 		info.extent.height = m_drawAreaHeight;
 		info.extent.depth = 1;
@@ -126,11 +126,11 @@ public:
 		// We prefer a lazily allocated m_vkDeviceMemory type
 		// This means that the m_vkDeviceMemory gets allocated when the implementation sees fit, e.g. when first using the images
 		VkBool32 lazyMemTypePresent;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
+		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
 		if (!lazyMemTypePresent)
 		{
 			// If this is not available, fall back to m_vkDevice local m_vkDeviceMemory
-			memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		}
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &multisampleTarget.color.memory));
 		vkBindImageMemory(m_vkDevice, multisampleTarget.color.image, multisampleTarget.color.memory, 0);
@@ -139,7 +139,7 @@ public:
 		VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
 		viewInfo.image = multisampleTarget.color.image;
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		viewInfo.format = swapChain.colorFormat;
+		viewInfo.format = m_swapChain.colorFormat;
 		viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
 		viewInfo.components.g = VK_COMPONENT_SWIZZLE_G;
 		viewInfo.components.b = VK_COMPONENT_SWIZZLE_B;
@@ -171,10 +171,10 @@ public:
 		memAlloc = vks::initializers::memoryAllocateInfo();
 		memAlloc.allocationSize = memReqs.size;
 
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
+		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
 		if (!lazyMemTypePresent)
 		{
-			memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		}
 
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &multisampleTarget.depth.memory));
@@ -209,7 +209,7 @@ public:
 		std::array<VkAttachmentDescription, 3> attachments = {};
 
 		// Multisampled attachment that we render to
-		attachments[0].format = swapChain.colorFormat;
+		attachments[0].format = m_swapChain.colorFormat;
 		attachments[0].samples = sampleCount;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -220,7 +220,7 @@ public:
 
 		// This is the frame buffer attachment to where the multisampled m_vkImage
 		// will be resolved to and which will be presented to the swapchain
-		attachments[1].format = swapChain.colorFormat;
+		attachments[1].format = m_swapChain.colorFormat;
 		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -297,7 +297,7 @@ public:
 	{
 		// Overrides the virtual function of the base class
 
-		// SRS - If the m_hwnd is resized, the MSAA attachments need to be released and recreated
+		// SRS - If the m_hwnd is m_resized, the MSAA attachments need to be released and recreated
 		if (attachmentSize.width != m_drawAreaWidth || attachmentSize.height != m_drawAreaHeight)
 		{
 			attachmentSize = { m_drawAreaWidth, m_drawAreaHeight };
@@ -330,10 +330,10 @@ public:
 		frameBufferCreateInfo.layers = 1;
 
 		// Create frame buffers for every swap chain m_vkImage
-		m_vkFrameBuffers.resize(swapChain.images.size());
+		m_vkFrameBuffers.resize(m_swapChain.images.size());
 		for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++)
 		{
-			attachments[1] = swapChain.imageViews[i];
+			attachments[1] = m_swapChain.imageViews[i];
 			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
 		}
 	}
@@ -384,7 +384,7 @@ public:
 
 	void loadAssets()
 	{
-		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
+		model.loadFromFile(getAssetPath() + "models/voyager.gltf", m_pVulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
 	}
 
 	void setupDescriptors()
@@ -403,10 +403,10 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -419,7 +419,7 @@ public:
 	{
 		// Layout uses set 0 for passing vertex shader ubo and set 1 for fragment shader images (taken from glTF model)
 		const std::vector<VkDescriptorSetLayout> setLayouts = {
-			descriptorSetLayout,
+			m_vkDescriptorSetLayout,
 			vkglTF::descriptorSetLayoutImage,
 		};
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), 2);
@@ -459,7 +459,7 @@ public:
 		shaderStages[1] = loadShader(getShadersPath() + "multisampling/mesh.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.MSAA));
 
-		if (vulkanDevice->m_vkPhysicalDeviceFeatures.sampleRateShading)
+		if (m_pVulkanDevice->m_vkPhysicalDeviceFeatures.sampleRateShading)
 		{
 			// MSAA with sample shading pipeline
 			// Sample shading enables per-sample shading to avoid shader aliasing and smooth out e.g. high frequency texture maps
@@ -477,7 +477,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Vertex shader uniform buffer block
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffer.map());
 	}
@@ -515,7 +515,7 @@ public:
 		setupDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -529,7 +529,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();
@@ -537,7 +537,7 @@ public:
 
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay)
 	{
-		if (vulkanDevice->m_vkPhysicalDeviceFeatures.sampleRateShading) {
+		if (m_pVulkanDevice->m_vkPhysicalDeviceFeatures.sampleRateShading) {
 			if (overlay->header("Settings")) {
 				if (overlay->checkBox("Sample rate shading", &useSampleShading)) {
 					buildCommandBuffers();

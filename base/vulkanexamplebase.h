@@ -78,10 +78,21 @@
 class VulkanExampleBase
 {
 
-	std::string getWindowTitle() const;
-	uint32_t destWidth{};
-	uint32_t destHeight{};
-	bool resizing = false;
+protected:
+    vkcpp::VulkanInstance m_vulkanInstanceOriginal;
+    vkcpp::PhysicalDevice m_physicalDeviceOriginal;
+    vkcpp::Device m_deviceOriginal;
+
+private:
+	uint32_t m_destWidth {};
+    uint32_t m_destHeight {};
+	bool m_resizing = false;
+    std::string m_shaderDir = "glsl";
+
+	void createVulkanAssets();
+
+
+    std::string getWindowTitle() const;
 	void handleMouseMove(int32_t x, int32_t y);
 	void nextFrame();
 	void updateOverlay();
@@ -92,39 +103,36 @@ class VulkanExampleBase
 	void createSwapChain();
 	void createCommandBuffers();
 	void destroyCommandBuffers();
-	std::string shaderDir = "glsl";
 
 protected:
+
 	// Returns the path to the root of the glsl, hlsl or slang shader directory.
 	std::string getShadersPath() const;
 
+
 	// Frame counter to display fps
-	uint32_t frameCounter = 0;
-	uint32_t lastFPS = 0;
-	std::chrono::time_point<std::chrono::high_resolution_clock> lastTimestamp, tPrevEnd;
-	// Vulkan m_vulkanInstance, stores all per-application states
-	VkInstance m_vulkanInstance{ VK_NULL_HANDLE };
-	std::vector<std::string> supportedInstanceExtensions;
-	// Physical m_vkDevice (GPU) that Vulkan will use
-	VkPhysicalDevice m_vkPhysicalDevice{ VK_NULL_HANDLE };
+	uint32_t m_frameCounter = 0;
+	uint32_t m_lastFPS = 0;
+	std::chrono::time_point<std::chrono::high_resolution_clock> m_lastTimestamp;
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_tPrevEnd;
+
+	std::vector<std::string> m_supportedInstanceExtensions;
 	// Stores physical m_vkDevice m_vkPhysicalDeviceProperties (for e.g. checking m_vkDevice limits)
 	VkPhysicalDeviceProperties m_vkPhysicalDeviceProperties{};
 	// Stores the m_vkPhysicalDeviceFeatures available on the selected physical m_vkDevice (for e.g. checking if a feature is available)
-	VkPhysicalDeviceFeatures deviceFeatures{};
+	VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures{};
 	// Stores all available m_vkDeviceMemory (type) m_vkPhysicalDeviceProperties for the physical m_vkDevice
-	VkPhysicalDeviceMemoryProperties deviceMemoryProperties{};
+	VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties{};
 	/** @brief Set of physical device features to be enabled for this example (must be set in the derived constructor) */
-	VkPhysicalDeviceFeatures enabledFeatures{};
+	VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures10{};
 	/** @brief Set of device extensions to be enabled for this example (must be set in the derived constructor) */
-	std::vector<const char*> enabledDeviceExtensions;
+	std::vector<const char*> m_requestedDeviceExtensions;
 	/** @brief Set of instance extensions to be enabled for this example (must be set in the derived constructor) */
-	std::vector<const char*> enabledInstanceExtensions;
+	std::vector<const char*> m_requestedInstanceExtensions;
 	/** @brief Set of layer settings to be enabled for this example (must be set in the derived constructor) */
-	std::vector<VkLayerSettingEXT> enabledLayerSettings;
+	std::vector<VkLayerSettingEXT> m_requestedLayerSettings;
 	/** @brief Optional pNext structure for passing extension structures to device creation */
-	void* deviceCreatepNextChain = nullptr;
-	/** @brief Logical device, application's view of the physical device (GPU) */
-	VkDevice m_vkDevice{ VK_NULL_HANDLE };
+	void* m_deviceCreatepNextChain = nullptr;
 	// Handle to the m_vkDevice graphics m_vkQueue that command buffers are submitted to
 	VkQueue m_vkQueue{ VK_NULL_HANDLE };
 	// Depth buffer format (selected during Vulkan initialization)
@@ -150,7 +158,7 @@ protected:
 	// Pipeline cache object
 	VkPipelineCache m_vkPipelineCache{ VK_NULL_HANDLE };
 	// Wraps the swap chain to present images (framebuffers) to the windowing system
-	VulkanSwapChain swapChain;
+	VulkanSwapChain m_swapChain;
 	// Synchronization semaphores
 	struct {
 		// Swap chain m_vkImage presentation
@@ -159,13 +167,13 @@ protected:
 		VkSemaphore m_vkSemaphoreRenderComplete;
 	} semaphores{};
 	std::vector<VkFence> m_vkFences;
-	bool requiresStencil{ false };
+	bool m_requiresStencil{ false };
 
 public:
 
-	bool prepared = false;
-	bool resized = false;
-	bool viewUpdated = false;
+	bool m_prepared = false;
+	bool m_resized = false;
+	bool m_viewUpdated = false;
 	uint32_t m_drawAreaWidth = 1280;
 	uint32_t m_drawAreaHeight = 720;
 
@@ -173,17 +181,18 @@ public:
 	CommandLineParser m_commandLineParser;
 
 	/** @brief Last frame time measured using a high performance timer (if available) */
-	float frameTimer = 1.0f;
+	float m_frameTimer = 1.0f;
 
-	vks::Benchmark benchmark;
+	vks::Benchmark m_benchmark;
 
 	/** @brief Encapsulated physical and logical vulkan device */
-	vks::VulkanDevice *vulkanDevice{};
+	vks::VulkanDevice *m_pVulkanDevice{};
 
 	/** @brief Example settings that can be changed e.g. by command line arguments */
 	struct ExampleSettings {
 		/** @brief Activates validation layers (and message output) when set to true */
-		bool m_useValidationLayers = false;
+		//	Always use validation layers. These are examples.
+//		bool m_useValidationLayers = false;
 		/** @brief Set to true if fullscreen mode has been requested via command line */
 		bool m_fullscreen = false;
 		/** @brief Set to true if v-sync will be forced for the swapchain */
@@ -223,7 +232,7 @@ public:
 
 	std::string title = "Vulkan Example";
 	std::string name = "vulkanExample";
-	uint32_t apiVersion = VK_API_VERSION_1_0;
+	uint32_t m_requestedApiVersion = VK_API_VERSION_1_0;
 
 	/** @brief Default depth stencil attachment used by the default render pass */
 	struct {

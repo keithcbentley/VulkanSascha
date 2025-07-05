@@ -167,17 +167,17 @@ VulkanExample::~VulkanExample()
 		separateVertexBuffers.uv.destroy();
 		interleavedVertexBuffer.destroy();
 		for (Image image : scene.images) {
-			vkDestroyImageView(vulkanDevice->m_vkDevice, image.texture.view, nullptr);
-			vkDestroyImage(vulkanDevice->m_vkDevice, image.texture.image, nullptr);
-			vkDestroySampler(vulkanDevice->m_vkDevice, image.texture.sampler, nullptr);
-			vkFreeMemory(vulkanDevice->m_vkDevice, image.texture.deviceMemory, nullptr);
+			vkDestroyImageView(m_pVulkanDevice->m_vkDevice, image.texture.view, nullptr);
+			vkDestroyImage(m_pVulkanDevice->m_vkDevice, image.texture.image, nullptr);
+			vkDestroySampler(m_pVulkanDevice->m_vkDevice, image.texture.sampler, nullptr);
+			vkFreeMemory(m_pVulkanDevice->m_vkDevice, image.texture.deviceMemory, nullptr);
 		}
 	}
 }
 
 void VulkanExample::getEnabledFeatures()
 {
-	enabledFeatures.samplerAnisotropy = deviceFeatures.samplerAnisotropy;
+	m_vkPhysicalDeviceFeatures10.samplerAnisotropy = m_vkPhysicalDeviceFeatures.samplerAnisotropy;
 }
 
 void VulkanExample::drawSceneNode(VkCommandBuffer commandBuffer, Node node)
@@ -294,7 +294,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 	scene.images.resize(glTFInput.images.size());
 	for (size_t i = 0; i < glTFInput.images.size(); i++) {
 		tinygltf::Image& glTFImage = glTFInput.images[i];
-		scene.images[i].texture.loadFromFile(path + "/" + glTFImage.uri, VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
+		scene.images[i].texture.loadFromFile(path + "/" + glTFImage.uri, VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
 	}
 	// Load textures
 	scene.textures.resize(glTFInput.textures.size());
@@ -339,11 +339,11 @@ void VulkanExample::uploadVertexData()
 	// Anonymous functions to simplify buffer creation
 	// Create a staging buffer used as a source for copies
 	auto createStagingBuffer = [this](vks::Buffer& buffer, void* data, VkDeviceSize size) {
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, size, data));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, size, data));
 	};
 	// Create a m_vkDevice local buffer used as a target for copies
 	auto createDeviceBuffer = [this](vks::Buffer& buffer, VkDeviceSize size, VkBufferUsageFlags usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) {
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(usageFlags | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &buffer, size));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(usageFlags | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &buffer, size));
 	};
 
 	VkCommandBuffer copyCmd;
@@ -359,10 +359,10 @@ void VulkanExample::uploadVertexData()
 	createDeviceBuffer(interleavedVertexBuffer, vertexStaging.size);
 
 	// Copy data from staging buffer (host) do m_vkDevice local buffer (gpu)
-	copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	copyRegion.size = vertexBufferSize;
 	vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, interleavedVertexBuffer.buffer, 1, &copyRegion);
-	vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 	vertexStaging.destroy();
 
 	/*
@@ -389,12 +389,12 @@ void VulkanExample::uploadVertexData()
 	};
 
 	// Copy data from staging buffer (host) do m_vkDevice local buffer (gpu)
-	copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	for (size_t i = 0; i < attributeBuffers.size(); i++) {
 		copyRegion.size = attributeBuffers[i].size;
 		vkCmdCopyBuffer(copyCmd, stagingBuffers[i].buffer, attributeBuffers[i].buffer, 1, &copyRegion);
 	}
-	vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 	for (size_t i = 0; i < 4; i++) {
 		stagingBuffers[i].destroy();
@@ -409,10 +409,10 @@ void VulkanExample::uploadVertexData()
 	createStagingBuffer(indexStaging, indexBuffer.data(), indexBufferSize);
 	createDeviceBuffer(indices, indexStaging.size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 	// Copy data from staging buffer (host) do m_vkDevice local buffer (gpu)
-	copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	copyRegion.size = indexBufferSize;
 	vkCmdCopyBuffer(copyCmd, indexStaging.buffer, indices.buffer, 1, &copyRegion);
-	vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 	// Free staging resources
 	indexStaging.destroy();
 }
@@ -546,7 +546,7 @@ void VulkanExample::preparePipelines()
 
 void VulkanExample::prepareUniformBuffers()
 {
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		&shaderData.buffer,
@@ -571,7 +571,7 @@ void VulkanExample::prepare()
 	setupDescriptors();
 	preparePipelines();
 	buildCommandBuffers();
-	prepared = true;
+	m_prepared = true;
 }
 
 void VulkanExample::render()

@@ -100,7 +100,7 @@ public:
 		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
 		m_UIOverlay.subpass = 2;
 
-		enabledFeatures.fragmentStoresAndAtomics = VK_TRUE;
+		m_vkPhysicalDeviceFeatures10.fragmentStoresAndAtomics = VK_TRUE;
 	}
 
 	~VulkanExample()
@@ -132,8 +132,8 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+			m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
 		}
 	};
 
@@ -186,7 +186,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &image, nullptr, &attachment->image));
 		vkGetImageMemoryRequirements(m_vkDevice, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &attachment->mem));
 		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, attachment->image, attachment->mem, 0));
 
@@ -211,10 +211,10 @@ public:
 		createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments.albedo);			// Albedo (color)
 	}
 
-	// Override framebuffer setup from base class, will automatically be called upon setup and if a m_hwnd is resized
+	// Override framebuffer setup from base class, will automatically be called upon setup and if a m_hwnd is m_resized
 	void setupFrameBuffer()
 	{
-		// If the m_hwnd is resized, all the framebuffers/attachments used in our composition passes need to be recreated
+		// If the m_hwnd is m_resized, all the framebuffers/attachments used in our composition passes need to be recreated
 		if (attachments.width != m_drawAreaWidth || attachments.height != m_drawAreaHeight) {
 			attachments.width = m_drawAreaWidth;
 			attachments.height = m_drawAreaHeight;
@@ -250,10 +250,10 @@ public:
 		frameBufferCreateInfo.layers = 1;
 
 		// Create frame buffers for every swap chain m_vkImage
-		m_vkFrameBuffers.resize(swapChain.images.size());
+		m_vkFrameBuffers.resize(m_swapChain.images.size());
 		for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++)
 		{
-			attachments[0] = swapChain.imageViews[i];
+			attachments[0] = m_swapChain.imageViews[i];
 			attachments[1] = this->attachments.position.view;
 			attachments[2] = this->attachments.normal.view;
 			attachments[3] = this->attachments.albedo.view;
@@ -272,7 +272,7 @@ public:
 
 		std::array<VkAttachmentDescription, 5> attachments{};
 		// Color attachment
-		attachments[0].format = swapChain.colorFormat;
+		attachments[0].format = m_swapChain.colorFormat;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -512,9 +512,9 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models.scene.loadFromFile(getAssetPath() + "models/samplebuilding.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		models.transparent.loadFromFile(getAssetPath() + "models/samplebuilding_glass.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		textures.glass.loadFromFile(getAssetPath() + "textures/colored_glass_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
+		models.scene.loadFromFile(getAssetPath() + "models/samplebuilding.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.transparent.loadFromFile(getAssetPath() + "models/samplebuilding_glass.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		textures.glass.loadFromFile(getAssetPath() + "textures/colored_glass_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
 	}
 
 	void setupDescriptors()
@@ -731,11 +731,11 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Matrices
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffers.GBuffer, sizeof(uboGBuffer));
+		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffers.GBuffer, sizeof(uboGBuffer));
 		VK_CHECK_RESULT(buffers.GBuffer.map());
 
 		// Lights
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffers.lights, lights.size() * sizeof(Light));
+		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffers.lights, lights.size() * sizeof(Light));
 		VK_CHECK_RESULT(buffers.lights.map());
 
 		// Update
@@ -762,7 +762,7 @@ public:
 		};
 
 		std::random_device rndDevice;
-		std::default_random_engine rndGen(benchmark.active ? 0 : rndDevice());
+		std::default_random_engine rndGen(m_benchmark.active ? 0 : rndDevice());
 		std::uniform_real_distribution<float> rndDist(-1.0f, 1.0f);
 		std::uniform_real_distribution<float> rndCol(0.0f, 0.5f);
 
@@ -801,12 +801,12 @@ public:
 		preparePipelines();
 		prepareCompositionPass();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		if (camera.updated) {
 			updateUniformBufferDeferredMatrices();

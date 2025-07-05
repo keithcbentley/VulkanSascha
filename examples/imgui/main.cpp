@@ -56,7 +56,7 @@ public:
 
 	ImGUI(VulkanExampleBase *example) : example(example)
 	{
-		device = example->vulkanDevice;
+		device = example->m_pVulkanDevice;
 		ImGui::CreateContext();
 		
 		//SRS - Set ImGui font and style scale factors to handle retina and other HiDPI displays
@@ -392,7 +392,7 @@ public:
 		// Update frame time display
 		if (updateFrameGraph) {
 			std::rotate(uiSettings.frameTimes.begin(), uiSettings.frameTimes.begin() + 1, uiSettings.frameTimes.end());
-			float frameTime = 1000.0f / (example->frameTimer * 1000.0f);
+			float frameTime = 1000.0f / (example->m_frameTimer * 1000.0f);
 			uiSettings.frameTimes.back() = frameTime;
 			if (frameTime < uiSettings.frameTimeMin) {
 				uiSettings.frameTimeMin = frameTime;
@@ -562,7 +562,7 @@ public:
 
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkPipeline;
-	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSetLayout m_vkDescriptorSetLayout;
 	VkDescriptorSet descriptorSet;
 
 	VulkanExample() : VulkanExampleBase()
@@ -574,7 +574,7 @@ public:
 		camera.setPerspective(45.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
 		
 		//SRS - Enable VK_KHR_get_physical_device_properties2 to retrieve m_vkDevice driver information for display
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		m_requestedInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 		// Don't use the ImGui overlay of the base framework in this sample
                 m_exampleSettings.m_showUIOverlay = false;
@@ -584,7 +584,7 @@ public:
 	{
 		vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
 		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 
 		uniformBufferVS.destroy();
 
@@ -608,7 +608,7 @@ public:
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
-		imGui->newFrame(this, (frameCounter == 0));
+		imGui->newFrame(this, (m_frameCounter == 0));
 		imGui->updateBuffers();
 
 		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
@@ -670,14 +670,14 @@ public:
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout =
 			vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Pipeline layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Descriptor set
-		VkDescriptorSetAllocateInfo allocInfo =	vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo =	vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferVS.descriptor),
@@ -721,7 +721,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Vertex shader uniform buffer block
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&uniformBufferVS,
@@ -739,7 +739,7 @@ public:
 
 		// Light source
 		if (uiSettings.animateLight) {
-			uiSettings.lightTimer += frameTimer * uiSettings.lightSpeed;
+			uiSettings.lightTimer += m_frameTimer * uiSettings.lightSpeed;
 			uboVS.lightPos.x = sin(glm::radians(uiSettings.lightTimer * 360.0f)) * 15.0f;
 			uboVS.lightPos.z = cos(glm::radians(uiSettings.lightTimer * 360.0f)) * 15.0f;
 		};
@@ -762,9 +762,9 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models.models.loadFromFile(getAssetPath() + "models/vulkanscenemodels.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		models.background.loadFromFile(getAssetPath() + "models/vulkanscenebackground.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		models.logos.loadFromFile(getAssetPath() + "models/vulkanscenelogos.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.models.loadFromFile(getAssetPath() + "models/vulkanscenemodels.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.background.loadFromFile(getAssetPath() + "models/vulkanscenebackground.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.logos.loadFromFile(getAssetPath() + "models/vulkanscenelogos.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 	}
 
 	void prepareImGui()
@@ -783,12 +783,12 @@ public:
 		preparePipelines();
 		prepareImGui();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 
 		updateUniformBuffers();
@@ -797,7 +797,7 @@ public:
 		ImGuiIO& io = ImGui::GetIO();
 
 		io.DisplaySize = ImVec2((float)m_drawAreaWidth, (float)m_drawAreaHeight);
-		io.DeltaTime = frameTimer;
+		io.DeltaTime = m_frameTimer;
 
 		io.MousePos = ImVec2(mouseState.position.x, mouseState.position.y);
 		io.MouseDown[0] = mouseState.buttons.left && m_UIOverlay.visible;

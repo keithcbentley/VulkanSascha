@@ -3799,7 +3799,7 @@ private:
         const VkSurfaceCapabilitiesKHR vkSurfaceCapabilities = surface.getSurfaceCapabilities();
         const VkExtent2D surfaceExtent = vkSurfaceCapabilities.currentExtent;
         //	Can't make "real" swapchains with 0 m_drawAreaWidth or m_drawAreaHeight, e.g.,
-        //	the m_hwnd is minimized.  Return a "null" swapChain if
+        //	the m_hwnd is minimized.  Return a "null" m_swapChain if
         //	this occurs.
         if (surfaceExtent.width == 0 || surfaceExtent.height == 0) {
             return Swapchain {};

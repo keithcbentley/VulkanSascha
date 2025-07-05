@@ -37,7 +37,7 @@ public:
 	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
 	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 
 	VkQueryPool queryPool{ VK_NULL_HANDLE };
 
@@ -61,7 +61,7 @@ public:
 		if (m_vkDevice) {
 			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 			vkDestroyQueryPool(m_vkDevice, queryPool, nullptr);
 			uniformBuffer.destroy();
 		}
@@ -70,17 +70,17 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Support for m_vkPipeline statistics is optional
-		if (deviceFeatures.pipelineStatisticsQuery) {
-			enabledFeatures.pipelineStatisticsQuery = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.pipelineStatisticsQuery) {
+			m_vkPhysicalDeviceFeatures10.pipelineStatisticsQuery = VK_TRUE;
 		}
 		else {
 			vks::tools::exitFatal("Selected GPU does not support m_vkPipeline statistics!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.fillModeNonSolid) {
+			m_vkPhysicalDeviceFeatures10.fillModeNonSolid = VK_TRUE;
 		}
-		if (deviceFeatures.tessellationShader) {
-			enabledFeatures.tessellationShader = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.tessellationShader) {
+			m_vkPhysicalDeviceFeatures10.tessellationShader = VK_TRUE;
 		}
 	}
 
@@ -95,7 +95,7 @@ public:
 			"Clipping stage primitives output    ",
 			"Fragment shader invocations        "
 		};
-		if (deviceFeatures.tessellationShader) {
+		if (m_vkPhysicalDeviceFeatures.tessellationShader) {
 			pipelineStatNames.push_back("Tess. control shader patches       ");
 			pipelineStatNames.push_back("Tess. eval. shader invocations     ");
 		}
@@ -113,7 +113,7 @@ public:
 			VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
 			VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
 			VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
-		if (deviceFeatures.tessellationShader) {
+		if (m_vkPhysicalDeviceFeatures.tessellationShader) {
 			queryPoolInfo.pipelineStatistics |=
 				VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT |
 				VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT;
@@ -210,7 +210,7 @@ public:
 		models.names = { "Sphere", "Teapot", "Torusknot", "Venus" };
 		models.objects.resize(filenames.size());
 		for (size_t i = 0; i < filenames.size(); i++) {
-			models.objects[i].loadFromFile(getAssetPath() + "models/" + filenames[i], vulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
+			models.objects[i].loadFromFile(getAssetPath() + "models/" + filenames[i], m_pVulkanDevice, m_vkQueue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
 		}
 	}
 
@@ -228,10 +228,10 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor)
@@ -243,7 +243,7 @@ public:
 	{
 		// Layout
 		if (m_vkPipelineLayout == VK_NULL_HANDLE) {
-			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 			VkPushConstantRange pushConstantRange = vks::initializers::pushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, sizeof(glm::vec3), 0);
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
@@ -319,7 +319,7 @@ public:
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
 		VK_CHECK_RESULT(uniformBuffer.map());
 	}
 
@@ -339,7 +339,7 @@ public:
 		setupDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -358,7 +358,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 			return;
 		updateUniformBuffers();
 		draw();
@@ -381,10 +381,10 @@ public:
 			recreatePipeline |= overlay->checkBox("Blending", &blending);
 			recreatePipeline |= overlay->checkBox("Discard", &discard);
 			// These m_vkPhysicalDeviceFeatures may not be supported by all implementations
-			if (deviceFeatures.fillModeNonSolid) {
+			if (m_vkPhysicalDeviceFeatures.fillModeNonSolid) {
 				recreatePipeline |= overlay->checkBox("Wireframe", &wireframe);
 			}
-			if (deviceFeatures.tessellationShader) {
+			if (m_vkPhysicalDeviceFeatures.tessellationShader) {
 				recreatePipeline |= overlay->checkBox("Tessellation", &tessellation);
 			}
 			if (recreatePipeline) {

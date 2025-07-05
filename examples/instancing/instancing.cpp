@@ -60,7 +60,7 @@ public:
 		VkPipeline starfield{ VK_NULL_HANDLE };
 	} pipelines;
 
-	VkDescriptorSetLayout descriptorSetLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 	struct {
 		VkDescriptorSet instancedRocks{ VK_NULL_HANDLE };
 		VkDescriptorSet planet{ VK_NULL_HANDLE };
@@ -82,7 +82,7 @@ public:
 			vkDestroyPipeline(m_vkDevice, pipelines.planet, nullptr);
 			vkDestroyPipeline(m_vkDevice, pipelines.starfield, nullptr);
 			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 			vkDestroyBuffer(m_vkDevice, instanceBuffer.buffer, nullptr);
 			vkFreeMemory(m_vkDevice, instanceBuffer.memory, nullptr);
 			textures.rocks.destroy();
@@ -95,8 +95,8 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+			m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
 		}
 	};
 
@@ -166,11 +166,11 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models.rock.loadFromFile(getAssetPath() + "models/rock01.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
-		models.planet.loadFromFile(getAssetPath() + "models/lavaplanet.gltf", vulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.rock.loadFromFile(getAssetPath() + "models/rock01.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.planet.loadFromFile(getAssetPath() + "models/lavaplanet.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
 
-		textures.planet.loadFromFile(getAssetPath() + "textures/lavaplanet_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
-		textures.rocks.loadFromFile(getAssetPath() + "textures/texturearray_rocks_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, m_vkQueue);
+		textures.planet.loadFromFile(getAssetPath() + "textures/lavaplanet_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
+		textures.rocks.loadFromFile(getAssetPath() + "textures/texturearray_rocks_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
 	}
 
 	void setupDescriptors()
@@ -191,13 +191,13 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Sets
 		VkDescriptorSetAllocateInfo descripotrSetAllocInfo;
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets;
 
-		descripotrSetAllocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayout, 1);
+		descripotrSetAllocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
 
 		// Instanced rocks
 		//	Binding 0 : Vertex shader uniform buffer
@@ -223,7 +223,7 @@ public:
 	void preparePipelines()
 	{
 		// Layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+		VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
 		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 		// Pipelines
@@ -321,7 +321,7 @@ public:
 		std::vector<InstanceData> instanceData;
 		instanceData.resize(INSTANCE_COUNT);
 
-		std::default_random_engine rndGenerator(benchmark.active ? 0 : (unsigned)time(nullptr));
+		std::default_random_engine rndGenerator(m_benchmark.active ? 0 : (unsigned)time(nullptr));
 		std::uniform_real_distribution<float> uniformDist(0.0, 1.0);
 		std::uniform_int_distribution<uint32_t> rndTextureIndex(0, textures.rocks.layerCount);
 
@@ -362,7 +362,7 @@ public:
 			VkBuffer buffer;
 		} stagingBuffer;
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			instanceBuffer.size,
@@ -370,7 +370,7 @@ public:
 			&stagingBuffer.memory,
 			instanceData.data()));
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			instanceBuffer.size,
@@ -378,7 +378,7 @@ public:
 			&instanceBuffer.memory));
 
 		// Copy to staging buffer
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		VkBufferCopy copyRegion = { };
 		copyRegion.size = instanceBuffer.size;
@@ -389,7 +389,7 @@ public:
 			1,
 			&copyRegion);
 
-		vulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+		m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 		instanceBuffer.descriptor.range = instanceBuffer.size;
 		instanceBuffer.descriptor.buffer = instanceBuffer.buffer;
@@ -402,7 +402,7 @@ public:
 
 	void prepareUniformBuffers()
 	{
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
 		VK_CHECK_RESULT(uniformBuffer.map());
 
 		updateUniformBuffer();
@@ -414,8 +414,8 @@ public:
 		uniformData.view = camera.matrices.view;
 
 		if (!paused) {
-			uniformData.locSpeed += frameTimer * 0.35f;
-			uniformData.globSpeed += frameTimer * 0.01f;
+			uniformData.locSpeed += m_frameTimer * 0.35f;
+			uniformData.globSpeed += m_frameTimer * 0.01f;
 		}
 
 		memcpy(uniformBuffer.mapped, &uniformData, sizeof(uniformData));
@@ -430,7 +430,7 @@ public:
 		setupDescriptors();
 		preparePipelines();
 		buildCommandBuffers();
-		prepared = true;
+		m_prepared = true;
 	}
 
 	void draw()
@@ -444,7 +444,7 @@ public:
 
 	virtual void render()
 	{
-		if (!prepared)
+		if (!m_prepared)
 		{
 			return;
 		}
