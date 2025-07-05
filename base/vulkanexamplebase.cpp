@@ -78,12 +78,6 @@ void VulkanExampleBase::createVulkanAssets()
     m_deviceOriginal = std::move(device);
 }
 
-VkResult VulkanExampleBase::createInstance()
-{
-//    createVulkanAssets();
-    return VK_SUCCESS;
-
-}
 
 void VulkanExampleBase::renderFrame()
 {
@@ -887,12 +881,6 @@ bool VulkanExampleBase::initVulkan()
     //    vks::debug::log("Sample: " + title);
     //}
 
-    // Create the m_vulkanInstance
-    VkResult result = createInstance();
-    if (result != VK_SUCCESS) {
-        vks::tools::exitFatal("Could not create Vulkan m_vulkanInstance : \n" + vks::tools::errorString(result), result);
-        return false;
-    }
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
     vks::android::loadVulkanFunctions(m_vulkanInstance);
@@ -964,13 +952,6 @@ bool VulkanExampleBase::initVulkan()
 
     // Derived examples can enable extensions based on the list of supported extensions read from the physical m_vkDevice
     getEnabledExtensions();
-
-    result = m_pVulkanDevice->createLogicalDevice(m_vkPhysicalDeviceFeatures10, m_requestedDeviceExtensions, m_deviceCreatepNextChain);
-    if (result != VK_SUCCESS) {
-        vks::tools::exitFatal("Could not create Vulkan m_vkDevice: \n" + vks::tools::errorString(result), result);
-        return false;
-    }
-//    m_vkDevice = m_pVulkanDevice->m_device;
 
     // Get a graphics m_vkQueue from the m_vkDevice
     vkGetDeviceQueue(m_deviceOriginal, m_pVulkanDevice->queueFamilyIndices.graphics, 0, &m_vkQueue);
