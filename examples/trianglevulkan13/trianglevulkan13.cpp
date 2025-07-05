@@ -742,7 +742,7 @@ public:
             VK_ACCESS_NONE,
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
             vkcpp::ImageSubresourceRange(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT));
@@ -796,7 +796,7 @@ public:
         // Finish the current dynamic rendering section
         commandBuffer.cmdEndRendering();
 
-        // This barrier prepares the color m_vkImage for presentation, we don't need to care for the depth m_vkImage
+        // This barrier prepares the color m_vkImage for presentation.
         commandBuffer.cmdInsertImageMemoryBarrier(
             swapChain.images[imageIndex],
             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
@@ -806,6 +806,20 @@ public:
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_PIPELINE_STAGE_2_NONE,
             vkcpp::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT));
+
+        //	Add a memory barrier to get rid of sync issues.
+        //  We don't really care about the image layout, we just want the memory sync.
+        //	Not sure if this is the minimum required.
+        commandBuffer.cmdInsertImageMemoryBarrier(
+            m_defaultDepthStencil.m_vkImage,
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            VK_ACCESS_NONE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            vkcpp::ImageSubresourceRange(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT));
+
         commandBuffer.end();
 
         // Submit the command buffer to the graphics m_vkQueue
