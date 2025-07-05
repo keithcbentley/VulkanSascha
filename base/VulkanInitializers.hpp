@@ -45,12 +45,12 @@ namespace vks
 			return commandBufferAllocateInfo;
 		}
 
-		inline VkCommandPoolCreateInfo commandPoolCreateInfo()
-		{
-			VkCommandPoolCreateInfo cmdPoolCreateInfo {};
-			cmdPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-			return cmdPoolCreateInfo;
-		}
+		//inline VkCommandPoolCreateInfo commandPoolCreateInfo()
+		//{
+		//	VkCommandPoolCreateInfo cmdPoolCreateInfo {};
+		//	cmdPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		//	return cmdPoolCreateInfo;
+		//}
 
 		inline VkCommandBufferBeginInfo commandBufferBeginInfo()
 		{

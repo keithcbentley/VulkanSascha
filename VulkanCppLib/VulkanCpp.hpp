@@ -2213,8 +2213,8 @@ public:
     }
 
     CommandPool(
-        VkCommandPoolCreateFlags vkCommandPoolCreateFlags,
         uint32_t queueFamilyIndex,
+        VkCommandPoolCreateFlags vkCommandPoolCreateFlags,
         VkDevice vkDevice)
     {
         VkCommandPoolCreateInfo commandPoolCreateInfo {};

@@ -876,16 +876,13 @@ bool VulkanExampleBase::initVulkan()
     vks::android::loadVulkanFunctions(m_vulkanInstance);
 #endif
 
-
-
     // Store m_vkPhysicalDeviceProperties (including limits),
     // m_vkPhysicalDeviceFeatures and m_vkDeviceMemory m_vkPhysicalDeviceProperties
     // of the physical m_vkDevice (so that examples can check against them)
 
 	m_physicalDeviceFeatures = m_physicalDeviceOriginal.getPhysicalDeviceFeatures2();
 	m_physicalDeviceProperties = m_physicalDeviceOriginal.getPhysicalDeviceProperties2();
-
-    vkGetPhysicalDeviceMemoryProperties(m_physicalDeviceOriginal, &m_vkPhysicalDeviceMemoryProperties);
+	m_vkPhysicalDeviceMemoryProperties = m_physicalDeviceOriginal.getPhysicalDeviceMemoryProperties();
 
     // Derived examples can override this to set actual m_vkPhysicalDeviceFeatures (based on above readings) to enable for logical m_vkDevice creation
     getEnabledFeatures();
@@ -899,7 +896,7 @@ bool VulkanExampleBase::initVulkan()
     getEnabledExtensions();
 
     // Get a graphics m_vkQueue from the m_vkDevice
-    vkGetDeviceQueue(m_deviceOriginal, m_pVulkanDevice->queueFamilyIndices.graphics, 0, &m_vkQueue);
+    vkGetDeviceQueue(m_deviceOriginal, m_pVulkanDevice->m_queueFamilyIndices.m_graphics, 0, &m_vkQueue);
 
     // Find a suitable depth and/or stencil format
     VkBool32 validFormat { false };
