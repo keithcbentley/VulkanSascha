@@ -23,11 +23,6 @@ VulkanDevice::VulkanDevice(
     m_physicalDevice = physicalDevice;
     m_device = device;
 
-    // Store Properties m_vkPhysicalDeviceFeatures, limits and m_vkPhysicalDeviceProperties of the physical device for later use
-    // Device m_vkPhysicalDeviceProperties also contain limits and sparse m_vkPhysicalDeviceProperties
-    vkGetPhysicalDeviceProperties(physicalDevice, &m_vkPhysicalDeviceProperties);
-    // Features should be checked by the examples before using them
-    vkGetPhysicalDeviceFeatures(physicalDevice, &m_vkPhysicalDeviceFeatures);
     // Memory m_vkPhysicalDeviceProperties are used regularly for creating all kinds of buffers
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &m_vkPhysicalDeviceMemoryProperties);
 
@@ -51,7 +46,7 @@ VulkanDevice::VulkanDevice(
         std::vector<VkExtensionProperties> extensions(extCount);
         if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extCount, &extensions.front()) == VK_SUCCESS) {
             for (auto& ext : extensions) {
-                m_supportedExtensions.push_back(ext.extensionName);
+                m_supportedExtensionNames.push_back(ext.extensionName);
             }
         }
     }
@@ -370,7 +365,7 @@ void VulkanDevice::flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue que
  */
 bool VulkanDevice::extensionSupported(std::string extension)
 {
-    return (std::find(m_supportedExtensions.begin(), m_supportedExtensions.end(), extension) != m_supportedExtensions.end());
+    return (std::find(m_supportedExtensionNames.begin(), m_supportedExtensionNames.end(), extension) != m_supportedExtensionNames.end());
 }
 
 /**

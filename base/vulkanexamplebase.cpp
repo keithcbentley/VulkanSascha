@@ -213,33 +213,33 @@ void VulkanExampleBase::nextFrame()
 
 void VulkanExampleBase::renderLoop()
 {
-// SRS - for non-apple plaforms, handle benchmarking here within VulkanExampleBase::renderLoop()
-//     - for macOS, handle benchmarking within NSApp rendering loop via displayLinkOutputCb()
-#if !(defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT))
-    if (m_benchmark.active) {
-#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
-        while (!configured) {
-            if (wl_display_dispatch(display) == -1)
-                break;
-        }
-        while (wl_display_prepare_read(display) != 0) {
-            if (wl_display_dispatch_pending(display) == -1)
-                break;
-        }
-        wl_display_flush(display);
-        wl_display_read_events(display);
-        if (wl_display_dispatch_pending(display) == -1)
-            return;
-#endif
-
-        m_benchmark.run([=] { render(); }, m_pVulkanDevice->m_vkPhysicalDeviceProperties);
-        vkDeviceWaitIdle(m_deviceOriginal);
-        if (!m_benchmark.filename.empty()) {
-            m_benchmark.saveResults();
-        }
-        return;
-    }
-#endif
+//// SRS - for non-apple plaforms, handle benchmarking here within VulkanExampleBase::renderLoop()
+////     - for macOS, handle benchmarking within NSApp rendering loop via displayLinkOutputCb()
+//#if !(defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT))
+//    if (m_benchmark.active) {
+//#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+//        while (!configured) {
+//            if (wl_display_dispatch(display) == -1)
+//                break;
+//        }
+//        while (wl_display_prepare_read(display) != 0) {
+//            if (wl_display_dispatch_pending(display) == -1)
+//                break;
+//        }
+//        wl_display_flush(display);
+//        wl_display_read_events(display);
+//        if (wl_display_dispatch_pending(display) == -1)
+//            return;
+//#endif
+//
+//        m_benchmark.run([=] { render(); }, m_pVulkanDevice->m_vkPhysicalDeviceProperties);
+//        vkDeviceWaitIdle(m_deviceOriginal);
+//        if (!m_benchmark.filename.empty()) {
+//            m_benchmark.saveResults();
+//        }
+//        return;
+//    }
+//#endif
 
     m_destWidth = m_drawAreaWidth;
     m_destHeight = m_drawAreaHeight;
