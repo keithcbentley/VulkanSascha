@@ -90,7 +90,7 @@ void VulkanExampleBase::renderFrame()
 
 std::string VulkanExampleBase::getWindowTitle() const
 {
-    std::string windowTitle { title + " - " + m_vkPhysicalDeviceProperties.deviceName };
+    std::string windowTitle { title + " - " + m_physicalDeviceProperties.m_properties2.properties.deviceName };
     if (!m_exampleSettings.m_showUIOverlay) {
         windowTitle += " - " + std::to_string(m_frameCounter) + " fps";
     }
@@ -570,7 +570,7 @@ void VulkanExampleBase::updateOverlay()
     ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiSetCond_FirstUseEver);
     ImGui::Begin("Vulkan Example", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
     ImGui::TextUnformatted(title.c_str());
-    ImGui::TextUnformatted(m_vkPhysicalDeviceProperties.deviceName);
+    ImGui::TextUnformatted(m_physicalDeviceProperties.m_properties2.properties.deviceName);
     ImGui::Text("%.2f ms/frame (%.1d fps)", (1000.0f / m_lastFPS), m_lastFPS);
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -871,75 +871,20 @@ bool VulkanExampleBase::initVulkan()
 {
     createVulkanAssets();
 
-    // Instead of checking for the command line switch, validation can be forced via a define
-#if defined(_VALIDATION)
-    this->settings.validation = true;
-#endif
-
-    // Validation messages can be stored, e.g. to be used in external tools like CI/CD
-    //if (m_commandLineParser.isSet("validationlogfile")) {
-    //    vks::debug::log("Sample: " + title);
-    //}
-
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
     vks::android::loadVulkanFunctions(m_vulkanInstance);
 #endif
 
-    // If requested, we enable the default validation layers for debugging
-    //if (m_exampleSettings.m_useValidationLayers) {
-    //    vks::debug::setupDebugging(m_vulkanInstance);
-    //}
 
-    // Physical m_vkDevice
-    //uint32_t gpuCount = 0;
-    //// Get number of available physical devices
-    //VK_CHECK_RESULT(vkEnumeratePhysicalDevices(m_vulkanInstance, &gpuCount, nullptr));
-    //if (gpuCount == 0) {
-    //    vks::tools::exitFatal("No m_vkDevice with Vulkan support found", -1);
-    //    return false;
-    //}
-    //// Enumerate devices
-    //std::vector<VkPhysicalDevice> physicalDevices(gpuCount);
-    //result = vkEnumeratePhysicalDevices(m_vulkanInstance, &gpuCount, physicalDevices.data());
-    //if (result != VK_SUCCESS) {
-    //    vks::tools::exitFatal("Could not enumerate physical devices : \n" + vks::tools::errorString(result), result);
-    //    return false;
-    //}
 
-    // GPU selection
+    // Store m_vkPhysicalDeviceProperties (including limits),
+    // m_vkPhysicalDeviceFeatures and m_vkDeviceMemory m_vkPhysicalDeviceProperties
+    // of the physical m_vkDevice (so that examples can check against them)
 
-    // Select physical m_vkDevice to be used for the Vulkan example
-    // Defaults to the first m_vkDevice unless specified by command line
-//    uint32_t selectedDevice = 0;
-//
-//#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
-//    // GPU selection via command line argument
-//    if (m_commandLineParser.isSet("gpuselection")) {
-//        uint32_t index = m_commandLineParser.getValueAsInt("gpuselection", 0);
-//        if (index > gpuCount - 1) {
-//            std::cerr << "Selected m_vkDevice index " << index << " is out of range, reverting to m_vkDevice 0 (use -listgpus to show available Vulkan devices)" << "\n";
-//        } else {
-//            selectedDevice = index;
-//        }
-//    }
-//    if (m_commandLineParser.isSet("gpulist")) {
-//        std::cout << "Available Vulkan devices" << "\n";
-//        for (uint32_t i = 0; i < gpuCount; i++) {
-//            VkPhysicalDeviceProperties deviceProperties;
-//            vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
-//            std::cout << "Device [" << i << "] : " << deviceProperties.deviceName << std::endl;
-//            std::cout << " Type: " << vks::tools::physicalDeviceTypeString(deviceProperties.deviceType) << "\n";
-//            std::cout << " API: " << (deviceProperties.apiVersion >> 22) << "." << ((deviceProperties.apiVersion >> 12) & 0x3ff) << "." << (deviceProperties.apiVersion & 0xfff) << "\n";
-//        }
-//    }
-//#endif
-//
-//    m_vkPhysicalDevice = physicalDevices[selectedDevice];
+	m_physicalDeviceFeatures = m_physicalDeviceOriginal.getPhysicalDeviceFeatures2();
+	m_physicalDeviceProperties = m_physicalDeviceOriginal.getPhysicalDeviceProperties2();
 
-    // Store m_vkPhysicalDeviceProperties (including limits), m_vkPhysicalDeviceFeatures and m_vkDeviceMemory m_vkPhysicalDeviceProperties of the physical m_vkDevice (so that examples can check against them)
-    vkGetPhysicalDeviceProperties(m_physicalDeviceOriginal, &m_vkPhysicalDeviceProperties);
-    vkGetPhysicalDeviceFeatures(m_physicalDeviceOriginal, &m_vkPhysicalDeviceFeatures);
     vkGetPhysicalDeviceMemoryProperties(m_physicalDeviceOriginal, &m_vkPhysicalDeviceMemoryProperties);
 
     // Derived examples can override this to set actual m_vkPhysicalDeviceFeatures (based on above readings) to enable for logical m_vkDevice creation

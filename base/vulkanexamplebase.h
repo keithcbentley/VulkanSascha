@@ -117,10 +117,15 @@ protected:
     std::chrono::time_point<std::chrono::high_resolution_clock> m_tPrevEnd;
 
 	std::vector<std::string> m_supportedInstanceExtensions;
+   
+	vkcpp::DeviceFeatures m_physicalDeviceFeatures;
+    vkcpp::DeviceProperties m_physicalDeviceProperties;
+
 	// Stores physical m_vkDevice m_vkPhysicalDeviceProperties (for e.g. checking m_vkDevice limits)
-	VkPhysicalDeviceProperties m_vkPhysicalDeviceProperties{};
+    //VkPhysicalDeviceProperties m_vkPhysicalDeviceProperties {};
 	// Stores the m_vkPhysicalDeviceFeatures available on the selected physical m_vkDevice (for e.g. checking if a feature is available)
-	VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures{};
+	//VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures{};
+
 	// Stores all available m_vkDeviceMemory (type) m_vkPhysicalDeviceProperties for the physical m_vkDevice
 	VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties{};
 	/** @brief Set of physical device features to be enabled for this example (must be set in the derived constructor) */

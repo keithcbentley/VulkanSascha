@@ -148,7 +148,7 @@ public:
     virtual void getEnabledFeatures() override
     {
         // Vulkan 1.3 m_vkDevice support is required for this example
-        if (m_vkPhysicalDeviceProperties.apiVersion < VK_API_VERSION_1_3) {
+        if (m_physicalDeviceProperties.m_properties2.properties.apiVersion < VK_API_VERSION_1_3) {
             vks::tools::exitFatal("Selected GPU does not support support Vulkan 1.3", VK_ERROR_INCOMPATIBLE_DRIVER);
         }
     }
