@@ -756,8 +756,8 @@ public:
     ~VulkanInstanceCreateInfo() = default;
     VulkanInstanceCreateInfo(const VulkanInstanceCreateInfo&) = delete;
     VulkanInstanceCreateInfo& operator=(const VulkanInstanceCreateInfo&) = delete;
-    VulkanInstanceCreateInfo(VulkanInstanceCreateInfo&&) = delete;
-    VulkanInstanceCreateInfo& operator=(VulkanInstanceCreateInfo&&) = delete;
+    VulkanInstanceCreateInfo(VulkanInstanceCreateInfo&&) noexcept = delete;
+    VulkanInstanceCreateInfo& operator=(VulkanInstanceCreateInfo&&) noexcept = delete;
 
     //  Don't allow just grabbing a pointer since the data
     //  may not have been assembled into the vectors for the
@@ -1103,8 +1103,8 @@ public:
     ~DeviceCreateInfo() = default;
     DeviceCreateInfo(const DeviceCreateInfo&) = delete;
     DeviceCreateInfo& operator=(const DeviceCreateInfo&) = delete;
-    DeviceCreateInfo(DeviceCreateInfo&&) = delete;
-    DeviceCreateInfo& operator=(DeviceCreateInfo&&) = delete;
+    DeviceCreateInfo(DeviceCreateInfo&&) noexcept = delete;
+    DeviceCreateInfo& operator=(DeviceCreateInfo&&) noexcept = delete;
 
     DeviceCreateInfo()
     {
@@ -1508,7 +1508,7 @@ class ShaderModule : public HandleWithOwner<VkShaderModule> {
 public:
     ShaderModule() = default;
 
-    static ShaderModule createShaderModuleFromFile(const char* fileName, VkDevice vkDevice)
+    static ShaderModule createShaderModuleFromFile(const std::string& fileName, VkDevice vkDevice)
     {
         auto fragShaderCode = readFile(fileName);
         VkShaderModuleCreateInfo createInfo {};
@@ -2498,7 +2498,7 @@ public:
     SubmitInfo(const SubmitInfo&) = delete;
     SubmitInfo& operator=(const SubmitInfo&) = delete;
     SubmitInfo(SubmitInfo&&) noexcept = delete;
-    SubmitInfo& operator=(SubmitInfo&&) = delete;
+    SubmitInfo& operator=(SubmitInfo&&) noexcept = delete;
 
     void addCommandBuffer(VkCommandBuffer vkCommandBuffer)
     {
@@ -2542,7 +2542,7 @@ public:
     SubmitInfo2(const SubmitInfo2&) = delete;
     SubmitInfo2& operator=(const SubmitInfo2&) = delete;
     SubmitInfo2(SubmitInfo2&&) noexcept = delete;
-    SubmitInfo2& operator=(SubmitInfo2&&) = delete;
+    SubmitInfo2& operator=(SubmitInfo2&&) noexcept = delete;
 
     void addCommandBuffer(VkCommandBuffer vkCommandBuffer)
     {
@@ -3090,32 +3090,29 @@ public:
 
 class PipelineLayoutCreateInfo : public VkPipelineLayoutCreateInfo {
 
-    std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+    std::vector<VkDescriptorSetLayout> m_vkDescriptorSetLayouts;
 
 public:
-    VkPipelineLayoutCreateInfo* operator&() = delete;
-
     PipelineLayoutCreateInfo()
-        : VkPipelineLayoutCreateInfo()
+        : VkPipelineLayoutCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     }
 
+    //	No copy, no move for now.  Could be changed with extra code if necessary.
+    ~PipelineLayoutCreateInfo() = default;
+    PipelineLayoutCreateInfo(const PipelineLayoutCreateInfo&) = delete;
+    PipelineLayoutCreateInfo& operator=(const PipelineLayoutCreateInfo&) = delete;
+    PipelineLayoutCreateInfo(PipelineLayoutCreateInfo&&) noexcept = delete;
+    PipelineLayoutCreateInfo& operator=(PipelineLayoutCreateInfo&&) noexcept = delete;
+
     void addDescriptorSetLayout(
-        vkcpp::DescriptorSetLayout descriptorSetLayout)
+        VkDescriptorSetLayout vkDescriptorSetLayout)
     {
-        m_descriptorSetLayouts.push_back(descriptorSetLayout);
-    }
-
-    VkPipelineLayoutCreateInfo* assemble()
-    {
-
-        setLayoutCount = (uint32_t)m_descriptorSetLayouts.size();
-        pSetLayouts = nullptr;
-        if (setLayoutCount > 0) {
-            pSetLayouts = m_descriptorSetLayouts.data();
-        }
-        return this;
+        //	Always up to date.
+        m_vkDescriptorSetLayouts.push_back(vkDescriptorSetLayout);
+        setLayoutCount = static_cast<uint32_t>(m_vkDescriptorSetLayouts.size());
+        pSetLayouts = m_vkDescriptorSetLayouts.data();
     }
 };
 
@@ -3134,10 +3131,10 @@ class PipelineLayout : public HandleWithOwner<VkPipelineLayout> {
 public:
     PipelineLayout() = default;
 
-    PipelineLayout(PipelineLayoutCreateInfo& pipelineLayoutCreateInfo, VkDevice vkDevice)
+    PipelineLayout(const PipelineLayoutCreateInfo& pipelineLayoutCreateInfo, VkDevice vkDevice)
     {
         VkPipelineLayout vkPipelineLayout;
-        VkResult vkResult = vkCreatePipelineLayout(vkDevice, pipelineLayoutCreateInfo.assemble(), nullptr, &vkPipelineLayout);
+        VkResult vkResult = vkCreatePipelineLayout(vkDevice, &pipelineLayoutCreateInfo, nullptr, &vkPipelineLayout);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -3148,6 +3145,12 @@ public:
 class PipelineInputAssemblyStateCreateInfo : public VkPipelineInputAssemblyStateCreateInfo {
 
 public:
+    PipelineInputAssemblyStateCreateInfo()
+        : VkPipelineInputAssemblyStateCreateInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    }
+
     PipelineInputAssemblyStateCreateInfo(VkPrimitiveTopology vkPrimitiveTopology)
         : VkPipelineInputAssemblyStateCreateInfo {}
     {
@@ -3175,13 +3178,18 @@ public:
 class PipelineMultisampleStateCreateInfo : public VkPipelineMultisampleStateCreateInfo {
 
 public:
-    //	Default create with reasonable settings.
     PipelineMultisampleStateCreateInfo()
         : VkPipelineMultisampleStateCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-        rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-        minSampleShading = 1.0f;
+    }
+
+    static PipelineMultisampleStateCreateInfo reasonableDefaults()
+    {
+        PipelineMultisampleStateCreateInfo reasonableDefaults;
+        reasonableDefaults.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        reasonableDefaults.minSampleShading = 1.0f;
+        return reasonableDefaults;
     }
 };
 
@@ -3209,47 +3217,28 @@ public:
 
 class PipelineColorBlendStateCreateInfo : public VkPipelineColorBlendStateCreateInfo {
 
+    std::vector<PipelineColorBlendAttachmentState> m_pipelineColorBlendAttachmentStates;
+
 public:
+    ~PipelineColorBlendStateCreateInfo() = default;
+    PipelineColorBlendStateCreateInfo(const PipelineColorBlendStateCreateInfo&) = delete;
+    PipelineColorBlendStateCreateInfo& operator=(const PipelineColorBlendStateCreateInfo&) = delete;
+    PipelineColorBlendStateCreateInfo(PipelineColorBlendStateCreateInfo&&) noexcept = delete;
+    PipelineColorBlendStateCreateInfo& operator=(PipelineColorBlendStateCreateInfo&&) noexcept = delete;
+
     //	Default create with reasonable settings.
     PipelineColorBlendStateCreateInfo()
         : VkPipelineColorBlendStateCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        logicOpEnable = VK_FALSE;
-        logicOp = VK_LOGIC_OP_COPY;
-    }
-};
-
-class VertexBinding {
-    //	This contains the vertex binding and the corresponding
-    //	attribute descriptions for the binding.
-
-public:
-    VkVertexInputBindingDescription m_vkVertexInputBindingDescription {};
-    std::vector<VkVertexInputAttributeDescription> m_vkVertexInputAttributeDescriptions;
-
-    VertexBinding(
-        uint32_t binding,
-        uint32_t stride,
-        VkVertexInputRate inputRate)
-    {
-        m_vkVertexInputBindingDescription.binding = binding;
-        m_vkVertexInputBindingDescription.stride = stride;
-        m_vkVertexInputBindingDescription.inputRate = inputRate;
     }
 
-    void addVertexInputAttributeDescription(
-        int bindingIndex,
-        int location,
-        VkFormat vkFormat,
-        uint32_t offset)
+    void addColorBlendAttachmentState(
+        const PipelineColorBlendAttachmentState& pipelineColorBlendAttachmentState)
     {
-        VkVertexInputAttributeDescription vkVertexInputAttributeDescription {};
-        vkVertexInputAttributeDescription.binding = static_cast<uint32_t>(bindingIndex);
-        vkVertexInputAttributeDescription.location = static_cast<uint32_t>(location);
-        vkVertexInputAttributeDescription.format = vkFormat;
-        vkVertexInputAttributeDescription.offset = static_cast<uint32_t>(offset);
-        m_vkVertexInputAttributeDescriptions.push_back(vkVertexInputAttributeDescription);
+        m_pipelineColorBlendAttachmentStates.emplace_back(pipelineColorBlendAttachmentState);
+        attachmentCount = static_cast<uint32_t>(m_pipelineColorBlendAttachmentStates.size());
+        pAttachments = m_pipelineColorBlendAttachmentStates.data();
     }
 };
 
@@ -3259,13 +3248,25 @@ public:
     PipelineDepthStencilStateCreateInfo()
         : VkPipelineDepthStencilStateCreateInfo {}
     {
-        //	Reasonable defaults
         sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        depthTestEnable = VK_TRUE;
-        depthWriteEnable = VK_TRUE;
-        depthCompareOp = VK_COMPARE_OP_LESS; // Less depth means in front of
-        depthBoundsTestEnable = VK_FALSE;
-        stencilTestEnable = VK_FALSE;
+    }
+
+    //	Not sure how reasonable this is :-)
+    static PipelineDepthStencilStateCreateInfo reasonableDefaults()
+    {
+        PipelineDepthStencilStateCreateInfo reasonable;
+        //	Reasonable defaults
+        reasonable.depthTestEnable = VK_TRUE;
+        reasonable.depthWriteEnable = VK_TRUE;
+        reasonable.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        reasonable.depthBoundsTestEnable = VK_FALSE;
+        reasonable.back.failOp = VK_STENCIL_OP_KEEP;
+        reasonable.back.passOp = VK_STENCIL_OP_KEEP;
+        reasonable.back.compareOp = VK_COMPARE_OP_ALWAYS;
+        reasonable.stencilTestEnable = VK_FALSE;
+        reasonable.front = reasonable.back;
+
+        return reasonable;
     }
 };
 static_assert(sizeof(PipelineDepthStencilStateCreateInfo) == sizeof(VkPipelineDepthStencilStateCreateInfo));
@@ -3275,56 +3276,160 @@ class PipelineDynamicStateCreateInfo : public VkPipelineDynamicStateCreateInfo {
     std::vector<VkDynamicState> m_dynamicStates;
 
 public:
-    VkPipelineDynamicStateCreateInfo* operator&() = delete;
-
     PipelineDynamicStateCreateInfo()
         : VkPipelineDynamicStateCreateInfo {}
     {
+        sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     }
 
     void addDynamicState(VkDynamicState vkDynamicState)
     {
-        m_dynamicStates.push_back(vkDynamicState);
+        //	Always up to date
+        m_dynamicStates.emplace_back(vkDynamicState);
+        dynamicStateCount = static_cast<uint32_t>(m_dynamicStates.size());
+        pDynamicStates = m_dynamicStates.data();
+    }
+};
+
+class PipelineVertexInputStateCreateInfo : public VkPipelineVertexInputStateCreateInfo {
+
+    std::vector<VkVertexInputBindingDescription> m_vertexInputBindingDescriptions;
+    std::vector<VkVertexInputAttributeDescription> m_vertexInputAttributeDescriptions;
+
+public:
+    ~PipelineVertexInputStateCreateInfo() = default;
+    PipelineVertexInputStateCreateInfo(const PipelineVertexInputStateCreateInfo&) = delete;
+    PipelineVertexInputStateCreateInfo& operator=(const PipelineVertexInputStateCreateInfo&) = delete;
+    PipelineVertexInputStateCreateInfo(PipelineVertexInputStateCreateInfo&&) noexcept = delete;
+    PipelineVertexInputStateCreateInfo& operator=(PipelineVertexInputStateCreateInfo&&) noexcept = delete;
+
+    PipelineVertexInputStateCreateInfo()
+        : VkPipelineVertexInputStateCreateInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     }
 
-    VkPipelineDynamicStateCreateInfo* assemble()
+    void addVertexInputBindingDescription(
+        const VkVertexInputBindingDescription& vertexInputBindingDescription)
     {
-        sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-        dynamicStateCount = static_cast<uint32_t>(m_dynamicStates.size());
-        pDynamicStates = nullptr;
-        if (dynamicStateCount > 0) {
-            pDynamicStates = m_dynamicStates.data();
-        }
-        return this;
+        m_vertexInputBindingDescriptions.emplace_back(vertexInputBindingDescription);
+        vertexBindingDescriptionCount = static_cast<uint32_t>(m_vertexInputBindingDescriptions.size());
+        pVertexBindingDescriptions = m_vertexInputBindingDescriptions.data();
+    }
+
+    void addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate vkVertexInputRate)
+    {
+        VkVertexInputBindingDescription vkVertexInputBindingDescription {
+            .binding = binding,
+            .stride = stride,
+            .inputRate = vkVertexInputRate
+        };
+
+        m_vertexInputBindingDescriptions.emplace_back(vkVertexInputBindingDescription);
+        vertexBindingDescriptionCount = static_cast<uint32_t>(m_vertexInputBindingDescriptions.size());
+        pVertexBindingDescriptions = m_vertexInputBindingDescriptions.data();
+    }
+
+    void addVertexInputAttributeDescription(
+        const VkVertexInputAttributeDescription& vertexInputAttributeDescription)
+    {
+        m_vertexInputAttributeDescriptions.emplace_back(vertexInputAttributeDescription);
+        vertexAttributeDescriptionCount = static_cast<uint32_t>(m_vertexInputAttributeDescriptions.size());
+        pVertexAttributeDescriptions = m_vertexInputAttributeDescriptions.data();
+    }
+
+    void addVertexInputAttributeDescription(
+        uint32_t binding, uint32_t location, VkFormat vkFormat, uint32_t offset)
+    {
+        VkVertexInputAttributeDescription vkVertexInputAttributeDescription {
+            .location = location,
+            .binding = binding,
+            .format = vkFormat,
+            .offset = offset
+        };
+        m_vertexInputAttributeDescriptions.emplace_back(vkVertexInputAttributeDescription);
+        vertexAttributeDescriptionCount = static_cast<uint32_t>(m_vertexInputAttributeDescriptions.size());
+        pVertexAttributeDescriptions = m_vertexInputAttributeDescriptions.data();
+    }
+};
+
+class PipelineViewportStateCreateInfo : public VkPipelineViewportStateCreateInfo {
+    //	TODO: are the flags used at all?
+
+    std::vector<VkViewport> m_viewports;
+    std::vector<VkRect2D> m_scissors;
+
+public:
+    PipelineViewportStateCreateInfo()
+        : VkPipelineViewportStateCreateInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    }
+
+    ~PipelineViewportStateCreateInfo() = default;
+    PipelineViewportStateCreateInfo(const PipelineViewportStateCreateInfo&) = delete;
+    PipelineViewportStateCreateInfo& operator=(const PipelineViewportStateCreateInfo&) = delete;
+    PipelineViewportStateCreateInfo(PipelineViewportStateCreateInfo&&) noexcept = delete;
+    PipelineViewportStateCreateInfo& operator=(PipelineViewportStateCreateInfo&&) noexcept = delete;
+
+    void addViewport(const VkViewport& viewport)
+    {
+        m_viewports.emplace_back(viewport);
+        viewportCount = static_cast<uint32_t>(m_viewports.size());
+        pViewports = m_viewports.data();
+    }
+
+    void addScissor(const VkRect2D scissor)
+    {
+        m_scissors.emplace_back(scissor);
+        scissorCount = static_cast<uint32_t>(m_scissors.size());
+        pScissors = m_scissors.data();
+    }
+};
+
+class PipelineRenderingCreateInfo : public VkPipelineRenderingCreateInfo {
+    //	TODO: is viewMask used?
+    std::vector<VkFormat> m_colorAttachmentFormats;
+
+public:
+    PipelineRenderingCreateInfo()
+        : VkPipelineRenderingCreateInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    }
+
+    void setDepthAttachmentFormat(VkFormat vkFormat)
+    {
+        depthAttachmentFormat = vkFormat;
+    }
+
+    void setStencilAttachmentFormat(VkFormat vkFormat)
+    {
+        stencilAttachmentFormat = vkFormat;
+    }
+
+    void addColorAttachmentFormat(VkFormat vkFormat)
+    {
+        m_colorAttachmentFormats.emplace_back(vkFormat);
+        colorAttachmentCount = static_cast<uint32_t>(m_colorAttachmentFormats.size());
+        pColorAttachmentFormats = m_colorAttachmentFormats.data();
     }
 };
 
 class GraphicsPipelineCreateInfo {
 
-    PipelineInputAssemblyStateCreateInfo m_inputAssemblyStateCreateInfo { VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST };
-
-    std::vector<VkVertexInputBindingDescription> m_vertexInputBindingDescriptions;
-    std::vector<VkVertexInputAttributeDescription> m_vertexInputAttributeDescriptions;
-    VkPipelineVertexInputStateCreateInfo m_vkPipelineVertexInputStateCreateInfo {};
-
-    std::vector<VkPipelineShaderStageCreateInfo> m_shaderStageCreateInfos;
-
+    PipelineInputAssemblyStateCreateInfo m_pipelineInputAssemblyStateCreateInfo;
+    PipelineVertexInputStateCreateInfo m_pipelineVertexInputStateCreateInfo;
+    std::vector<VkPipelineShaderStageCreateInfo> m_vkPipelineShaderStageCreateInfos;
     PipelineDynamicStateCreateInfo m_pipelineDynamicStateCreateInfo;
-
-    VkViewport m_viewport {};
-    VkRect2D m_scissor {};
-
-    VkPipelineViewportStateCreateInfo m_viewportState {};
-
+    PipelineViewportStateCreateInfo m_viewportStateCreateInfo;
     PipelineRasterizationStateCreateInfo m_pipelineRasterizationStateCreateInfo;
     PipelineMultisampleStateCreateInfo m_pipelineMultisampleStateCreateInfo;
-    PipelineColorBlendAttachmentState m_pipelineColorBlendAttachmentState;
     PipelineColorBlendStateCreateInfo m_pipelineColorBlendStateCreateInfo;
-    PipelineDepthStencilStateCreateInfo m_vkPipelineDepthStencilStateCreateInfo;
+    PipelineDepthStencilStateCreateInfo m_pipelineDepthStencilStateCreateInfo;
 
-    PipelineLayout m_pipelineLayout;
-    RenderPass m_renderPass;
-    int m_subpassNumber;
+    //	TODO: just handling pipeline rendering create info extensions for now.
+    PipelineRenderingCreateInfo m_pipelineRenderingCreateInfo;
 
     //	Contains rather than inherits from the Vulkan structure.
     //	Not sure if it makes any difference.  It's a tiny bit
@@ -3333,9 +3438,89 @@ class GraphicsPipelineCreateInfo {
     //	into the Vulkan create info structure.
     VkGraphicsPipelineCreateInfo m_vkGraphicsPipelineCreateInfo {};
 
+    void assemblePartial()
+    {
+        m_vkGraphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+
+        m_vkGraphicsPipelineCreateInfo.pVertexInputState = &m_pipelineVertexInputStateCreateInfo;
+        m_vkGraphicsPipelineCreateInfo.pInputAssemblyState = &m_pipelineInputAssemblyStateCreateInfo;
+        m_vkGraphicsPipelineCreateInfo.pViewportState = &m_viewportStateCreateInfo;
+        m_vkGraphicsPipelineCreateInfo.pRasterizationState = &m_pipelineRasterizationStateCreateInfo;
+        m_vkGraphicsPipelineCreateInfo.pMultisampleState = &m_pipelineMultisampleStateCreateInfo;
+        m_vkGraphicsPipelineCreateInfo.pColorBlendState = &m_pipelineColorBlendStateCreateInfo;
+        m_vkGraphicsPipelineCreateInfo.pDynamicState = &m_pipelineDynamicStateCreateInfo;
+        m_vkGraphicsPipelineCreateInfo.pDepthStencilState = &m_pipelineDepthStencilStateCreateInfo;
+
+        m_vkGraphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
+        m_vkGraphicsPipelineCreateInfo.basePipelineIndex = -1; // Optional
+    }
+
 public:
+    GraphicsPipelineCreateInfo()
+    {
+        assemblePartial();
+    }
+
+    //	No move, no copy.  Maybe update code if necessary for multiple pipelines.
+    ~GraphicsPipelineCreateInfo() = default;
+    GraphicsPipelineCreateInfo(const GraphicsPipelineCreateInfo&) = delete;
+    GraphicsPipelineCreateInfo& operator=(const GraphicsPipelineCreateInfo&) = delete;
+    GraphicsPipelineCreateInfo(GraphicsPipelineCreateInfo&&) = delete;
+    GraphicsPipelineCreateInfo& operator=(GraphicsPipelineCreateInfo&&) = delete;
+
+    VkGraphicsPipelineCreateInfo* operator&()
+    {
+        return &m_vkGraphicsPipelineCreateInfo;
+    }
+
+    void usePipelineRenderingCreateInfo()
+    {
+        m_vkGraphicsPipelineCreateInfo.pNext = &m_pipelineRenderingCreateInfo;
+    }
+
+    void setInputAssemblyState(VkPrimitiveTopology vkPrimitiveTopology)
+    {
+        m_pipelineInputAssemblyStateCreateInfo = PipelineInputAssemblyStateCreateInfo(vkPrimitiveTopology);
+    }
+
+    void setRasterizationStateCreateInfo(const PipelineRasterizationStateCreateInfo& pipelineRasterizationStateCreateInfo)
+    {
+        m_pipelineRasterizationStateCreateInfo = pipelineRasterizationStateCreateInfo;
+    }
+
+    void setMultisampleStateCreateInfo(const PipelineMultisampleStateCreateInfo& pipelineMultisampleStateCreateInfo)
+    {
+        m_pipelineMultisampleStateCreateInfo = pipelineMultisampleStateCreateInfo;
+    }
+
+    void setDepthStencilStateCreateInfo(PipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo)
+    {
+        m_pipelineDepthStencilStateCreateInfo = pipelineDepthStencilStateCreateInfo;
+    }
+
+    void setDepthAttachmentFormat(VkFormat vkFormat)
+    {
+        m_pipelineRenderingCreateInfo.setDepthAttachmentFormat(vkFormat);
+    }
+
+    void setStencilAttachmentFormat(VkFormat vkFormat)
+    {
+        m_pipelineRenderingCreateInfo.setStencilAttachmentFormat(vkFormat);
+    }
+
+    void addColorAttachmentFormat(VkFormat vkFormat)
+    {
+        m_pipelineRenderingCreateInfo.addColorAttachmentFormat(vkFormat);
+    }
+
+    void addColorBlendAttachmentState(
+        const PipelineColorBlendAttachmentState& pipelineColorBlendAttachmentState)
+    {
+        m_pipelineColorBlendStateCreateInfo.addColorBlendAttachmentState(pipelineColorBlendAttachmentState);
+    }
+
     void addShaderModule(
-        vkcpp::ShaderModule shaderModule,
+        const ShaderModule& shaderModule,
         VkShaderStageFlagBits vkShaderStageFlagBits,
         const char* entryPointName)
     {
@@ -3344,18 +3529,33 @@ public:
         vkPipelineShaderStageCreateInfo.stage = vkShaderStageFlagBits;
         vkPipelineShaderStageCreateInfo.module = shaderModule;
         vkPipelineShaderStageCreateInfo.pName = entryPointName;
-        m_shaderStageCreateInfos.push_back(vkPipelineShaderStageCreateInfo);
+        m_vkPipelineShaderStageCreateInfos.emplace_back(vkPipelineShaderStageCreateInfo);
+        m_vkGraphicsPipelineCreateInfo.stageCount = static_cast<uint32_t>(m_vkPipelineShaderStageCreateInfos.size());
+        m_vkGraphicsPipelineCreateInfo.pStages = m_vkPipelineShaderStageCreateInfos.data();
     }
 
-    void addVertexBinding(const VertexBinding& vertexBinding)
+    void addVertexInputBindingDescription(
+        const VkVertexInputBindingDescription& vertexInputBindingDescription)
     {
-        //	Take the binding and split it to the binding description
-        //	and the corresponding attribute description since they are
-        //	passed separately when creating the m_vkPipeline.
-        m_vertexInputBindingDescriptions.push_back(vertexBinding.m_vkVertexInputBindingDescription);
-        for (const VkVertexInputAttributeDescription& vkVertexInputAttributeDescription : vertexBinding.m_vkVertexInputAttributeDescriptions) {
-            m_vertexInputAttributeDescriptions.push_back(vkVertexInputAttributeDescription);
-        }
+        m_pipelineVertexInputStateCreateInfo.addVertexInputBindingDescription(vertexInputBindingDescription);
+    }
+
+    void addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate vkVertexInputRate)
+    {
+        m_pipelineVertexInputStateCreateInfo.addVertexInputBindingDescription(binding, stride, vkVertexInputRate);
+    }
+
+    void addVertexInputAttributeDescription(
+        const VkVertexInputAttributeDescription& vertexInputAttributeDescription)
+    {
+        m_pipelineVertexInputStateCreateInfo.addVertexInputAttributeDescription(vertexInputAttributeDescription);
+    }
+
+    void addVertexInputAttributeDescription(
+        uint32_t binding, uint32_t location, VkFormat vkFormat, uint32_t offset)
+    {
+        m_pipelineVertexInputStateCreateInfo
+            .addVertexInputAttributeDescription(binding, location, vkFormat, offset);
     }
 
     void addDynamicState(VkDynamicState vkDynamicState)
@@ -3363,93 +3563,36 @@ public:
         m_pipelineDynamicStateCreateInfo.addDynamicState(vkDynamicState);
     }
 
-    void setViewportExtent(VkExtent2D extent)
+    // void setViewportExtent(VkExtent2D extent)
+    //{
+    //     m_viewport.width = static_cast<float>(extent.width);
+    //     m_viewport.height = static_cast<float>(extent.height);
+    // }
+
+    // void setScissorExtent(VkExtent2D extent)
+    //{
+    //     m_scissor.extent = extent;
+    // }
+
+    void addViewport(const VkViewport& viewport)
     {
-        m_viewport.width = static_cast<float>(extent.width);
-        m_viewport.height = static_cast<float>(extent.height);
+        m_viewportStateCreateInfo.addViewport(viewport);
     }
 
-    void setScissorExtent(VkExtent2D extent)
+    void addScissor(const VkRect2D scissor)
     {
-        m_scissor.extent = extent;
+        m_viewportStateCreateInfo.addScissor(scissor);
     }
 
-    void setPipelineLayout(PipelineLayout pipelineLayout)
+    void setPipelineLayout(const PipelineLayout& pipelineLayout)
     {
-        m_pipelineLayout = pipelineLayout;
+        m_vkGraphicsPipelineCreateInfo.layout = pipelineLayout;
     }
 
-    void setRenderPass(RenderPass renderPass, int subpassNumber)
+    void setRenderPass(const RenderPass& renderPass, int subpassNumber)
     {
-        m_renderPass = renderPass;
-        m_subpassNumber = subpassNumber;
-    }
-
-    //	A bit dodgy.  Returning pointer to internal member.
-    //	Should just be used to create m_vkPipeline.
-    VkGraphicsPipelineCreateInfo* assemble()
-    {
-
-        //	TODO: need to clear out create info in case we are called twice.
-
-        //	Assemble m_vkPipeline create info
-        m_vkGraphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-
-        //	Shaders
-        m_vkGraphicsPipelineCreateInfo.stageCount = static_cast<uint32_t>(m_shaderStageCreateInfos.size());
-        if (m_vkGraphicsPipelineCreateInfo.stageCount > 0) {
-            m_vkGraphicsPipelineCreateInfo.pStages = m_shaderStageCreateInfos.data();
-        }
-
-        //	Just assemble this create structure in place.
-        //	Doesn't seem to be a need to make the create structure independent right now.
-        //	TODO: maybe make independent when more vertex info?  This is getting messy.
-        m_vkPipelineVertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-        m_vkPipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(m_vertexInputBindingDescriptions.size());
-        if (m_vkPipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount) {
-            m_vkPipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = m_vertexInputBindingDescriptions.data();
-        }
-
-        m_vkPipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(m_vertexInputAttributeDescriptions.size());
-        if (m_vkPipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount) {
-            m_vkPipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = m_vertexInputAttributeDescriptions.data();
-        }
-
-        m_vkGraphicsPipelineCreateInfo.pVertexInputState = &m_vkPipelineVertexInputStateCreateInfo;
-
-        m_vkGraphicsPipelineCreateInfo.pInputAssemblyState = &m_inputAssemblyStateCreateInfo;
-
-        m_viewport.maxDepth = 1.0f;
-        // TODO make the viewportState smarter?
-        m_viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-        m_viewportState.viewportCount = 1;
-        m_viewportState.pViewports = &m_viewport;
-        m_viewportState.scissorCount = 1;
-        m_viewportState.pScissors = &m_scissor;
-        m_vkGraphicsPipelineCreateInfo.pViewportState = &m_viewportState;
-
-        m_vkGraphicsPipelineCreateInfo.pRasterizationState = &m_pipelineRasterizationStateCreateInfo;
-
-        m_vkGraphicsPipelineCreateInfo.pMultisampleState = &m_pipelineMultisampleStateCreateInfo;
-
-        m_vkGraphicsPipelineCreateInfo.pDepthStencilState = nullptr;
-
-        m_pipelineColorBlendStateCreateInfo.attachmentCount = 1;
-        m_pipelineColorBlendStateCreateInfo.pAttachments = &m_pipelineColorBlendAttachmentState;
-        m_vkGraphicsPipelineCreateInfo.pColorBlendState = &m_pipelineColorBlendStateCreateInfo;
-
-        m_vkGraphicsPipelineCreateInfo.pDynamicState = m_pipelineDynamicStateCreateInfo.assemble();
-
-        m_vkGraphicsPipelineCreateInfo.pDepthStencilState = &m_vkPipelineDepthStencilStateCreateInfo;
-
-        m_vkGraphicsPipelineCreateInfo.layout = m_pipelineLayout;
-        m_vkGraphicsPipelineCreateInfo.renderPass = m_renderPass;
-        m_vkGraphicsPipelineCreateInfo.subpass = m_subpassNumber;
-        m_vkGraphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-        m_vkGraphicsPipelineCreateInfo.basePipelineIndex = -1; // Optional
-
-        return &m_vkGraphicsPipelineCreateInfo;
+        m_vkGraphicsPipelineCreateInfo.renderPass = renderPass;
+        m_vkGraphicsPipelineCreateInfo.subpass = subpassNumber;
     }
 };
 
@@ -3471,7 +3614,7 @@ public:
     GraphicsPipeline(GraphicsPipelineCreateInfo& pipelineCreateInfo, VkDevice vkDevice)
     {
         VkPipeline vkPipeline;
-        VkResult vkResult = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, pipelineCreateInfo.assemble(), nullptr, &vkPipeline);
+        VkResult vkResult = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &vkPipeline);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -3936,5 +4079,4 @@ public:
             std::move(imageView));
     }
 };
-
 }

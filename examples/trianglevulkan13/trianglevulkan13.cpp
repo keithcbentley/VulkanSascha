@@ -2,7 +2,7 @@
  * Vulkan Example - Basic indexed triangle rendering using Vulkan 1.3
  *
  * Note:
- * This is a variation of the the triangle sample that makes use of Vulkan 1.3 m_vkPhysicalDeviceFeatures
+ * This is a variation of the triangle sample that makes use of Vulkan 1.3 m_vkPhysicalDeviceFeatures
  * This simplifies the api a bit, esp. with dynamic rendering replacing render passes (and with that framebuffers)
  *
  * Copyright (C) 2024-2025 by Sascha Willems - www.saschawillems.de
@@ -23,9 +23,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <VulkanCpp.hpp>
-// #include <vulkan/vulkan.h>
 #include "vulkanexamplebase.h"
+#include <VulkanCpp.hpp>
 
 // We want to keep GPU and CPU busy. To do that we may start building a new command buffer while the previous one is still being executed
 // This number defines how many frames may be worked on simultaneously at once
@@ -72,7 +71,7 @@ public:
     // The m_vkPipeline layout is used by a m_vkPipeline to access the descriptor sets
     // It defines interface (without binding any actual data) between the shader stages used by the m_vkPipeline and the shader resources
     // A m_vkPipeline layout can be shared among multiple pipelines as long as their interfaces match
-    VkPipelineLayout m_vkPipelineLayout { VK_NULL_HANDLE };
+    vkcpp::PipelineLayout m_pipelineLayoutOriginal;
 
     // Pipelines (often called "m_vkPipeline state objects") are used to bake all states that affect a m_vkPipeline
     // While in OpenGL every state can be changed at (almost) any time, Vulkan requires to layout the graphics (and compute) m_vkPipeline states upfront
@@ -92,13 +91,13 @@ public:
     // Fences are used to make sure command buffers aren't rerecorded until they've finished executing
     std::array<VkFence, MAX_CONCURRENT_FRAMES> m_waitFences {};
 
-//    VkCommandPool m_vkCommandPool { VK_NULL_HANDLE };
+    //    VkCommandPool m_vkCommandPool { VK_NULL_HANDLE };
     std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> m_commandBuffers {};
 
     // To select the correct sync and command objects, we need to keep track of the current frame
     uint32_t m_currentFrameIndex { 0 };
 
-	VkPhysicalDeviceVulkan13Features m_vkPhysicalDeviceVulkan13Features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
+    VkPhysicalDeviceVulkan13Features m_vkPhysicalDeviceVulkan13Features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
 
     VulkanExample()
         : VulkanExampleBase()
@@ -124,7 +123,6 @@ public:
         // Note: Inherited destructor cleans up resources stored in base class
         if (m_deviceOriginal) {
             vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
-            vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
             vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
             vkDestroyBuffer(m_deviceOriginal, m_vertexBuffer.m_vkBuffer, nullptr);
             vkFreeMemory(m_deviceOriginal, m_vertexBuffer.m_vkDeviceMemory, nullptr);
@@ -496,159 +494,74 @@ public:
         }
     }
 
-    void createPipeline()
-    {
-        // The m_vkPipeline layout is the interface telling the m_vkPipeline what type of descriptors will later be bound
-        VkPipelineLayoutCreateInfo pipelineLayoutCI { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        pipelineLayoutCI.setLayoutCount = 1;
-        pipelineLayoutCI.pSetLayouts = &m_vkDescriptorSetLayout;
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
+	void createPipeline() {
+		vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+		pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayout);
+		m_pipelineLayoutOriginal = vkcpp::PipelineLayout(pipelineLayoutCreateInfo, m_deviceOriginal);
 
-        // Create the graphics m_vkPipeline used in this example
-        // Vulkan uses the concept of rendering pipelines to encapsulate fixed states, replacing OpenGL's complex state machine
-        // A m_vkPipeline is then stored and hashed on the GPU making m_vkPipeline changes very fast
+		vkcpp::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo;
+		graphicsPipelineCreateInfo.setPipelineLayout(m_pipelineLayoutOriginal);
 
-        VkGraphicsPipelineCreateInfo pipelineCI { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-        // The layout used for this m_vkPipeline (can be shared among multiple pipelines using the same layout)
-        pipelineCI.layout = m_vkPipelineLayout;
+		graphicsPipelineCreateInfo.setInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-        // Construct the different states making up the m_vkPipeline
+		vkcpp::PipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo;
+		graphicsPipelineCreateInfo.setRasterizationStateCreateInfo(pipelineRasterizationStateCreateInfo);
 
-        // Input assembly state describes how primitives are assembled
-        // This m_vkPipeline will assemble vertex data as a triangle lists (though we only use one triangle)
-        VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-        inputAssemblyStateCI.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+//		vkcpp::PipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo;
+		vkcpp::PipelineColorBlendAttachmentState pipelineColorBlendAttachmentState;
+		graphicsPipelineCreateInfo.addColorBlendAttachmentState(pipelineColorBlendAttachmentState);
 
-        // Rasterization state
-        VkPipelineRasterizationStateCreateInfo rasterizationStateCI { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-        rasterizationStateCI.polygonMode = VK_POLYGON_MODE_FILL;
-        rasterizationStateCI.cullMode = VK_CULL_MODE_NONE;
-        rasterizationStateCI.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        rasterizationStateCI.depthClampEnable = VK_FALSE;
-        rasterizationStateCI.rasterizerDiscardEnable = VK_FALSE;
-        rasterizationStateCI.depthBiasEnable = VK_FALSE;
-        rasterizationStateCI.lineWidth = 1.0f;
+		//	Need to do viewport and scissor
+		graphicsPipelineCreateInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
+		graphicsPipelineCreateInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
 
-        // Color blend state describes how blend factors are calculated (if used)
-        // We need one blend attachment state per color attachment (even if blending is not used)
-        VkPipelineColorBlendAttachmentState blendAttachmentState {};
-        blendAttachmentState.colorWriteMask = 0xf;
-        blendAttachmentState.blendEnable = VK_FALSE;
-        VkPipelineColorBlendStateCreateInfo colorBlendStateCI { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-        colorBlendStateCI.attachmentCount = 1;
-        colorBlendStateCI.pAttachments = &blendAttachmentState;
+		//	Not sure what to do here if we have dynamic state.
+		VkViewport viewport{};
+		viewport.width = 200;
+		viewport.height = 200;
+		graphicsPipelineCreateInfo.addViewport(VkViewport{});
 
-        // Viewport state sets the number of viewports and scissor used in this m_vkPipeline
-        // Note: This is actually overridden by the dynamic states (see below)
-        VkPipelineViewportStateCreateInfo viewportStateCI { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
-        viewportStateCI.viewportCount = 1;
-        viewportStateCI.scissorCount = 1;
+		VkRect2D scissor{};
+		scissor.extent.width = 200;
+		scissor.extent.height = 200;
+		graphicsPipelineCreateInfo.addScissor(scissor);
 
-        // Enable dynamic states
-        // Most states are baked into the m_vkPipeline, but there is somee state that can be dynamically changed within the command buffer to mak e things easuer
-        // To be able to change these we need do specify which dynamic states will be changed using this m_vkPipeline. Their actual states are set later on in the command buffer
-        std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-        VkPipelineDynamicStateCreateInfo dynamicStateCI { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-        dynamicStateCI.pDynamicStates = dynamicStateEnables.data();
-        dynamicStateCI.dynamicStateCount = static_cast<uint32_t>(dynamicStateEnables.size());
-
-        // Depth and stencil state containing depth and stencil compare and test operations
-        // We only use depth tests and want depth tests and writes to be enabled and compare with less or equal
-        VkPipelineDepthStencilStateCreateInfo depthStencilStateCI { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-        depthStencilStateCI.depthTestEnable = VK_TRUE;
-        depthStencilStateCI.depthWriteEnable = VK_TRUE;
-        depthStencilStateCI.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-        depthStencilStateCI.depthBoundsTestEnable = VK_FALSE;
-        depthStencilStateCI.back.failOp = VK_STENCIL_OP_KEEP;
-        depthStencilStateCI.back.passOp = VK_STENCIL_OP_KEEP;
-        depthStencilStateCI.back.compareOp = VK_COMPARE_OP_ALWAYS;
-        depthStencilStateCI.stencilTestEnable = VK_FALSE;
-        depthStencilStateCI.front = depthStencilStateCI.back;
-
-        // This example does not make use of multi sampling (for anti-aliasing), the state must still be set and passed to the m_vkPipeline
-        VkPipelineMultisampleStateCreateInfo multisampleStateCI { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-        multisampleStateCI.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        graphicsPipelineCreateInfo.setDepthStencilStateCreateInfo(
+            vkcpp::PipelineDepthStencilStateCreateInfo::reasonableDefaults());
 
         // Vertex input descriptions
         // Specifies the vertex input parameters for a m_vkPipeline
 
         // Vertex input binding
         // This example uses a single vertex input binding at binding point 0 (see vkCmdBindVertexBuffers)
-        VkVertexInputBindingDescription vertexInputBinding {};
-        vertexInputBinding.binding = 0;
-        vertexInputBinding.stride = sizeof(Vertex);
-        vertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
+        graphicsPipelineCreateInfo.addVertexInputBindingDescription(0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX);
         // Input attribute bindings describe shader attribute locations and m_vkDeviceMemory layouts
-        std::array<VkVertexInputAttributeDescription, 2> vertexInputAttributs {};
-        // These match the following shader layout (see triangle.vert):
-        //	layout (location = 0) in vec3 inPos;
-        //	layout (location = 1) in vec3 inColor;
-        // Attribute location 0: Position
-        vertexInputAttributs[0].binding = 0;
-        vertexInputAttributs[0].location = 0;
-        // Position attribute is three 32 bit signed (SFLOAT) floats (R32 G32 B32)
-        vertexInputAttributs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        vertexInputAttributs[0].offset = offsetof(Vertex, position);
-        // Attribute location 1: Color
-        vertexInputAttributs[1].binding = 0;
-        vertexInputAttributs[1].location = 1;
-        // Color attribute is three 32 bit signed (SFLOAT) floats (R32 G32 B32)
-        vertexInputAttributs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        vertexInputAttributs[1].offset = offsetof(Vertex, color);
+        graphicsPipelineCreateInfo.addVertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position));
+        graphicsPipelineCreateInfo.addVertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color));
 
-        // Vertex input state used for m_vkPipeline creation
-        VkPipelineVertexInputStateCreateInfo vertexInputStateCI { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-        vertexInputStateCI.vertexBindingDescriptionCount = 1;
-        vertexInputStateCI.pVertexBindingDescriptions = &vertexInputBinding;
-        vertexInputStateCI.vertexAttributeDescriptionCount = 2;
-        vertexInputStateCI.pVertexAttributeDescriptions = vertexInputAttributs.data();
+        //	Shader modules can be safely destroyed after pipeline creation, so RAII
+        //	for the handles is ok for this situation.
+        vkcpp::ShaderModule vertexShaderModule = vkcpp::ShaderModule::createShaderModuleFromFile(
+            getShadersPath() + "triangle/triangle.vert.spv", m_deviceOriginal);
+        graphicsPipelineCreateInfo.addShaderModule(vertexShaderModule, VK_SHADER_STAGE_VERTEX_BIT, "main");
 
-        // Shaders
-        std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages {};
+        vkcpp::ShaderModule fragmentShaderModule = vkcpp::ShaderModule::createShaderModuleFromFile(
+            getShadersPath() + "triangle/triangle.frag.spv", m_deviceOriginal);
+        graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModule, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
 
-        // Vertex shader
-        shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-        shaderStages[0].module = loadSPIRVShader(getShadersPath() + "triangle/triangle.vert.spv");
-        shaderStages[0].pName = "main";
-        assert(shaderStages[0].module != VK_NULL_HANDLE);
-
-        // Fragment shader
-        shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        shaderStages[1].module = loadSPIRVShader(getShadersPath() + "triangle/triangle.frag.spv");
-        shaderStages[1].pName = "main";
-        assert(shaderStages[1].module != VK_NULL_HANDLE);
-
-        // Set m_vkPipeline shader stage info
-        pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
-        pipelineCI.pStages = shaderStages.data();
+		// Assign the m_vkPipeline states to the m_vkPipeline creation info structure
+		graphicsPipelineCreateInfo.setMultisampleStateCreateInfo(
+			vkcpp::PipelineMultisampleStateCreateInfo::reasonableDefaults());
 
         // Attachment information for dynamic rendering
-        VkPipelineRenderingCreateInfoKHR pipelineRenderingCI { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
-        pipelineRenderingCI.colorAttachmentCount = 1;
-        pipelineRenderingCI.pColorAttachmentFormats = &m_swapChain.colorFormat;
-        pipelineRenderingCI.depthAttachmentFormat = m_vkFormatDepth;
-        pipelineRenderingCI.stencilAttachmentFormat = m_vkFormatDepth;
-
-        // Assign the m_vkPipeline states to the m_vkPipeline creation info structure
-        pipelineCI.pVertexInputState = &vertexInputStateCI;
-        pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
-        pipelineCI.pRasterizationState = &rasterizationStateCI;
-        pipelineCI.pColorBlendState = &colorBlendStateCI;
-        pipelineCI.pMultisampleState = &multisampleStateCI;
-        pipelineCI.pViewportState = &viewportStateCI;
-        pipelineCI.pDepthStencilState = &depthStencilStateCI;
-        pipelineCI.pDynamicState = &dynamicStateCI;
-        pipelineCI.pNext = &pipelineRenderingCI;
+		graphicsPipelineCreateInfo.setDepthAttachmentFormat(m_vkFormatDepth);
+		graphicsPipelineCreateInfo.setStencilAttachmentFormat(m_vkFormatDepth);
+		graphicsPipelineCreateInfo.addColorAttachmentFormat(m_swapChain.colorFormat);
+		graphicsPipelineCreateInfo.usePipelineRenderingCreateInfo();
 
         // Create rendering m_vkPipeline using the specified states
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
-
-        // Shader modules can safely be destroyed when the m_vkPipeline has been created
-        vkDestroyShaderModule(m_deviceOriginal, shaderStages[0].module, nullptr);
-        vkDestroyShaderModule(m_deviceOriginal, shaderStages[1].module, nullptr);
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+			m_deviceOriginal, m_vkPipelineCache, 1, &graphicsPipelineCreateInfo, nullptr, &m_vkPipeline));
     }
 
     void createUniformBuffers()
@@ -778,7 +691,7 @@ public:
 
         // Bind descriptor set for the current frame's uniform buffer,
         // so the shader uses the data from that buffer for this draw
-        commandBuffer.cmdBindDescriptorSet(m_vkPipelineLayout, uniformBuffers[m_currentFrameIndex].descriptorSet);
+        commandBuffer.cmdBindDescriptorSet(m_pipelineLayoutOriginal, uniformBuffers[m_currentFrameIndex].descriptorSet);
 
         // The m_vkPipeline (state object) contains all states of the rendering m_vkPipeline,
         // binding it will set all the states specified at m_vkPipeline creation time
