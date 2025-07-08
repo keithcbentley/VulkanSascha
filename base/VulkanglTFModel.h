@@ -226,14 +226,17 @@ namespace vkglTF
 		glm::vec4 joint0;
 		glm::vec4 weight0;
 		glm::vec4 tangent;
-		static VkVertexInputBindingDescription vertexInputBindingDescription;
-		static std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescriptions;
-		static VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo;
-		static VkVertexInputBindingDescription inputBindingDescription(uint32_t binding);
-		static VkVertexInputAttributeDescription inputAttributeDescription(uint32_t binding, uint32_t location, VertexComponent component);
-		static std::vector<VkVertexInputAttributeDescription> inputAttributeDescriptions(uint32_t binding, const std::vector<VertexComponent> components);
+		static VkVertexInputBindingDescription s_vertexInputBindingDescription;
+		static std::vector<VkVertexInputAttributeDescription> s_vertexInputAttributeDescriptions;
+		static VkPipelineVertexInputStateCreateInfo s_pipelineVertexInputStateCreateInfo;
+		static VkVertexInputBindingDescription s_inputBindingDescription(uint32_t binding);
+		static VkVertexInputAttributeDescription s_inputAttributeDescription(uint32_t binding, uint32_t location, VertexComponent component);
+		static std::vector<VkVertexInputAttributeDescription> s_inputAttributeDescriptions(uint32_t binding, const std::vector<VertexComponent> components);
 		/** @brief Returns the default pipeline vertex input state create info structure for the requested vertex components */
 		static VkPipelineVertexInputStateCreateInfo* getPipelineVertexInputState(const std::vector<VertexComponent> components);
+
+		static vkcpp::PipelineVertexInputStateCreateInfo getPipelineVertexInputStateVkcpp(const std::vector<VertexComponent> components);
+
 	};
 
 	enum FileLoadingFlags {

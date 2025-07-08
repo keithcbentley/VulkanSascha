@@ -1849,18 +1849,6 @@ public:
     }
 };
 
-//	TODO: do we really need this yet?
-class RenderPassCreateInfo2 : public VkRenderPassCreateInfo2 {
-
-public:
-    VkRenderPassCreateInfo2* operator&() = delete;
-
-    VkRenderPassCreateInfo2* assemble()
-    {
-        return this;
-    }
-};
-
 class RenderPass : public HandleWithOwner<VkRenderPass> {
 
     RenderPass(VkRenderPass vkRenderPass, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
@@ -1886,15 +1874,15 @@ public:
         new (this) RenderPass(vkRenderPass, vkDevice, &destroy);
     }
 
-    //	TODO: do we really need this yet?
-    // RenderPass(RenderPassCreateInfo2& renderPassCreateInfo2, VkDevice vkDevice) {
-    //	VkRenderPass	vkRenderPass;
-    //	VkResult vkResult = vkCreateRenderPass2(vkDevice, renderPassCreateInfo2.assemble(), nullptr, &vkRenderPass);
-    //	if (vkResult != VK_SUCCESS) {
-    //		throw Exception(vkResult);
-    //	}
-    //	new(this)RenderPass(vkRenderPass, vkDevice, &destroy);
-    //}
+    RenderPass(const VkRenderPassCreateInfo& vkRenderPassCreateInfo, VkDevice vkDevice)
+    {
+        VkRenderPass vkRenderPass;
+        VkResult vkResult = vkCreateRenderPass(vkDevice, &vkRenderPassCreateInfo, nullptr, &vkRenderPass);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) RenderPass(vkRenderPass, vkDevice, &destroy);
+    }
 };
 
 class ImageCreateInfo : public VkImageCreateInfo {
@@ -3169,8 +3157,8 @@ public:
         sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
         polygonMode = VK_POLYGON_MODE_FILL;
         lineWidth = 1.0f;
-        // cullMode = VK_CULL_MODE_BACK_BIT;
-        cullMode = VK_CULL_MODE_NONE;
+        cullMode = VK_CULL_MODE_BACK_BIT;
+        // cullMode = VK_CULL_MODE_NONE;
         frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     }
 };
@@ -3251,22 +3239,20 @@ public:
         sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     }
 
-    //	Not sure how reasonable this is :-)
-    static PipelineDepthStencilStateCreateInfo reasonableDefaults()
+    static PipelineDepthStencilStateCreateInfo basicDepth()
     {
-        PipelineDepthStencilStateCreateInfo reasonable;
-        //	Reasonable defaults
-        reasonable.depthTestEnable = VK_TRUE;
-        reasonable.depthWriteEnable = VK_TRUE;
-        reasonable.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-        reasonable.depthBoundsTestEnable = VK_FALSE;
-        reasonable.back.failOp = VK_STENCIL_OP_KEEP;
-        reasonable.back.passOp = VK_STENCIL_OP_KEEP;
-        reasonable.back.compareOp = VK_COMPARE_OP_ALWAYS;
-        reasonable.stencilTestEnable = VK_FALSE;
-        reasonable.front = reasonable.back;
+        PipelineDepthStencilStateCreateInfo basicDepth;
+        basicDepth.depthTestEnable = VK_TRUE;
+        basicDepth.depthWriteEnable = VK_TRUE;
+        basicDepth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        basicDepth.depthBoundsTestEnable = VK_FALSE;
+        basicDepth.back.failOp = VK_STENCIL_OP_KEEP;
+        basicDepth.back.passOp = VK_STENCIL_OP_KEEP;
+        basicDepth.back.compareOp = VK_COMPARE_OP_ALWAYS;
+        basicDepth.stencilTestEnable = VK_FALSE;
+        basicDepth.front = basicDepth.back;
 
-        return reasonable;
+        return basicDepth;
     }
 };
 static_assert(sizeof(PipelineDepthStencilStateCreateInfo) == sizeof(VkPipelineDepthStencilStateCreateInfo));
@@ -3296,12 +3282,54 @@ class PipelineVertexInputStateCreateInfo : public VkPipelineVertexInputStateCrea
     std::vector<VkVertexInputBindingDescription> m_vertexInputBindingDescriptions;
     std::vector<VkVertexInputAttributeDescription> m_vertexInputAttributeDescriptions;
 
+    void reassemble()
+    {
+        vertexBindingDescriptionCount = static_cast<uint32_t>(m_vertexInputBindingDescriptions.size());
+        pVertexBindingDescriptions = m_vertexInputBindingDescriptions.data();
+        vertexAttributeDescriptionCount = static_cast<uint32_t>(m_vertexInputAttributeDescriptions.size());
+        pVertexAttributeDescriptions = m_vertexInputAttributeDescriptions.data();
+    }
+
 public:
     ~PipelineVertexInputStateCreateInfo() = default;
-    PipelineVertexInputStateCreateInfo(const PipelineVertexInputStateCreateInfo&) = delete;
-    PipelineVertexInputStateCreateInfo& operator=(const PipelineVertexInputStateCreateInfo&) = delete;
-    PipelineVertexInputStateCreateInfo(PipelineVertexInputStateCreateInfo&&) noexcept = delete;
-    PipelineVertexInputStateCreateInfo& operator=(PipelineVertexInputStateCreateInfo&&) noexcept = delete;
+
+    //	Doesn't copy pNext.
+    PipelineVertexInputStateCreateInfo(const PipelineVertexInputStateCreateInfo& other)
+        : VkPipelineVertexInputStateCreateInfo(other)
+    {
+        pNext = nullptr;
+        m_vertexInputBindingDescriptions = other.m_vertexInputBindingDescriptions;
+        m_vertexInputAttributeDescriptions = other.m_vertexInputAttributeDescriptions;
+        reassemble();
+    }
+
+    PipelineVertexInputStateCreateInfo& operator=(const PipelineVertexInputStateCreateInfo& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~PipelineVertexInputStateCreateInfo();
+        new (this) PipelineVertexInputStateCreateInfo(other);
+        return *this;
+    }
+
+    PipelineVertexInputStateCreateInfo(PipelineVertexInputStateCreateInfo&& other) noexcept
+        : VkPipelineVertexInputStateCreateInfo(std::move(other))
+    {
+        pNext = nullptr;
+        m_vertexInputBindingDescriptions = std::move(other.m_vertexInputBindingDescriptions);
+        m_vertexInputAttributeDescriptions = std::move(other.m_vertexInputAttributeDescriptions);
+        reassemble();
+    }
+
+    PipelineVertexInputStateCreateInfo& operator=(PipelineVertexInputStateCreateInfo&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~PipelineVertexInputStateCreateInfo();
+        new (this) PipelineVertexInputStateCreateInfo(std::move(other));
+    }
 
     PipelineVertexInputStateCreateInfo()
         : VkPipelineVertexInputStateCreateInfo {}
@@ -3416,6 +3444,7 @@ public:
     }
 };
 
+class GraphicsPipeline;
 class GraphicsPipelineCreateInfo {
 
     PipelineInputAssemblyStateCreateInfo m_pipelineInputAssemblyStateCreateInfo;
@@ -3488,6 +3517,11 @@ public:
         m_pipelineRasterizationStateCreateInfo = pipelineRasterizationStateCreateInfo;
     }
 
+    void setRasterizationPolygonMode(VkPolygonMode vkPolygonMode)
+    {
+        m_pipelineRasterizationStateCreateInfo.polygonMode = vkPolygonMode;
+    }
+
     void setMultisampleStateCreateInfo(const PipelineMultisampleStateCreateInfo& pipelineMultisampleStateCreateInfo)
     {
         m_pipelineMultisampleStateCreateInfo = pipelineMultisampleStateCreateInfo;
@@ -3534,6 +3568,13 @@ public:
         m_vkGraphicsPipelineCreateInfo.pStages = m_vkPipelineShaderStageCreateInfos.data();
     }
 
+    void clearShaders()
+    {
+        m_vkPipelineShaderStageCreateInfos.clear();
+        m_vkGraphicsPipelineCreateInfo.stageCount = static_cast<uint32_t>(m_vkPipelineShaderStageCreateInfos.size());
+        m_vkGraphicsPipelineCreateInfo.pStages = m_vkPipelineShaderStageCreateInfos.data();
+    }
+
     void addVertexInputBindingDescription(
         const VkVertexInputBindingDescription& vertexInputBindingDescription)
     {
@@ -3563,16 +3604,27 @@ public:
         m_pipelineDynamicStateCreateInfo.addDynamicState(vkDynamicState);
     }
 
-    // void setViewportExtent(VkExtent2D extent)
-    //{
-    //     m_viewport.width = static_cast<float>(extent.width);
-    //     m_viewport.height = static_cast<float>(extent.height);
-    // }
+    //	Useful for porting.
+    void setPipelineVertexInputStateCreateInfo(const PipelineVertexInputStateCreateInfo& pipelineVertexInputStateCreateInfo)
+    {
+        m_pipelineVertexInputStateCreateInfo = pipelineVertexInputStateCreateInfo;
+    }
 
-    // void setScissorExtent(VkExtent2D extent)
-    //{
-    //     m_scissor.extent = extent;
-    // }
+    void allowDerivatives(bool torf)
+    {
+        if (torf) {
+            m_vkGraphicsPipelineCreateInfo.flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+            return;
+        }
+        m_vkGraphicsPipelineCreateInfo.flags &= ~VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+    }
+
+    void setBasePipeline(VkPipeline basePipeline)
+    {
+        m_vkGraphicsPipelineCreateInfo.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+        m_vkGraphicsPipelineCreateInfo.basePipelineHandle = basePipeline;
+        m_vkGraphicsPipelineCreateInfo.basePipelineIndex = -1;
+    }
 
     void addViewport(const VkViewport& viewport)
     {

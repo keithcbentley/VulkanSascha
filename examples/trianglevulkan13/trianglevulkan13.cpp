@@ -501,33 +501,24 @@ public:
 
 		vkcpp::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo;
 		graphicsPipelineCreateInfo.setPipelineLayout(m_pipelineLayoutOriginal);
-
 		graphicsPipelineCreateInfo.setInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
 		vkcpp::PipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo;
-		graphicsPipelineCreateInfo.setRasterizationStateCreateInfo(pipelineRasterizationStateCreateInfo);
+		graphicsPipelineCreateInfo.setRasterizationStateCreateInfo(
+			pipelineRasterizationStateCreateInfo);
 
-//		vkcpp::PipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo;
 		vkcpp::PipelineColorBlendAttachmentState pipelineColorBlendAttachmentState;
 		graphicsPipelineCreateInfo.addColorBlendAttachmentState(pipelineColorBlendAttachmentState);
 
-		//	Need to do viewport and scissor
 		graphicsPipelineCreateInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
 		graphicsPipelineCreateInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
 
 		//	Not sure what to do here if we have dynamic state.
-		VkViewport viewport{};
-		viewport.width = 200;
-		viewport.height = 200;
 		graphicsPipelineCreateInfo.addViewport(VkViewport{});
-
-		VkRect2D scissor{};
-		scissor.extent.width = 200;
-		scissor.extent.height = 200;
-		graphicsPipelineCreateInfo.addScissor(scissor);
+		graphicsPipelineCreateInfo.addScissor(VkRect2D{});
 
         graphicsPipelineCreateInfo.setDepthStencilStateCreateInfo(
-            vkcpp::PipelineDepthStencilStateCreateInfo::reasonableDefaults());
+            vkcpp::PipelineDepthStencilStateCreateInfo::basicDepth());
 
         // Vertex input descriptions
         // Specifies the vertex input parameters for a m_vkPipeline
@@ -549,7 +540,6 @@ public:
             getShadersPath() + "triangle/triangle.frag.spv", m_deviceOriginal);
         graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModule, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
 
-		// Assign the m_vkPipeline states to the m_vkPipeline creation info structure
 		graphicsPipelineCreateInfo.setMultisampleStateCreateInfo(
 			vkcpp::PipelineMultisampleStateCreateInfo::reasonableDefaults());
 

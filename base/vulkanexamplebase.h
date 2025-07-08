@@ -151,7 +151,8 @@ protected:
 	// Command buffers used for rendering
 	std::vector<VkCommandBuffer> drawCmdBuffers;
 	// Global render pass for frame buffer writes
-	VkRenderPass m_vkRenderPass{ VK_NULL_HANDLE };
+	//VkRenderPass m_vkRenderPass{ VK_NULL_HANDLE };
+	vkcpp::RenderPass m_renderPassOriginal;
 	// List of available frame buffers (same as number of swap chain images)
 	std::vector<VkFramebuffer>m_vkFrameBuffers;
 	// Active frame buffer index

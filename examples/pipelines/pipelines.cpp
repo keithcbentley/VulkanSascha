@@ -10,6 +10,7 @@
 
 #include "VulkanglTFModel.h"
 #include "vulkanexamplebase.h"
+#include <VulkanCpp.hpp>
 
 class VulkanExample : public VulkanExampleBase {
 public:
@@ -22,15 +23,16 @@ public:
     } uniformData;
     vks::Buffer uniformBuffer;
 
-    VkPipelineLayout m_vkPipelineLayout { VK_NULL_HANDLE };
+    vkcpp::PipelineLayout m_pipelineLayoutOriginal;
+
     VkDescriptorSet descriptorSet { VK_NULL_HANDLE };
     VkDescriptorSetLayout m_vkDescriptorSetLayout { VK_NULL_HANDLE };
 
     struct {
-        VkPipeline phong { VK_NULL_HANDLE };
-        VkPipeline wireframe { VK_NULL_HANDLE };
-        VkPipeline toon { VK_NULL_HANDLE };
-    } pipelines;
+        vkcpp::GraphicsPipeline m_phongPipelineOriginal;
+        vkcpp::GraphicsPipeline m_wireframePipelineOriginal;
+        vkcpp::GraphicsPipeline m_toonPipelineOriginal;
+    } m_pipelines;
 
     VulkanExample()
         : VulkanExampleBase()
@@ -46,13 +48,6 @@ public:
     ~VulkanExample()
     {
         if (m_deviceOriginal) {
-            vkDestroyPipeline(m_deviceOriginal, pipelines.phong, nullptr);
-            if (m_vkPhysicalDeviceFeatures10.fillModeNonSolid) {
-                vkDestroyPipeline(m_deviceOriginal, pipelines.wireframe, nullptr);
-            }
-            vkDestroyPipeline(m_deviceOriginal, pipelines.toon, nullptr);
-
-            vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
             vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
 
             uniformBuffer.destroy();
@@ -82,7 +77,7 @@ public:
         clearValues[1].depthStencil = { 1.0f, 0 };
 
         VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-        renderPassBeginInfo.renderPass = m_vkRenderPass;
+        renderPassBeginInfo.renderPass = m_renderPassOriginal;
         renderPassBeginInfo.renderArea.offset.x = 0;
         renderPassBeginInfo.renderArea.offset.y = 0;
         renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -103,20 +98,20 @@ public:
             VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
             vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-            vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+            vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayoutOriginal, 0, 1, &descriptorSet, 0, NULL);
             scene.bindBuffers(drawCmdBuffers[i]);
 
             // Left : Render the scene using the solid colored pipeline with phong shading
             viewport.width = (float)m_drawAreaWidth / 3.0f;
             vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-            vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.phong);
+            vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.m_phongPipelineOriginal);
             vkCmdSetLineWidth(drawCmdBuffers[i], 1.0f);
             scene.draw(drawCmdBuffers[i]);
 
             // Center : Render the scene using a toon style pipeline
             viewport.x = (float)m_drawAreaWidth / 3.0f;
             vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-            vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.toon);
+            vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.m_toonPipelineOriginal);
             // Line m_drawAreaWidth > 1.0f only if wide lines feature is supported
             if (m_vkPhysicalDeviceFeatures10.wideLines) {
                 vkCmdSetLineWidth(drawCmdBuffers[i], 2.0f);
@@ -127,7 +122,7 @@ public:
             if (m_vkPhysicalDeviceFeatures10.fillModeNonSolid) {
                 viewport.x = (float)m_drawAreaWidth / 3.0f + (float)m_drawAreaWidth / 3.0f;
                 vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-                vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.wireframe);
+                vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.m_wireframePipelineOriginal);
                 scene.draw(drawCmdBuffers[i]);
             }
 
@@ -175,75 +170,84 @@ public:
 
     void preparePipelines()
     {
-        // Layout
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
-        // Pipelines
+        vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+        pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayout);
+        m_pipelineLayoutOriginal = vkcpp::PipelineLayout(pipelineLayoutCreateInfo, m_deviceOriginal);
 
-        // Most state is shared between all pipelines
-        VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
-        VkPipelineRasterizationStateCreateInfo rasterizationState = vks::initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
-        VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
-        VkPipelineColorBlendStateCreateInfo colorBlendState = vks::initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
-        VkPipelineDepthStencilStateCreateInfo depthStencilState = vks::initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
-        VkPipelineViewportStateCreateInfo viewportState = vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
-        VkPipelineMultisampleStateCreateInfo multisampleState = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
-        std::vector<VkDynamicState> dynamicStateEnables = {
-            VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_SCISSOR,
-            VK_DYNAMIC_STATE_LINE_WIDTH,
-        };
-        VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
-        std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
+        vkcpp::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo;
+        graphicsPipelineCreateInfo.setRenderPass(m_renderPassOriginal, 0);
+        graphicsPipelineCreateInfo.setPipelineLayout(m_pipelineLayoutOriginal);
+        graphicsPipelineCreateInfo.setInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+        graphicsPipelineCreateInfo.setRasterizationStateCreateInfo(vkcpp::PipelineRasterizationStateCreateInfo());
 
-        VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass);
-        pipelineCI.pInputAssemblyState = &inputAssemblyState;
-        pipelineCI.pRasterizationState = &rasterizationState;
-        pipelineCI.pColorBlendState = &colorBlendState;
-        pipelineCI.pMultisampleState = &multisampleState;
-        pipelineCI.pViewportState = &viewportState;
-        pipelineCI.pDepthStencilState = &depthStencilState;
-        pipelineCI.pDynamicState = &dynamicState;
-        pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
-        pipelineCI.pStages = shaderStages.data();
-        pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Color });
+        graphicsPipelineCreateInfo.addColorBlendAttachmentState(vkcpp::PipelineColorBlendAttachmentState());
+        graphicsPipelineCreateInfo.setDepthStencilStateCreateInfo(vkcpp::PipelineDepthStencilStateCreateInfo::basicDepth());
+        graphicsPipelineCreateInfo.addViewport(VkViewport {});
+        graphicsPipelineCreateInfo.addScissor(VkRect2D {});
 
-        // Create the different pipelines used in this sample
+        graphicsPipelineCreateInfo.setMultisampleStateCreateInfo(
+            vkcpp::PipelineMultisampleStateCreateInfo::reasonableDefaults());
 
-        // We are using this pipeline as the base for the other pipelines (derivatives)
-        // Pipeline derivatives can be used for pipelines that share most of their state
-        // Depending on the implementation this may result in better performance for pipeline
-        // switching and faster creation time
-        pipelineCI.flags = VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+        graphicsPipelineCreateInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
+        graphicsPipelineCreateInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
+        graphicsPipelineCreateInfo.addDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+        graphicsPipelineCreateInfo.setPipelineVertexInputStateCreateInfo(
+            vkglTF::Vertex::getPipelineVertexInputStateVkcpp(
+                { vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Color }));
+        graphicsPipelineCreateInfo.allowDerivatives(true);
 
-        // Textured pipeline
-        // Phong shading pipeline
-        shaderStages[0] = loadShader(getShadersPath() + "pipelines/phong.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-        shaderStages[1] = loadShader(getShadersPath() + "pipelines/phong.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.phong));
 
-        // All pipelines created after the base pipeline will be derivatives
-        pipelineCI.flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
-        // Base pipeline will be our first created pipeline
-        pipelineCI.basePipelineHandle = pipelines.phong;
-        // It's only allowed to either use a handle or index for the base pipeline
-        // As we use the handle, we must set the index to -1 (see section 9.5 of the specification)
-        pipelineCI.basePipelineIndex = -1;
+        //	Shader modules can be safely destroyed after pipeline creation, so RAII
+        //	for the handles is ok for this situation.
+        vkcpp::ShaderModule vertexShaderModulePhong = vkcpp::ShaderModule::createShaderModuleFromFile(
+            getShadersPath() + "pipelines/phong.vert.spv", m_deviceOriginal);
+        graphicsPipelineCreateInfo.addShaderModule(vertexShaderModulePhong, VK_SHADER_STAGE_VERTEX_BIT, "main");
+
+        vkcpp::ShaderModule fragmentShaderModulePhong = vkcpp::ShaderModule::createShaderModuleFromFile(
+            getShadersPath() + "pipelines/phong.frag.spv", m_deviceOriginal);
+        graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModulePhong, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
+
+        m_pipelines.m_phongPipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo, m_deviceOriginal);
+
+        //	Not sure if this is necessary, but original code turned this off.
+        graphicsPipelineCreateInfo.allowDerivatives(false);
+        graphicsPipelineCreateInfo.setBasePipeline(m_pipelines.m_phongPipelineOriginal);
 
         // Toon shading pipeline
-        shaderStages[0] = loadShader(getShadersPath() + "pipelines/toon.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-        shaderStages[1] = loadShader(getShadersPath() + "pipelines/toon.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.toon));
+		graphicsPipelineCreateInfo.clearShaders();
+		vkcpp::ShaderModule vertexShaderModuleToon = vkcpp::ShaderModule::createShaderModuleFromFile(
+			getShadersPath() + "pipelines/toon.vert.spv", m_deviceOriginal);
+		graphicsPipelineCreateInfo.addShaderModule(vertexShaderModuleToon, VK_SHADER_STAGE_VERTEX_BIT, "main");
+
+		vkcpp::ShaderModule fragmentShaderModuleToon = vkcpp::ShaderModule::createShaderModuleFromFile(
+			getShadersPath() + "pipelines/toon.frag.spv", m_deviceOriginal);
+		graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModuleToon, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
+
+        m_pipelines.m_toonPipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo, m_deviceOriginal);
+
+		//	Wireframe
+		graphicsPipelineCreateInfo.setRasterizationPolygonMode(VK_POLYGON_MODE_LINE);
+
+		graphicsPipelineCreateInfo.clearShaders();
+		vkcpp::ShaderModule vertexShaderModuleWireframe = vkcpp::ShaderModule::createShaderModuleFromFile(
+			getShadersPath() + "pipelines/wireframe.vert.spv", m_deviceOriginal);
+		graphicsPipelineCreateInfo.addShaderModule(vertexShaderModuleWireframe, VK_SHADER_STAGE_VERTEX_BIT, "main");
+
+		vkcpp::ShaderModule fragmentShaderModuleWireframe = vkcpp::ShaderModule::createShaderModuleFromFile(
+			getShadersPath() + "pipelines/wireframe.frag.spv", m_deviceOriginal);
+		graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModuleWireframe, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
+
+		m_pipelines.m_wireframePipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo, m_deviceOriginal);
 
         // Pipeline for wire frame rendering
         // Non solid rendering is not a mandatory Vulkan feature
-        if (m_vkPhysicalDeviceFeatures10.fillModeNonSolid) {
-            rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
-            shaderStages[0] = loadShader(getShadersPath() + "pipelines/wireframe.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-            shaderStages[1] = loadShader(getShadersPath() + "pipelines/wireframe.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-            VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.wireframe));
-        }
+        ////if (m_vkPhysicalDeviceFeatures10.fillModeNonSolid) {
+        ////    rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
+        ////    shaderStages[0] = loadShader(getShadersPath() + "pipelines/wireframe.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+        ////    shaderStages[1] = loadShader(getShadersPath() + "pipelines/wireframe.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+        ////    VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_pipelines.m_wireframe));
+        ////}
     }
 
     // Prepare and initialize uniform buffer containing shader uniforms

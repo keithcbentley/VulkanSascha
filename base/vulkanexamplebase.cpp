@@ -146,7 +146,7 @@ void VulkanExampleBase::prepare()
             loadShader(getShadersPath() + "base/uioverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
         };
         m_UIOverlay.prepareResources();
-        m_UIOverlay.preparePipeline(m_vkPipelineCache, m_vkRenderPass, m_swapChain.colorFormat, m_vkFormatDepth);
+        m_UIOverlay.preparePipeline(m_vkPipelineCache, m_renderPassOriginal, m_swapChain.colorFormat, m_vkFormatDepth);
     }
 }
 
@@ -794,10 +794,8 @@ VulkanExampleBase::~VulkanExampleBase()
         vkDestroyDescriptorPool(m_deviceOriginal, m_vkDescriptorPool, nullptr);
     }
     destroyCommandBuffers();
-    if (m_vkRenderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(m_deviceOriginal, m_vkRenderPass, nullptr);
-    }
-    for (auto& frameBuffer : m_vkFrameBuffers) {
+
+	for (auto& frameBuffer : m_vkFrameBuffers) {
         vkDestroyFramebuffer(m_deviceOriginal, frameBuffer, nullptr);
     }
 
@@ -2798,7 +2796,7 @@ void VulkanExampleBase::setupFrameBuffer()
         };
         VkFramebufferCreateInfo frameBufferCreateInfo {};
         frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        frameBufferCreateInfo.renderPass = m_vkRenderPass;
+        frameBufferCreateInfo.renderPass = m_renderPassOriginal;
         frameBufferCreateInfo.attachmentCount = 2;
         frameBufferCreateInfo.pAttachments = attachments;
         frameBufferCreateInfo.width = m_drawAreaWidth;
@@ -2868,16 +2866,18 @@ void VulkanExampleBase::setupRenderPass()
     dependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
     dependencies[1].dependencyFlags = 0;
 
-    VkRenderPassCreateInfo renderPassInfo = {};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpassDescription;
-    renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
-    renderPassInfo.pDependencies = dependencies.data();
+    VkRenderPassCreateInfo vkRenderPassCreateInfo = {};
+	vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	vkRenderPassCreateInfo.pAttachments = attachments.data();
+	vkRenderPassCreateInfo.subpassCount = 1;
+	vkRenderPassCreateInfo.pSubpasses = &subpassDescription;
+	vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+	vkRenderPassCreateInfo.pDependencies = dependencies.data();
 
-    VK_CHECK_RESULT(vkCreateRenderPass(m_deviceOriginal, &renderPassInfo, nullptr, &m_vkRenderPass));
+	m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo, m_deviceOriginal);
+
+//    VK_CHECK_RESULT(vkCreateRenderPass(m_deviceOriginal, &renderPassInfo, nullptr, &m_vkRenderPass));
 }
 
 void VulkanExampleBase::getEnabledFeatures() { }
