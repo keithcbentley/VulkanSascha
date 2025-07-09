@@ -55,16 +55,16 @@ public:
 
     // Uniform buffer block object
     struct UniformBuffer {
-        VkDeviceMemory memory { VK_NULL_HANDLE };
-        VkBuffer buffer { VK_NULL_HANDLE };
+        vkcpp::DeviceMemory m_deviceMemoryOriginal;
+        vkcpp::Buffer m_bufferOriginal;
         // The descriptor set stores the resources bound to the binding points in a shader
         // It connects the binding points of the different shaders with the buffers and images used for those bindings
         VkDescriptorSet descriptorSet { VK_NULL_HANDLE };
         // We keep a pointer to the mapped buffer, so we can easily update it's contents via a memcpy
-        uint8_t* mapped { nullptr };
+        uint8_t* m_pMappedMemory { nullptr };
     };
     // We use one UBO per frame, so we can have a frame overlap and make sure that uniforms aren't updated while still in use
-    std::array<UniformBuffer, MAX_CONCURRENT_FRAMES> uniformBuffers;
+    std::array<UniformBuffer, MAX_CONCURRENT_FRAMES> m_uniformBuffers;
 
     // For simplicity we use the same uniform block layout as in the shader:
     //
@@ -147,8 +147,8 @@ public:
             }
             for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
                 vkDestroyFence(m_deviceOriginal, m_vkWaitFences[i], nullptr);
-                vkDestroyBuffer(m_deviceOriginal, uniformBuffers[i].buffer, nullptr);
-                vkFreeMemory(m_deviceOriginal, uniformBuffers[i].memory, nullptr);
+//                vkDestroyBuffer(m_deviceOriginal, m_uniformBuffers[i].m_vkBuffer, nullptr);
+//                vkFreeMemory(m_deviceOriginal, m_uniformBuffers[i].m_vkDeviceMemory, nullptr);
             }
         }
     }
@@ -440,24 +440,24 @@ public:
             allocInfo.descriptorPool = m_vkDescriptorPool;
             allocInfo.descriptorSetCount = 1;
             allocInfo.pSetLayouts = &m_vkDescriptorSetLayout;
-            VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &uniformBuffers[i].descriptorSet));
+            VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &m_uniformBuffers[i].descriptorSet));
 
             // Update the descriptor set determining the shader binding points
             // For every binding point used in a shader there needs to be one
             // descriptor set matching that binding point
-            VkWriteDescriptorSet writeDescriptorSet {};
 
             // The buffer's information is passed using a descriptor info structure
-            VkDescriptorBufferInfo bufferInfo {};
-            bufferInfo.buffer = uniformBuffers[i].buffer;
-            bufferInfo.range = sizeof(ShaderData);
+            VkDescriptorBufferInfo vkDescriptorBufferInfo {};
+			vkDescriptorBufferInfo.buffer = m_uniformBuffers[i].m_bufferOriginal;
+			vkDescriptorBufferInfo.range = sizeof(ShaderData);
 
             // Binding 0 : Uniform buffer
-            writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeDescriptorSet.dstSet = uniformBuffers[i].descriptorSet;
+			VkWriteDescriptorSet writeDescriptorSet{};
+			writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writeDescriptorSet.dstSet = m_uniformBuffers[i].descriptorSet;
             writeDescriptorSet.descriptorCount = 1;
             writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            writeDescriptorSet.pBufferInfo = &bufferInfo;
+            writeDescriptorSet.pBufferInfo = &vkDescriptorBufferInfo;
             writeDescriptorSet.dstBinding = 0;
             vkUpdateDescriptorSets(m_deviceOriginal, 1, &writeDescriptorSet, 0, nullptr);
         }
@@ -859,38 +859,45 @@ public:
     {
         // Prepare and initialize the per-frame uniform buffer blocks containing shader uniforms
         // Single uniforms like in OpenGL are no longer present in Vulkan. All hader uniforms are passed via uniform buffer blocks
-        VkMemoryRequirements memReqs;
 
-        // Vertex shader uniform buffer block
-        VkBufferCreateInfo bufferInfo {};
-        VkMemoryAllocateInfo allocInfo {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.pNext = nullptr;
-        allocInfo.allocationSize = 0;
-        allocInfo.memoryTypeIndex = 0;
 
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		VkBufferCreateInfo bufferInfo{};
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = sizeof(ShaderData);
-        // This buffer will be used as a uniform buffer
         bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 
         // Create the buffers
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            VK_CHECK_RESULT(vkCreateBuffer(m_deviceOriginal, &bufferInfo, nullptr, &uniformBuffers[i].buffer));
+			m_uniformBuffers[i].m_bufferOriginal = vkcpp::Buffer(bufferInfo, m_deviceOriginal);
+
             // Get m_vkDeviceMemory requirements including size, alignment and m_vkDeviceMemory type
-            vkGetBufferMemoryRequirements(m_deviceOriginal, uniformBuffers[i].buffer, &memReqs);
-            allocInfo.allocationSize = memReqs.size;
+			VkMemoryRequirements vkMemoryRequirements;
+			vkGetBufferMemoryRequirements(m_deviceOriginal, m_uniformBuffers[i].m_bufferOriginal, &vkMemoryRequirements);
+
+			VkMemoryAllocateInfo vkMemoryAllocateInfo{};
+			vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			vkMemoryAllocateInfo.pNext = nullptr;
+			vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
+
             // Get the m_vkDeviceMemory type index that supports host visible m_vkDeviceMemory access
             // Most implementations offer multiple m_vkDeviceMemory types and selecting the correct one to allocate m_vkDeviceMemory from is crucial
             // We also want the buffer to be host coherent so we don't have to flush (or sync after every update.
             // Note: This may affect performance so you might not want to do this in a real world application that updates buffers on a regular base
-            allocInfo.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            // Allocate m_vkDeviceMemory for the uniform buffer
-            VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &allocInfo, nullptr, &(uniformBuffers[i].memory)));
-            // Bind m_vkDeviceMemory to buffer
-            VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, uniformBuffers[i].buffer, uniformBuffers[i].memory, 0));
+
+			vkMemoryAllocateInfo.memoryTypeIndex
+				= getMemoryTypeIndex(
+					vkMemoryRequirements.memoryTypeBits,
+					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+
+			m_uniformBuffers[i].m_deviceMemoryOriginal = vkcpp::DeviceMemory(vkMemoryAllocateInfo, m_deviceOriginal);
+
+			// Bind m_vkDeviceMemory to buffer
+            vkBindBufferMemory(m_deviceOriginal, m_uniformBuffers[i].m_bufferOriginal, m_uniformBuffers[i].m_deviceMemoryOriginal, 0);
             // We map the buffer once, so we can update it without having to map it again
-            VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, uniformBuffers[i].memory, 0, sizeof(ShaderData), 0, (void**)&uniformBuffers[i].mapped));
+            vkMapMemory(m_deviceOriginal, m_uniformBuffers[i].m_deviceMemoryOriginal, 0, sizeof(ShaderData), 0, (void**)&m_uniformBuffers[i].m_pMappedMemory);
+
+
         }
     }
 
@@ -936,45 +943,42 @@ public:
 
         // Copy the current matrices to the current frame's uniform buffer
         // Note: Since we requested a host coherent m_vkDeviceMemory type for the uniform buffer, the write is instantly visible to the GPU
-        memcpy(uniformBuffers[m_currentFrameIndex].mapped, &shaderData, sizeof(ShaderData));
+        memcpy(m_uniformBuffers[m_currentFrameIndex].m_pMappedMemory, &shaderData, sizeof(ShaderData));
 
         // Build the command buffer
         // Unlike in OpenGL all rendering commands are recorded into command buffers that are then submitted to the m_vkQueue
         // This allows to generate work upfront in a separate thread
         // For basic command buffers (like in this sample), recording is so fast that there is no need to offload this
 
-        //		const VkCommandBuffer vkCommandBuffer = m_commandBuffers[m_currentFrameIndex];
+		// Start the first sub pass specified in our default render pass setup by the base class
+		// This will clear the color and depth attachment
+		// Set clear values for all framebuffer attachments with loadOp set to clear
+		// We use two attachments (color and depth) that are cleared at the start of the subpass and as such we need to set clear values for both
+		VkClearValue clearValues[2]{};
+		clearValues[0].color = {{ 0.0f, 0.0f, 0.2f, 1.0f }};
+		clearValues[1].depthStencil = {1.0f, 0};
+
+		VkRenderPassBeginInfo renderPassBeginInfo{};
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.pNext = nullptr;
+		renderPassBeginInfo.renderPass = m_renderPassOriginal;
+		renderPassBeginInfo.renderArea.offset.x = 0;
+		renderPassBeginInfo.renderArea.offset.y = 0;
+		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
+		renderPassBeginInfo.clearValueCount = 2;
+		renderPassBeginInfo.pClearValues = clearValues;
+		renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
+
         vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_vkCommandBuffers[m_currentFrameIndex]);
 
         commandBuffer
 			.reset()
-			.begin();
-
-        // Start the first sub pass specified in our default render pass setup by the base class
-        // This will clear the color and depth attachment
-        // Set clear values for all framebuffer attachments with loadOp set to clear
-        // We use two attachments (color and depth) that are cleared at the start of the subpass and as such we need to set clear values for both
-        VkClearValue clearValues[2] {};
-        clearValues[0].color = { { 0.0f, 0.0f, 0.2f, 1.0f } };
-        clearValues[1].depthStencil = { 1.0f, 0 };
-
-        VkRenderPassBeginInfo renderPassBeginInfo {};
-        renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassBeginInfo.pNext = nullptr;
-        renderPassBeginInfo.renderPass = m_renderPassOriginal;
-        renderPassBeginInfo.renderArea.offset.x = 0;
-        renderPassBeginInfo.renderArea.offset.y = 0;
-        renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
-        renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
-        renderPassBeginInfo.clearValueCount = 2;
-        renderPassBeginInfo.pClearValues = clearValues;
-        renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
-
-        commandBuffer
+			.begin()
 			.cmdBeginRenderPass(renderPassBeginInfo)
 			.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
 			.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
-			.cmdBindDescriptorSet(m_pipelineLayout, uniformBuffers[m_currentFrameIndex].descriptorSet)
+			.cmdBindDescriptorSet(m_pipelineLayout, m_uniformBuffers[m_currentFrameIndex].descriptorSet)
 		    .cmdBindPipeline(m_graphicsPipeline)
 	        .cmdBindVertexBuffer(m_vertices.m_buffer)
 			.cmdBindIndexBuffer(m_indices.m_buffer, VK_INDEX_TYPE_UINT32)
