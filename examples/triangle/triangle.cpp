@@ -955,10 +955,10 @@ public:
 		// For basic command buffers (like in this sample), recording is so fast that there is no need to offload this
 
 //		const VkCommandBuffer vkCommandBuffer = m_commandBuffers[m_currentFrameIndex];
-		vkcpp::CommandBuffer commandBufferVkcpp = vkcpp::CommandBuffer::makeCopy(m_commandBuffers[m_currentFrameIndex]);
+		vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_commandBuffers[m_currentFrameIndex]);
 
-		commandBufferVkcpp.reset();
-		commandBufferVkcpp.begin();
+		commandBuffer.reset();
+		commandBuffer.begin();
 
 		// Start the first sub pass specified in our default render pass setup by the base class
 		// This will clear the color and depth attachment
@@ -980,36 +980,23 @@ public:
 		renderPassBeginInfo.pClearValues = clearValues;
 		renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
 
-		commandBufferVkcpp.cmdBeginRenderPass(renderPassBeginInfo);
+		commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
 
-		// Update dynamic viewport state
-		VkViewport viewport{};
-		viewport.height = (float)m_drawAreaHeight;
-		viewport.width = (float)m_drawAreaWidth;
-		viewport.minDepth = (float)0.0f;
-		viewport.maxDepth = (float)1.0f;
-		commandBufferVkcpp.cmdSetViewport(viewport);
+		commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
+		commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
 
-		// Update dynamic scissor state
-		VkRect2D scissor{};
-		scissor.extent.width = m_drawAreaWidth;
-		scissor.extent.height = m_drawAreaHeight;
-		scissor.offset.x = 0;
-		scissor.offset.y = 0;
-		commandBufferVkcpp.cmdSetScissor(scissor);
+		commandBuffer.cmdBindDescriptorSet(m_vkPipelineLayout, uniformBuffers[m_currentFrameIndex].descriptorSet);
 
-		commandBufferVkcpp.cmdBindDescriptorSet(m_vkPipelineLayout, uniformBuffers[m_currentFrameIndex].descriptorSet);
+		commandBuffer.cmdBindPipeline(m_vkPipeline);
 
-		commandBufferVkcpp.cmdBindPipeline(m_vkPipeline);
-
-		commandBufferVkcpp.cmdBindVertexBuffer(vertices.m_buffer);
-		commandBufferVkcpp.cmdBindIndexBuffer(indices.m_vkBuffer, VK_INDEX_TYPE_UINT32);
-		commandBufferVkcpp.cmdDrawIndexed(indices.count);
-		commandBufferVkcpp.cmdEndRenderPass();
+		commandBuffer.cmdBindVertexBuffer(vertices.m_buffer);
+		commandBuffer.cmdBindIndexBuffer(indices.m_vkBuffer, VK_INDEX_TYPE_UINT32);
+		commandBuffer.cmdDrawIndexed(indices.count);
+		commandBuffer.cmdEndRenderPass();
 
 		// Ending the render pass will add an implicit barrier transitioning the frame buffer color attachment to
 		// VK_IMAGE_LAYOUT_PRESENT_SRC_KHR for presenting it to the windowing system
-		commandBufferVkcpp.end();
+		commandBuffer.end();
 
 
 		// Submit the command buffer to the graphics m_vkQueue
@@ -1019,7 +1006,7 @@ public:
 		//VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		// The submit info structure specifies a command buffer m_vkQueue submission batch
 		vkcpp::SubmitInfo submitInfo;
-		submitInfo.addCommandBuffer(commandBufferVkcpp);
+		submitInfo.addCommandBuffer(commandBuffer);
 		submitInfo.addWaitSemaphore(m_presentCompleteSemaphores[m_currentFrameIndex], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 		submitInfo.addSignalSemaphore(m_renderCompleteSemaphores[imageIndex]);
 
