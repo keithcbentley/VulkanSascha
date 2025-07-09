@@ -240,14 +240,6 @@ public:
 
 		m_pipelines.m_wireframePipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo, m_deviceOriginal);
 
-        // Pipeline for wire frame rendering
-        // Non solid rendering is not a mandatory Vulkan feature
-        ////if (m_vkPhysicalDeviceFeatures10.fillModeNonSolid) {
-        ////    rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
-        ////    shaderStages[0] = loadShader(getShadersPath() + "pipelines/wireframe.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-        ////    shaderStages[1] = loadShader(getShadersPath() + "pipelines/wireframe.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-        ////    VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_pipelines.m_wireframe));
-        ////}
     }
 
     // Prepare and initialize uniform buffer containing shader uniforms

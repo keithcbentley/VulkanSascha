@@ -47,9 +47,8 @@ public:
 
 	~VulkanExample()
 	{
-		vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
-		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+		vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
 		for (auto cube : cubes) {
 			cube.uniformBuffer.destroy();
 			cube.texture.destroy();
@@ -58,9 +57,9 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
-			m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
-		};
+		////if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+		////	m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
+		////};
 	}
 
 	void buildCommandBuffers()
@@ -72,7 +71,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = m_vkRenderPass;
+		renderPassBeginInfo.renderPass = m_renderPassOriginal;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -171,7 +170,7 @@ public:
 		descriptorLayoutCI.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
 		descriptorLayoutCI.pBindings = setLayoutBindings.data();
 
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &m_vkDescriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayoutCI, nullptr, &m_vkDescriptorSetLayout));
 
 		/*
 
@@ -205,7 +204,7 @@ public:
 		// Max. number of descriptor sets that can be allocated from this pool (one per object)
 		descriptorPoolCI.maxSets = static_cast<uint32_t>(cubes.size());
 
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolCI, nullptr, &m_vkDescriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolCI, nullptr, &m_vkDescriptorPool));
 
 		/*
 
@@ -225,7 +224,7 @@ public:
 			allocateInfo.descriptorPool = m_vkDescriptorPool;
 			allocateInfo.descriptorSetCount = 1;
 			allocateInfo.pSetLayouts = &m_vkDescriptorSetLayout;
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocateInfo, &cube.descriptorSet));
+			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocateInfo, &cube.descriptorSet));
 
 			// Update the descriptor set with the actual descriptors matching shader bindings set in the layout
 
@@ -257,7 +256,7 @@ public:
 			// This is possible because each VkWriteDescriptorSet also contains the destination set to be updated
 			// For simplicity we will update once per set instead
 
-			vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+			vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 		}
 
 	}
@@ -272,7 +271,7 @@ public:
 		// The m_vkPipeline layout is based on the descriptor set layout we created above
 		pipelineLayoutCI.setLayoutCount = 1;
 		pipelineLayoutCI.pSetLayouts = &m_vkDescriptorSetLayout;
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 		const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
@@ -286,7 +285,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), static_cast<uint32_t>(dynamicStateEnables.size()),0);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 		pipelineCI.pRasterizationState = &rasterizationStateCI;
 		pipelineCI.pColorBlendState = &colorBlendStateCI;
@@ -300,7 +299,7 @@ public:
 
 	    shaderStages[0] = loadShader(getShadersPath() + "descriptorsets/cube.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "descriptorsets/cube.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	void prepareUniformBuffers()

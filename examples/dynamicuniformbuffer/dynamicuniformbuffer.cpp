@@ -97,13 +97,13 @@ public:
 
 	~VulkanExample()
 	{
-		if (m_vkDevice) {
+		if (m_deviceOriginal) {
 			if (uboDataDynamic.model) {
 				alignedFree(uboDataDynamic.model);
 			}
-			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+			vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
+			vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
 			vertexBuffer.destroy();
 			indexBuffer.destroy();
 			uniformBuffers.view.destroy();
@@ -120,7 +120,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = m_vkRenderPass;
+		renderPassBeginInfo.renderPass = m_renderPassOriginal;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -214,7 +214,7 @@ public:
 		};
 
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -224,11 +224,11 @@ public:
 		};
 
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Projection/View matrix as uniform buffer
@@ -236,14 +236,14 @@ public:
 			// Binding 1 : Instance matrix as dynamic uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, &uniformBuffers.dynamic.descriptor),
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0,  VK_FALSE);
@@ -274,7 +274,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "dynamicuniformbuffer/base.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "dynamicuniformbuffer/base.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
 		pipelineCreateInfo.pVertexInputState = &vertexInputStateCI;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;
@@ -285,7 +285,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -295,7 +295,8 @@ public:
 		// We allocate this manually as the alignment of the offset differs between GPUs
 
 		// Calculate required alignment based on minimum m_vkDevice offset alignment
-		size_t minUboAlignment = m_pVulkanDevice->m_vkPhysicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+//		size_t minUboAlignment = m_pVulkanDevice->m_vkPhysicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+		size_t minUboAlignment = m_physicalDeviceProperties.m_properties2.properties.limits.minUniformBufferOffsetAlignment;
 		dynamicAlignment = sizeof(glm::mat4);
 		if (minUboAlignment > 0) {
 			dynamicAlignment = (dynamicAlignment + minUboAlignment - 1) & ~(minUboAlignment - 1);
@@ -396,7 +397,7 @@ public:
 		VkMappedMemoryRange memoryRange = vks::initializers::mappedMemoryRange();
 		memoryRange.memory = uniformBuffers.dynamic.memory;
 		memoryRange.size = uniformBuffers.dynamic.size;
-		vkFlushMappedMemoryRanges(m_vkDevice, 1, &memoryRange);
+		vkFlushMappedMemoryRanges(m_deviceOriginal, 1, &memoryRange);
 	}
 
 	void prepare()

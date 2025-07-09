@@ -1331,16 +1331,6 @@ class Buffer : public HandleWithOwner<VkBuffer, Device> {
     {
     }
 
-    Buffer(const VkBufferCreateInfo& vkBufferCreateInfo, const Device& device)
-    {
-        VkBuffer vkBuffer;
-        VkResult vkResult = vkCreateBuffer(device, &vkBufferCreateInfo, nullptr, &vkBuffer);
-        if (vkResult != VK_SUCCESS) {
-            throw Exception(vkResult);
-        }
-        new (this) Buffer(vkBuffer, device, vkBufferCreateInfo.size, &destroy);
-    }
-
     VkDeviceSize m_size = 0;
 
 public:
@@ -1360,6 +1350,16 @@ public:
         uint32_t queueFamilyIndexLocal = queueFamilyIndex;
         vkBufferCreateInfo.pQueueFamilyIndices = &queueFamilyIndexLocal;
         new (this) Buffer(vkBufferCreateInfo, device);
+    }
+
+    Buffer(const VkBufferCreateInfo& vkBufferCreateInfo, const Device& device)
+    {
+        VkBuffer vkBuffer;
+        VkResult vkResult = vkCreateBuffer(device, &vkBufferCreateInfo, nullptr, &vkBuffer);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) Buffer(vkBuffer, device, vkBufferCreateInfo.size, &destroy);
     }
 
     VkDeviceSize size() const
@@ -2394,11 +2394,20 @@ public:
         vkCmdSetViewport(*this, 0, 1, &viewport);
     }
 
-    void cmdSetScissor(
-        VkExtent2D vkExtent2D) const
+    void cmdSetViewport(const VkViewport& vkViewport) const
+    {
+        vkCmdSetViewport(*this, 0, 1, &vkViewport);
+    }
+
+    void cmdSetScissor(VkExtent2D vkExtent2D) const
     {
         VkRect2D scissor {};
         scissor.extent = vkExtent2D;
+        vkCmdSetScissor(*this, 0, 1, &scissor);
+    }
+
+    void cmdSetScissor(const VkRect2D& scissor) const
+    {
         vkCmdSetScissor(*this, 0, 1, &scissor);
     }
 
@@ -2568,10 +2577,9 @@ public:
 
 class PresentInfo : public VkPresentInfoKHR {
 
-    //	TODO: modify to m_vkBuffer more semaphores?
-    VkSemaphore m_vkSemaphoreWait = nullptr;
-    VkSwapchainKHR m_vkSwapChain = nullptr;
-    uint32_t m_swapChainImageIndex = 0;
+	std::vector<VkSemaphore> m_vkSemaphoreWaits;
+    std::vector<VkSwapchainKHR> m_vkSwapChains;
+    std::vector<uint32_t> m_swapChainImageIndices;
 
 public:
     PresentInfo()
@@ -2580,22 +2588,28 @@ public:
         sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     }
 
+	~PresentInfo() = default;
+	PresentInfo(const PresentInfo&) = delete;
+	PresentInfo& operator=(const PresentInfo&) = delete;
+	PresentInfo(PresentInfo&&) noexcept = delete;
+	PresentInfo& operator=(PresentInfo&&) = delete;
+
     void addWaitSemaphore(VkSemaphore vkSemaphore)
     {
-        m_vkSemaphoreWait = vkSemaphore;
-        waitSemaphoreCount = 1;
-        pWaitSemaphores = &m_vkSemaphoreWait;
+		m_vkSemaphoreWaits.push_back(vkSemaphore);
+		waitSemaphoreCount = static_cast<uint32_t>(m_vkSemaphoreWaits.size());
+		pWaitSemaphores = m_vkSemaphoreWaits.data();
     }
 
     void addSwapchain(
         VkSwapchainKHR vkSwapChain,
         uint32_t swapChainImageIndex)
     {
-        m_vkSwapChain = vkSwapChain;
-        m_swapChainImageIndex = swapChainImageIndex;
-        swapchainCount = 1;
-        pSwapchains = &m_vkSwapChain;
-        pImageIndices = &m_swapChainImageIndex;
+        m_vkSwapChains.push_back(vkSwapChain);
+        m_swapChainImageIndices.push_back(swapChainImageIndex);
+		swapchainCount = static_cast<uint32_t>(m_vkSwapChains.size());
+		pSwapchains = m_vkSwapChains.data();
+		pImageIndices = m_swapChainImageIndices.data();
     }
 };
 

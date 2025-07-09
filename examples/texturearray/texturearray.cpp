@@ -68,14 +68,14 @@ public:
 
 	~VulkanExample()
 	{
-		if (m_vkDevice) {
-			vkDestroyImageView(m_vkDevice, textureArray.view, nullptr);
-			vkDestroyImage(m_vkDevice, textureArray.image, nullptr);
-			vkDestroySampler(m_vkDevice, textureArray.sampler, nullptr);
-			vkFreeMemory(m_vkDevice, textureArray.deviceMemory, nullptr);
-			vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+		if (m_deviceOriginal) {
+			vkDestroyImageView(m_deviceOriginal, textureArray.view, nullptr);
+			vkDestroyImage(m_deviceOriginal, textureArray.image, nullptr);
+			vkDestroySampler(m_deviceOriginal, textureArray.sampler, nullptr);
+			vkFreeMemory(m_deviceOriginal, textureArray.deviceMemory, nullptr);
+			vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
+			vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
 			vertexBuffer.destroy();
 			indexBuffer.destroy();
 			uniformBuffer.destroy();
@@ -132,23 +132,23 @@ public:
 		bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, &stagingBuffer));
+		VK_CHECK_RESULT(vkCreateBuffer(m_deviceOriginal, &bufferCreateInfo, nullptr, &stagingBuffer));
 
 		// Get m_vkDeviceMemory requirements for the staging buffer (alignment, m_vkDeviceMemory type bits)
-		vkGetBufferMemoryRequirements(m_vkDevice, stagingBuffer, &memReqs);
+		vkGetBufferMemoryRequirements(m_deviceOriginal, stagingBuffer, &memReqs);
 
 		memAllocInfo.allocationSize = memReqs.size;
 		// Get m_vkDeviceMemory type index for a host visible buffer
 		memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &stagingMemory));
-		VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, stagingBuffer, stagingMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &stagingMemory));
+		VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, stagingBuffer, stagingMemory, 0));
 
 		// Copy texture data into staging buffer
 		uint8_t *data;
-		VK_CHECK_RESULT(vkMapMemory(m_vkDevice, stagingMemory, 0, memReqs.size, 0, (void **)&data));
+		VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, stagingMemory, 0, memReqs.size, 0, (void **)&data));
 		memcpy(data, ktxTextureData, ktxTextureSize);
-		vkUnmapMemory(m_vkDevice, stagingMemory);
+		vkUnmapMemory(m_deviceOriginal, stagingMemory);
 
 		// Setup buffer copy regions for array layers
 		std::vector<VkBufferImageCopy> bufferCopyRegions;
@@ -186,15 +186,15 @@ public:
 		imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		imageCreateInfo.arrayLayers = layerCount;
 
-		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &textureArray.image));
+		VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCreateInfo, nullptr, &textureArray.image));
 
-		vkGetImageMemoryRequirements(m_vkDevice, textureArray.image, &memReqs);
+		vkGetImageMemoryRequirements(m_deviceOriginal, textureArray.image, &memReqs);
 
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &textureArray.deviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, textureArray.image, textureArray.deviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &textureArray.deviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, textureArray.image, textureArray.deviceMemory, 0));
 
 		VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
@@ -247,7 +247,7 @@ public:
 		sampler.minLod = 0.0f;
 		sampler.maxLod = 0.0f;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &textureArray.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &sampler, nullptr, &textureArray.sampler));
 
 		// Create m_vkImage m_vkImageView
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
@@ -257,11 +257,11 @@ public:
 		view.subresourceRange.layerCount = layerCount;
 		view.subresourceRange.levelCount = 1;
 		view.image = textureArray.image;
-		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &view, nullptr, &textureArray.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &textureArray.view));
 
 		// Clean up staging resources
-		vkFreeMemory(m_vkDevice, stagingMemory, nullptr);
-		vkDestroyBuffer(m_vkDevice, stagingBuffer, nullptr);
+		vkFreeMemory(m_deviceOriginal, stagingMemory, nullptr);
+		vkDestroyBuffer(m_deviceOriginal, stagingBuffer, nullptr);
 		ktxTexture_Destroy(ktxTexture);
 	}
 
@@ -279,7 +279,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = m_vkRenderPass;
+		renderPassBeginInfo.renderPass = m_renderPassOriginal;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -391,7 +391,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -401,11 +401,11 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSet));
 
 		// Image descriptor for the texture array
 		VkDescriptorImageInfo textureDescriptor =
@@ -420,14 +420,14 @@ public:
 			// Binding 1 : Fragment shader texture sampler
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -458,7 +458,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "texturearray/instancing.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "texturearray/instancing.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
 		pipelineCI.pVertexInputState = &vertexInputStateCI;
 		pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 		pipelineCI.pRasterizationState = &rasterizationStateCI;
@@ -469,7 +469,7 @@ public:
 		pipelineCI.pDynamicState = &dynamicStateCI;
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	void prepareUniformBuffers()
@@ -496,9 +496,9 @@ public:
 		uint8_t *pData;
 		uint32_t dataOffset = sizeof(uniformData.matrices);
 		uint32_t dataSize = layerCount * sizeof(PerInstanceData);
-		VK_CHECK_RESULT(vkMapMemory(m_vkDevice, uniformBuffer.memory, dataOffset, dataSize, 0, (void **)&pData));
+		VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, uniformBuffer.memory, dataOffset, dataSize, 0, (void **)&pData));
 		memcpy(pData, uniformData.instance, dataSize);
-		vkUnmapMemory(m_vkDevice, uniformBuffer.memory);
+		vkUnmapMemory(m_deviceOriginal, uniformBuffer.memory);
 
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffer.map());

@@ -64,11 +64,11 @@ public:
 
 	~VulkanExample()
 	{
-		if (m_vkDevice) {
+		if (m_deviceOriginal) {
 			destroyTextureImage(texture);
-                    vkDestroyPipeline(m_vkDevice, m_vkPipeline, nullptr);
-                        vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-                    vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+                    vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
+                        vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
+                    vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
 			vertexBuffer.destroy();
 			indexBuffer.destroy();
 			uniformBuffer.destroy();
@@ -79,7 +79,7 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported
-		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+		if (m_physicalDeviceFeatures.m_features2.features.samplerAnisotropy) {
 			m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
 		};
 	}
@@ -150,7 +150,7 @@ public:
 			// Don't use linear if format is not supported for (linear) shader sampling
 			// Get m_vkDevice m_vkPhysicalDeviceProperties for the requested texture format
 			VkFormatProperties formatProperties;
-			vkGetPhysicalDeviceFormatProperties(m_vkPhysicalDevice, format, &formatProperties);
+			vkGetPhysicalDeviceFormatProperties(m_physicalDeviceOriginal, format, &formatProperties);
 			useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
 		}
 
@@ -171,21 +171,21 @@ public:
 			// This buffer is used as a transfer source for the buffer copy
 			bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-                        VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, &stagingBuffer));
+                        VK_CHECK_RESULT(vkCreateBuffer(m_deviceOriginal, &bufferCreateInfo, nullptr, &stagingBuffer));
 
 			// Get m_vkDeviceMemory requirements for the staging buffer (alignment, m_vkDeviceMemory type bits)
-                        vkGetBufferMemoryRequirements(m_vkDevice, stagingBuffer, &memReqs);
+                        vkGetBufferMemoryRequirements(m_deviceOriginal, stagingBuffer, &memReqs);
 			memAllocInfo.allocationSize = memReqs.size;
 			// Get m_vkDeviceMemory type index for a host visible buffer
 			memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-                        VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &stagingMemory));
-                        VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, stagingBuffer, stagingMemory, 0));
+                        VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &stagingMemory));
+                        VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, stagingBuffer, stagingMemory, 0));
 
 			// Copy texture data into host local staging buffer
 			uint8_t *data;
-                        VK_CHECK_RESULT(vkMapMemory(m_vkDevice, stagingMemory, 0, memReqs.size, 0, (void**)&data));
+                        VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, stagingMemory, 0, memReqs.size, 0, (void**)&data));
 			memcpy(data, ktxTextureData, ktxTextureSize);
-                        vkUnmapMemory(m_vkDevice, stagingMemory);
+                        vkUnmapMemory(m_deviceOriginal, stagingMemory);
 
 			// Setup buffer copy regions for each mip level
 			std::vector<VkBufferImageCopy> bufferCopyRegions;
@@ -222,13 +222,13 @@ public:
 			imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageCreateInfo.extent = { texture.width, texture.height, 1 };
 			imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-			VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &texture.image));
+			VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCreateInfo, nullptr, &texture.image));
 
-			vkGetImageMemoryRequirements(m_vkDevice, texture.image, &memReqs);
+			vkGetImageMemoryRequirements(m_deviceOriginal, texture.image, &memReqs);
 			memAllocInfo.allocationSize = memReqs.size;
 			memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-			VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &texture.deviceMemory));
-			VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, texture.image, texture.deviceMemory, 0));
+			VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &texture.deviceMemory));
+			VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, texture.image, texture.deviceMemory, 0));
 
 			VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
@@ -299,8 +299,8 @@ public:
 			m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 			// Clean up staging resources
-			vkFreeMemory(m_vkDevice, stagingMemory, nullptr);
-			vkDestroyBuffer(m_vkDevice, stagingBuffer, nullptr);
+			vkFreeMemory(m_deviceOriginal, stagingMemory, nullptr);
+			vkDestroyBuffer(m_deviceOriginal, stagingBuffer, nullptr);
 		} else {
 			// Copy data to a linear tiled m_vkImage
 
@@ -319,23 +319,23 @@ public:
 			imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 			imageCreateInfo.extent = { texture.width, texture.height, 1 };
-                        VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCreateInfo, nullptr, &mappableImage));
+                        VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCreateInfo, nullptr, &mappableImage));
 
 			// Get m_vkDeviceMemory requirements for this m_vkImage like size and alignment
-                        vkGetImageMemoryRequirements(m_vkDevice, mappableImage, &memReqs);
+                        vkGetImageMemoryRequirements(m_deviceOriginal, mappableImage, &memReqs);
 			// Set m_vkDeviceMemory allocation size to required m_vkDeviceMemory size
 			memAllocInfo.allocationSize = memReqs.size;
 			// Get m_vkDeviceMemory type that can be mapped to host m_vkDeviceMemory
 			memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-                        VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAllocInfo, nullptr, &mappableMemory));
-                        VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, mappableImage, mappableMemory, 0));
+                        VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &mappableMemory));
+                        VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, mappableImage, mappableMemory, 0));
 
 			// Map m_vkImage m_vkDeviceMemory
 			void *data;
-                        VK_CHECK_RESULT(vkMapMemory(m_vkDevice, mappableMemory, 0, memReqs.size, 0, &data));
+                        VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, mappableMemory, 0, memReqs.size, 0, &data));
 			// Copy m_vkImage data of the first mip level into m_vkDeviceMemory
 			memcpy(data, ktxTextureData, memReqs.size);
-                        vkUnmapMemory(m_vkDevice, mappableMemory);
+                        vkUnmapMemory(m_deviceOriginal, mappableMemory);
 
 			// Linear tiled images don't need to be staged and can be directly used as textures
 			texture.image = mappableImage;
@@ -396,9 +396,9 @@ public:
 		sampler.maxLod = (useStaging) ? (float)texture.mipLevels : 0.0f;
 		// Enable anisotropic filtering
 		// This feature is optional, so we must check if it's supported on the m_vkDevice
-		if (m_pVulkanDevice->m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+		if (m_physicalDeviceFeatures.m_features2.features.samplerAnisotropy) {
 			// Use max. level of anisotropy for this example
-			sampler.maxAnisotropy = m_pVulkanDevice->m_vkPhysicalDeviceProperties.limits.maxSamplerAnisotropy;
+			sampler.maxAnisotropy = m_physicalDeviceProperties.m_properties2.properties.limits.maxSamplerAnisotropy;
 			sampler.anisotropyEnable = VK_TRUE;
 		} else {
 			// The m_vkDevice does not support anisotropic filtering
@@ -406,7 +406,7 @@ public:
 			sampler.anisotropyEnable = VK_FALSE;
 		}
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-                VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &texture.sampler));
+                VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &sampler, nullptr, &texture.sampler));
 
 		// Create m_vkImage m_vkImageView
 		// Textures are not directly accessed by the shaders and
@@ -426,16 +426,16 @@ public:
 		view.subresourceRange.levelCount = (useStaging) ? texture.mipLevels : 1;
 		// The m_vkImageView will be based on the texture's m_vkImage
 		view.image = texture.image;
-                VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &view, nullptr, &texture.view));
+                VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &texture.view));
 	}
 
 	// Free all Vulkan resources used by a texture object
 	void destroyTextureImage(Texture texture)
 	{
-            vkDestroyImageView(m_vkDevice, texture.view, nullptr);
-            vkDestroyImage(m_vkDevice, texture.image, nullptr);
-            vkDestroySampler(m_vkDevice, texture.sampler, nullptr);
-            vkFreeMemory(m_vkDevice, texture.deviceMemory, nullptr);
+            vkDestroyImageView(m_deviceOriginal, texture.view, nullptr);
+            vkDestroyImage(m_deviceOriginal, texture.image, nullptr);
+            vkDestroySampler(m_deviceOriginal, texture.sampler, nullptr);
+            vkFreeMemory(m_deviceOriginal, texture.deviceMemory, nullptr);
 	}
 
 	void buildCommandBuffers()
@@ -447,7 +447,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = m_vkRenderPass;
+		renderPassBeginInfo.renderPass = m_renderPassOriginal;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -536,7 +536,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-                VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+                VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -546,11 +546,11 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSet));
 
 		// Setup a descriptor m_vkImage info for the current texture to be used as a combined m_vkImage sampler
 		VkDescriptorImageInfo textureDescriptor;
@@ -571,14 +571,14 @@ public:
 				1,												// Shader binding point 1
 				&textureDescriptor)								// Pointer to the descriptor m_vkImage for our texture
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -611,7 +611,7 @@ public:
 		vertexInputState.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributes.size());
 		vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
 		pipelineCreateInfo.pVertexInputState = &vertexInputState;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;
@@ -622,7 +622,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
