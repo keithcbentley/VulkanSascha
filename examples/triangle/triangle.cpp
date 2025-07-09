@@ -86,13 +86,13 @@ public:
     // The m_vkPipeline layout is used by a m_vkPipeline to access the descriptor sets
     // It defines interface (without binding any actual data) between the shader stages used by the m_vkPipeline and the shader resources
     // A m_vkPipeline layout can be shared among multiple pipelines as long as their interfaces match
-    VkPipelineLayout m_vkPipelineLayout { VK_NULL_HANDLE };
+    vkcpp::PipelineLayout m_pipelineLayout;
 
     // Pipelines (often called "m_vkPipeline state objects") are used to bake all states that affect a m_vkPipeline
     // While in OpenGL every state can be changed at (almost) any time, Vulkan requires to layout the graphics (and compute) m_vkPipeline states upfront
     // So for each combination of non-dynamic m_vkPipeline states you need a new m_vkPipeline (there are a few exceptions to this not discussed here)
     // Even though this adds a new dimension of planning ahead, it's a great opportunity for performance optimizations by the driver
-    VkPipeline m_vkPipeline { VK_NULL_HANDLE };
+    vkcpp::GraphicsPipeline m_graphicsPipeline;
 
     // The descriptor set layout describes the shader binding layout (without actually referencing descriptor)
     // Like the m_vkPipeline layout it's pretty much a blueprint and can be used with different descriptor sets as long as their layout matches
@@ -131,8 +131,8 @@ public:
         // Clean up used Vulkan resources
         // Note: Inherited destructor cleans up resources stored in base class
         if (m_deviceOriginal) {
-            vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
-            vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
+            //vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
+            //vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
             vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
             //			vkDestroyBuffer(m_deviceOriginal, vertices.m_vkBuffer, nullptr);
             //			vkFreeMemory(m_deviceOriginal, vertices.m_vkDeviceMemory, nullptr);
@@ -688,12 +688,9 @@ public:
     {
         // Create the m_vkPipeline layout that is used to generate the rendering pipelines that are based on this descriptor set layout
         // In a more complex scenario you would have different m_vkPipeline layouts for different descriptor set layouts that could be reused
-        VkPipelineLayoutCreateInfo pipelineLayoutCI {};
-        pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutCI.pNext = nullptr;
-        pipelineLayoutCI.setLayoutCount = 1;
-        pipelineLayoutCI.pSetLayouts = &m_vkDescriptorSetLayout;
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
+		vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+		pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayout);
+		m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo, m_deviceOriginal);
 
         // Create the graphics m_vkPipeline used in this example
         // Vulkan uses the concept of rendering pipelines to encapsulate fixed states, replacing OpenGL's complex state machine
@@ -703,7 +700,7 @@ public:
         VkGraphicsPipelineCreateInfo pipelineCI {};
         pipelineCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         // The layout used for this m_vkPipeline (can be shared among multiple pipelines using the same layout)
-        pipelineCI.layout = m_vkPipelineLayout;
+        pipelineCI.layout = m_pipelineLayout;
         // Renderpass this m_vkPipeline is attached to
         pipelineCI.renderPass = m_renderPassOriginal;
 
@@ -850,7 +847,8 @@ public:
         pipelineCI.pDynamicState = &dynamicStateCI;
 
         // Create rendering m_vkPipeline using the specified states
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		m_graphicsPipeline = vkcpp::GraphicsPipeline(pipelineCI, m_deviceOriginal);
+        //VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 
         // Shader modules are no longer needed once the graphics m_vkPipeline has been created
         vkDestroyShaderModule(m_deviceOriginal, shaderStages[0].module, nullptr);
@@ -948,8 +946,9 @@ public:
         //		const VkCommandBuffer vkCommandBuffer = m_commandBuffers[m_currentFrameIndex];
         vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_vkCommandBuffers[m_currentFrameIndex]);
 
-        commandBuffer.reset();
-        commandBuffer.begin();
+        commandBuffer
+			.reset()
+			.begin();
 
         // Start the first sub pass specified in our default render pass setup by the base class
         // This will clear the color and depth attachment
@@ -971,23 +970,17 @@ public:
         renderPassBeginInfo.pClearValues = clearValues;
         renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
 
-        commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
-
-        commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
-        commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
-
-        commandBuffer.cmdBindDescriptorSet(m_vkPipelineLayout, uniformBuffers[m_currentFrameIndex].descriptorSet);
-
-        commandBuffer.cmdBindPipeline(m_vkPipeline);
-
-        commandBuffer.cmdBindVertexBuffer(m_vertices.m_buffer);
-        commandBuffer.cmdBindIndexBuffer(m_indices.m_buffer, VK_INDEX_TYPE_UINT32);
-        commandBuffer.cmdDrawIndexed(m_indices.count);
-        commandBuffer.cmdEndRenderPass();
-
-        // Ending the render pass will add an implicit barrier transitioning the frame buffer color attachment to
-        // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR for presenting it to the windowing system
-        commandBuffer.end();
+        commandBuffer
+			.cmdBeginRenderPass(renderPassBeginInfo)
+			.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
+			.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
+			.cmdBindDescriptorSet(m_pipelineLayout, uniformBuffers[m_currentFrameIndex].descriptorSet)
+		    .cmdBindPipeline(m_graphicsPipeline)
+	        .cmdBindVertexBuffer(m_vertices.m_buffer)
+			.cmdBindIndexBuffer(m_indices.m_buffer, VK_INDEX_TYPE_UINT32)
+			.cmdDrawIndexed(m_indices.count)
+			.cmdEndRenderPass()
+	        .end();
 
         // Submit the command buffer to the graphics m_vkQueue
 
