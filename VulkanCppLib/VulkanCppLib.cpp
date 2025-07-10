@@ -48,8 +48,9 @@ VkPhysicalDeviceMemoryProperties PhysicalDevice::getPhysicalDeviceMemoryProperti
 
 uint32_t PhysicalDevice::findMemoryTypeIndex(
     uint32_t usableMemoryIndexBits,
-    MemoryPropertyFlags requiredProperties) const
+    MemoryPropertyFlags requiredPropertiesArg) const
 {
+	MemoryPropertyFlags requiredProperties(requiredPropertiesArg);
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice, &memProperties);
 

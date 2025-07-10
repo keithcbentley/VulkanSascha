@@ -1383,10 +1383,11 @@ public:
 
 class Buffer_DeviceMemory {
 
-    Buffer_DeviceMemory(Buffer&& buffer, DeviceMemory&& deviceMemory, void* mappedMemory)
+    //	Handy constructor.
+    Buffer_DeviceMemory(Buffer&& buffer, DeviceMemory&& deviceMemory)
         : m_buffer(std::move(buffer))
         , m_deviceMemory(std::move(deviceMemory))
-        , m_mappedMemory(mappedMemory)
+        , m_mappedMemory(nullptr)
     {
     }
 
@@ -1397,7 +1398,13 @@ public:
 
     Buffer_DeviceMemory() = default;
     ~Buffer_DeviceMemory() = default;
-    Buffer_DeviceMemory(const Buffer_DeviceMemory& other) = default;
+
+    Buffer_DeviceMemory(const Buffer_DeviceMemory& other)
+        : m_buffer(other.m_buffer)
+        , m_deviceMemory(other.m_deviceMemory)
+        , m_mappedMemory(other.m_mappedMemory)
+    {
+    }
 
     Buffer_DeviceMemory& operator=(const Buffer_DeviceMemory& other)
     {
@@ -1426,33 +1433,43 @@ public:
         return *this;
     }
 
+    //	Basic constructor. Creates Buffer, DeviceMemory, and binds them.
     Buffer_DeviceMemory(
         VkBufferUsageFlags vkBufferUsageFlags,
         VkDeviceSize size,
         uint32_t queueFamilyIndex,
-        MemoryPropertyFlags memoryPropertyFlags,
+        MemoryPropertyFlags requiredMemoryPropertyFlags,
         const Device& device)
     {
         Buffer buffer(vkBufferUsageFlags, size, queueFamilyIndex, device);
-
-        DeviceMemory deviceMemory = buffer.allocateDeviceMemory(memoryPropertyFlags);
+        DeviceMemory deviceMemory = buffer.allocateDeviceMemory(requiredMemoryPropertyFlags);
 
         VkResult vkResult = vkBindBufferMemory(device, buffer, deviceMemory, 0);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
 
-        // TODO: should this be a method on DeviceMemory?
+        new (this) Buffer_DeviceMemory(std::move(buffer), std::move(deviceMemory));
+    }
+
+    static Buffer_DeviceMemory withMap(
+        VkBufferUsageFlags vkBufferUsageFlags,
+        int64_t size,
+        uint32_t queueFamilyIndex,
+        MemoryPropertyFlags requiredMemoryPropertyFlags,
+        const Device& device)
+    {
+        Buffer_DeviceMemory newbdm(vkBufferUsageFlags, size, queueFamilyIndex, requiredMemoryPropertyFlags, device);
         void* mappedMemory;
-        vkResult = vkMapMemory(device, deviceMemory, 0, size, 0, &mappedMemory);
+        VkResult vkResult = vkMapMemory(device, newbdm.m_deviceMemory, 0, size, 0, &mappedMemory);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-
-        new (this) Buffer_DeviceMemory(std::move(buffer), std::move(deviceMemory), mappedMemory);
+        newbdm.m_mappedMemory = mappedMemory;
+        return newbdm;
     }
 
-    Buffer_DeviceMemory(
+    static Buffer_DeviceMemory withCopy(
         VkBufferUsageFlags vkBufferUsageFlags,
         int64_t size,
         uint32_t queueFamilyIndex,
@@ -1460,14 +1477,15 @@ public:
         const void* pSrcMem,
         const Device& device)
     {
-        new (this) Buffer_DeviceMemory(
-            vkBufferUsageFlags,
-            size,
-            queueFamilyIndex,
-            requiredMemoryPropertyFlags,
-            device);
-        memcpy(m_mappedMemory, pSrcMem, size);
-        // unmapMemory();
+		Buffer_DeviceMemory newbdm = withMap(
+			vkBufferUsageFlags,
+			size,
+			queueFamilyIndex,
+			requiredMemoryPropertyFlags,
+			device);
+
+        memcpy(newbdm.m_mappedMemory, pSrcMem, size);
+		return newbdm;
     }
 
     void unmapMemory()
@@ -2275,7 +2293,7 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-		return *this;
+        return *this;
     }
 
     const CommandBuffer& begin() const
@@ -2287,7 +2305,7 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-		return *this;
+        return *this;
     }
 
     void beginOneTimeSubmit() const
@@ -2368,13 +2386,13 @@ public:
     const CommandBuffer cmdBeginRenderPass(const VkRenderPassBeginInfo& vkRenderPassBeginInfo) const
     {
         vkCmdBeginRenderPass(*this, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdEndRenderPass() const
     {
         vkCmdEndRenderPass(*this);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdSetViewport(
@@ -2386,7 +2404,7 @@ public:
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(*this, 0, 1, &viewport);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdSetViewport(uint32_t width, uint32_t height) const
@@ -2397,13 +2415,13 @@ public:
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(*this, 0, 1, &viewport);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdSetViewport(const VkViewport& vkViewport) const
     {
         vkCmdSetViewport(*this, 0, 1, &vkViewport);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdSetScissor(VkExtent2D vkExtent2D) const
@@ -2411,13 +2429,13 @@ public:
         VkRect2D scissor {};
         scissor.extent = vkExtent2D;
         vkCmdSetScissor(*this, 0, 1, &scissor);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdSetScissor(const VkRect2D& scissor) const
     {
         vkCmdSetScissor(*this, 0, 1, &scissor);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdSetScissor(uint32_t width, uint32_t height) const
@@ -2426,14 +2444,14 @@ public:
         scissor.extent.width = width;
         scissor.extent.height = height;
         vkCmdSetScissor(*this, 0, 1, &scissor);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdBindPipeline(
         VkPipeline vkPipeline) const
     {
         vkCmdBindPipeline(*this, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdBindDescriptorSet(
@@ -2442,26 +2460,26 @@ public:
     {
         vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
             vkPipelineLayout, 0, 1, &vkDescriptorSet, 0, nullptr);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdBindVertexBuffer(VkBuffer vkBuffer) const
     {
         VkDeviceSize offsets[1] { 0 };
         vkCmdBindVertexBuffers(*this, 0, 1, &vkBuffer, offsets);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdBindIndexBuffer(VkBuffer vkBuffer, VkIndexType vkIndexType) const
     {
         vkCmdBindIndexBuffer(*this, vkBuffer, 0, vkIndexType);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdDrawIndexed(uint32_t indexCount) const
     {
         vkCmdDrawIndexed(*this, indexCount, 1, 0, 0, 0);
-		return *this;
+        return *this;
     }
 
     const CommandBuffer cmdInsertImageMemoryBarrier(
@@ -2490,7 +2508,7 @@ public:
             0, nullptr,
             0, nullptr,
             1, &imageMemoryBarrier);
-		return *this;
+        return *this;
     }
 };
 
@@ -2593,7 +2611,7 @@ public:
 
 class PresentInfo : public VkPresentInfoKHR {
 
-	std::vector<VkSemaphore> m_vkSemaphoreWaits;
+    std::vector<VkSemaphore> m_vkSemaphoreWaits;
     std::vector<VkSwapchainKHR> m_vkSwapChains;
     std::vector<uint32_t> m_swapChainImageIndices;
 
@@ -2604,17 +2622,17 @@ public:
         sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     }
 
-	~PresentInfo() = default;
-	PresentInfo(const PresentInfo&) = delete;
-	PresentInfo& operator=(const PresentInfo&) = delete;
-	PresentInfo(PresentInfo&&) noexcept = delete;
-	PresentInfo& operator=(PresentInfo&&) = delete;
+    ~PresentInfo() = default;
+    PresentInfo(const PresentInfo&) = delete;
+    PresentInfo& operator=(const PresentInfo&) = delete;
+    PresentInfo(PresentInfo&&) noexcept = delete;
+    PresentInfo& operator=(PresentInfo&&) = delete;
 
     void addWaitSemaphore(VkSemaphore vkSemaphore)
     {
-		m_vkSemaphoreWaits.push_back(vkSemaphore);
-		waitSemaphoreCount = static_cast<uint32_t>(m_vkSemaphoreWaits.size());
-		pWaitSemaphores = m_vkSemaphoreWaits.data();
+        m_vkSemaphoreWaits.push_back(vkSemaphore);
+        waitSemaphoreCount = static_cast<uint32_t>(m_vkSemaphoreWaits.size());
+        pWaitSemaphores = m_vkSemaphoreWaits.data();
     }
 
     void addSwapchain(
@@ -2623,9 +2641,9 @@ public:
     {
         m_vkSwapChains.push_back(vkSwapChain);
         m_swapChainImageIndices.push_back(swapChainImageIndex);
-		swapchainCount = static_cast<uint32_t>(m_vkSwapChains.size());
-		pSwapchains = m_vkSwapChains.data();
-		pImageIndices = m_swapChainImageIndices.data();
+        swapchainCount = static_cast<uint32_t>(m_vkSwapChains.size());
+        pSwapchains = m_vkSwapChains.data();
+        pImageIndices = m_swapChainImageIndices.data();
     }
 };
 
@@ -3703,15 +3721,15 @@ public:
         new (this) GraphicsPipeline(vkPipeline, vkDevice, &destroy);
     }
 
-	GraphicsPipeline(VkGraphicsPipelineCreateInfo& vkGraphicsPipelineCreateInfo, VkDevice vkDevice) {
-		VkPipeline vkPipeline;
-		VkResult vkResult = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &vkGraphicsPipelineCreateInfo, nullptr, &vkPipeline);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-		new (this) GraphicsPipeline(vkPipeline, vkDevice, &destroy);
-	}
-
+    GraphicsPipeline(VkGraphicsPipelineCreateInfo& vkGraphicsPipelineCreateInfo, VkDevice vkDevice)
+    {
+        VkPipeline vkPipeline;
+        VkResult vkResult = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &vkGraphicsPipelineCreateInfo, nullptr, &vkPipeline);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) GraphicsPipeline(vkPipeline, vkDevice, &destroy);
+    }
 };
 
 class SwapchainCreateInfo : public VkSwapchainCreateInfoKHR {
@@ -3839,6 +3857,7 @@ public:
     DeviceMemory m_deviceMemory;
 
     Image_Memory() = default;
+    ~Image_Memory() = default;
 
     Image_Memory(const Image_Memory&) = delete;
     Image_Memory& operator=(const Image_Memory&) = delete;
@@ -3896,7 +3915,28 @@ public:
     ImageView m_imageView;
 
     Image_Memory_View() = default;
+    ~Image_Memory_View() = default;
 
+    Image_Memory_View(const Image_Memory_View&) = delete;
+    Image_Memory_View& operator=(const Image_Memory_View&) = delete;
+
+    Image_Memory_View(Image_Memory_View&& other) noexcept
+        : m_image(std::move(other.m_image))
+        , m_deviceMemory(std::move(other.m_deviceMemory))
+        , m_imageView(std::move(other.m_imageView))
+    {
+    }
+
+    Image_Memory_View& operator=(Image_Memory_View&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Image_Memory_View();
+        new (this) Image_Memory_View(std::move(other));
+    }
+
+    //	Handy move constructor.
     Image_Memory_View(
         Image&& image,
         DeviceMemory&& deviceMemory,
