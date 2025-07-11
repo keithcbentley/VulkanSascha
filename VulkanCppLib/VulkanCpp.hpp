@@ -1948,6 +1948,34 @@ class Image : public HandleWithOwner<VkImage, Device> {
 
 public:
     Image() = default;
+    ~Image() = default;
+    Image(const Image& other)
+        : HandleWithOwner(other)
+    {
+    }
+
+    Image& operator=(const Image& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Image();
+        new (this) Image(other);
+        return *this;
+    }
+
+	Image(Image&& other) noexcept
+		: HandleWithOwner(std::move(other)) {
+	}
+
+	Image& operator=(Image&& other) noexcept {
+		if (this == &other) {
+			return *this;
+		}
+		this->~Image();
+		new (this) Image(std::move(other));
+		return *this;
+	}
 
     Image(const ImageCreateInfo& imageCreateInfo, Device device)
     {
@@ -1959,17 +1987,15 @@ public:
         new (this) Image(vkImage, device, &destroy);
     }
 
-    // static Image fromExisting(VkImage vkImage, Device m_vkDevice) {
-    //	return Image(vkImage, m_vkDevice, nullptr);
-    // }
-
-    // static std::vector<Image> fromExisting(std::vector<VkImage>& vkImages, Device m_vkDevice) {
-    //	std::vector<Image> images;
-    //	for (VkImage vkImage : vkImages) {
-    //		images.push_back(fromExisting(vkImage, m_vkDevice));
-    //	}
-    //	return images;
-    // }
+    Image(const VkImageCreateInfo& vkImageCreateInfo, Device device)
+    {
+        VkImage vkImage;
+        VkResult vkResult = vkCreateImage(device, &vkImageCreateInfo, nullptr, &vkImage);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) Image(vkImage, device, &destroy);
+    }
 
     VkMemoryRequirements getMemoryRequirements() const
     {

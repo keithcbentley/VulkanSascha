@@ -369,29 +369,30 @@ public:
     void setupDepthStencil() override
     {
         // Create an optimal m_vkImage used as the depth stencil attachment
-        VkImageCreateInfo imageCI {};
-        imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageCI.imageType = VK_IMAGE_TYPE_2D;
-        imageCI.format = m_vkFormatDepth;
+        VkImageCreateInfo vkImageCreateInfo{};
+		vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		vkImageCreateInfo.format = m_vkFormatDepth;
         // Use example's m_drawAreaHeight and m_drawAreaWidth
-        imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
-        imageCI.mipLevels = 1;
-        imageCI.arrayLayers = 1;
-        imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCI, nullptr, &m_defaultDepthStencil.m_vkImage));
+		vkImageCreateInfo.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
+		vkImageCreateInfo.mipLevels = 1;
+		vkImageCreateInfo.arrayLayers = 1;
+		vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		vkImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo, m_deviceOriginal);
+        //VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &vkImageCreateInfo, nullptr, &m_defaultDepthStencil.m_vkImage));
 
         // Allocate m_vkDeviceMemory for the m_vkImage (m_vkDevice local) and bind it to our m_vkImage
         VkMemoryAllocateInfo memAlloc {};
         memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         VkMemoryRequirements memReqs;
-        vkGetImageMemoryRequirements(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, &memReqs);
+        vkGetImageMemoryRequirements(m_deviceOriginal, m_defaultDepthStencil.m_image, &memReqs);
         memAlloc.allocationSize = memReqs.size;
         memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAlloc, nullptr, &m_defaultDepthStencil.m_vkDeviceMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, m_defaultDepthStencil.m_vkDeviceMemory, 0));
+        VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_vkDeviceMemory, 0));
 
         // Create a m_vkImageView for the depth stencil m_vkImage
         // Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
@@ -410,7 +411,7 @@ public:
         depthStencilViewCI.subresourceRange.levelCount = 1;
         depthStencilViewCI.subresourceRange.baseArrayLayer = 0;
         depthStencilViewCI.subresourceRange.layerCount = 1;
-        depthStencilViewCI.image = m_defaultDepthStencil.m_vkImage;
+        depthStencilViewCI.image = m_defaultDepthStencil.m_image;
         VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &depthStencilViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
     }
 

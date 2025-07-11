@@ -800,7 +800,7 @@ VulkanExampleBase::~VulkanExampleBase()
         vkDestroyShaderModule(m_deviceOriginal, shaderModule, nullptr);
     }
     vkDestroyImageView(m_deviceOriginal, m_defaultDepthStencil.m_vkImageView, nullptr);
-    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
+//    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
     vkFreeMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkDeviceMemory, nullptr);
 
     vkDestroyPipelineCache(m_deviceOriginal, m_vkPipelineCache, nullptr);
@@ -2742,32 +2742,33 @@ void VulkanExampleBase::createCommandPool()
 
 void VulkanExampleBase::setupDepthStencil()
 {
-    VkImageCreateInfo imageCI {};
-    imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageCI.imageType = VK_IMAGE_TYPE_2D;
-    imageCI.format = m_vkFormatDepth;
-    imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
-    imageCI.mipLevels = 1;
-    imageCI.arrayLayers = 1;
-    imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    VkImageCreateInfo vkImageCreateInfo{};
+	vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	vkImageCreateInfo.format = m_vkFormatDepth;
+	vkImageCreateInfo.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
+	vkImageCreateInfo.mipLevels = 1;
+	vkImageCreateInfo.arrayLayers = 1;
+	vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo, m_deviceOriginal);
+	//VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &vkImageCreateInfo, nullptr, &m_defaultDepthStencil.m_vkImage));
 
-    VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCI, nullptr, &m_defaultDepthStencil.m_vkImage));
-    VkMemoryRequirements memReqs {};
-    vkGetImageMemoryRequirements(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, &memReqs);
+	VkMemoryRequirements memReqs {};
+    vkGetImageMemoryRequirements(m_deviceOriginal, m_defaultDepthStencil.m_image, &memReqs);
 
     VkMemoryAllocateInfo memAllloc {};
     memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAllloc.allocationSize = memReqs.size;
     memAllloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllloc, nullptr, &m_defaultDepthStencil.m_vkDeviceMemory));
-    VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, m_defaultDepthStencil.m_vkDeviceMemory, 0));
+    VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_vkDeviceMemory, 0));
 
     VkImageViewCreateInfo imageViewCI {};
     imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imageViewCI.image = m_defaultDepthStencil.m_vkImage;
+    imageViewCI.image = m_defaultDepthStencil.m_image;
     imageViewCI.format = m_vkFormatDepth;
     imageViewCI.subresourceRange.baseMipLevel = 0;
     imageViewCI.subresourceRange.levelCount = 1;
@@ -2899,7 +2900,7 @@ void VulkanExampleBase::windowResize()
 
     // Recreate the frame buffers
     vkDestroyImageView(m_deviceOriginal, m_defaultDepthStencil.m_vkImageView, nullptr);
-    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
+//    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
     vkFreeMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkDeviceMemory, nullptr);
     setupDepthStencil();
     for (auto& frameBuffer : m_vkFrameBuffers) {
