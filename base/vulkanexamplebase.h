@@ -158,7 +158,7 @@ protected:
 	// Active frame buffer index
 	uint32_t m_currentBufferIndex = 0;
 	// Descriptor set pool
-	VkDescriptorPool m_vkDescriptorPool{ VK_NULL_HANDLE };
+	vkcpp::DescriptorPool m_descriptorPool;
 	// List of shader modules created (stored for cleanup)
 	std::vector<VkShaderModule> m_vkShaderModules;
 	// Pipeline cache object

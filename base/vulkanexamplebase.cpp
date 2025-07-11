@@ -790,9 +790,6 @@ VulkanExampleBase::~VulkanExampleBase()
 {
     // Clean up Vulkan resources
     m_swapChain.cleanup();
-    if (m_vkDescriptorPool != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(m_deviceOriginal, m_vkDescriptorPool, nullptr);
-    }
     destroyCommandBuffers();
 
 	for (auto& frameBuffer : m_vkFrameBuffers) {

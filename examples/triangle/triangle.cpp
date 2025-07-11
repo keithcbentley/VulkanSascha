@@ -326,28 +326,12 @@ public:
     // Descriptors are allocated from a pool, that tells the implementation how many and what types of descriptors we are going to use (at maximum)
     void createDescriptorPool()
     {
-        // We need to tell the API the number of max. requested descriptors per type
-        VkDescriptorPoolSize descriptorTypeCounts[1] {};
-        // This example only one descriptor type (uniform buffer)
-        descriptorTypeCounts[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        // We have one buffer (and as such descriptor) per frame
-        descriptorTypeCounts[0].descriptorCount = MAX_CONCURRENT_FRAMES;
-        // For additional types you need to add new entries in the type count list
-        // E.g. for two combined m_vkImage samplers :
-        // typeCounts[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        // typeCounts[1].descriptorCount = 2;
-
-        // Create the global descriptor pool
-        // All descriptors used in this example are allocated from this pool
-        VkDescriptorPoolCreateInfo descriptorPoolCI {};
-        descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        descriptorPoolCI.pNext = nullptr;
-        descriptorPoolCI.poolSizeCount = 1;
-        descriptorPoolCI.pPoolSizes = descriptorTypeCounts;
+		vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+		descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_CONCURRENT_FRAMES);
         // Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
         // Our sample will create one set per uniform buffer per frame
-        descriptorPoolCI.maxSets = MAX_CONCURRENT_FRAMES;
-        VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolCI, nullptr, &m_vkDescriptorPool));
+		descriptorPoolCreateInfo.maxSets = MAX_CONCURRENT_FRAMES;
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo, m_deviceOriginal);
     }
 
     // Descriptor set layouts define the interface between our application and the shader
@@ -378,7 +362,7 @@ public:
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
             VkDescriptorSetAllocateInfo allocInfo {};
             allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            allocInfo.descriptorPool = m_vkDescriptorPool;
+            allocInfo.descriptorPool = m_descriptorPool;
             allocInfo.descriptorSetCount = 1;
             allocInfo.pSetLayouts = &m_vkDescriptorSetLayout;
             VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &m_uniformBuffers[i].descriptorSet));

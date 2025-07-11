@@ -1477,15 +1477,15 @@ public:
         const void* pSrcMem,
         const Device& device)
     {
-		Buffer_DeviceMemory newbdm = withMap(
-			vkBufferUsageFlags,
-			size,
-			queueFamilyIndex,
-			requiredMemoryPropertyFlags,
-			device);
+        Buffer_DeviceMemory newbdm = withMap(
+            vkBufferUsageFlags,
+            size,
+            queueFamilyIndex,
+            requiredMemoryPropertyFlags,
+            device);
 
         memcpy(newbdm.m_mappedMemory, pSrcMem, size);
-		return newbdm;
+        return newbdm;
     }
 
     void unmapMemory()
@@ -2744,42 +2744,31 @@ class DescriptorPoolCreateInfo : public VkDescriptorPoolCreateInfo {
     //	The map allows us to collect the size info in any order.
     //	When it's time to assemble, we'll put the collected info
     //	into the vector so that it's ready for the create call.
-    std::map<VkDescriptorType, int> m_poolSizesMap;
-    std::vector<VkDescriptorPoolSize> m_poolSizes;
+    std::vector<VkDescriptorPoolSize> m_vkDescriptorPoolSizes;
 
 public:
-    //	Don't allow getting the pointer to the raw create info structure
-    //	since it may not be assembled.  Must call assemble to get the pointer.
-    VkDescriptorPoolCreateInfo* operator&() = delete;
-
     DescriptorPoolCreateInfo()
         : VkDescriptorPoolCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     }
 
+    ~DescriptorPoolCreateInfo() = default;
+    DescriptorPoolCreateInfo(const DescriptorPoolCreateInfo&) = delete;
+    DescriptorPoolCreateInfo& operator=(const DescriptorPoolCreateInfo&) = delete;
+    DescriptorPoolCreateInfo(DescriptorPoolCreateInfo&&) noexcept = delete;
+    DescriptorPoolCreateInfo& operator=(DescriptorPoolCreateInfo&&) noexcept = delete;
+
     void addDescriptorCount(VkDescriptorType vkDescriptorType, int count)
     {
-        m_poolSizesMap[vkDescriptorType] += count;
-    }
-
-    VkDescriptorPoolCreateInfo* assemble()
-    {
-        m_poolSizes.clear();
         VkDescriptorPoolSize vkDescriptorPoolSize;
-        for (std::pair<VkDescriptorType, int> kv : m_poolSizesMap) {
-            vkDescriptorPoolSize.type = kv.first;
-            vkDescriptorPoolSize.descriptorCount = kv.second;
-            m_poolSizes.push_back(vkDescriptorPoolSize);
-        }
-        poolSizeCount = static_cast<uint32_t>(m_poolSizes.size());
-        pPoolSizes = nullptr;
-        if (poolSizeCount > 0) {
-            pPoolSizes = m_poolSizes.data();
-        }
-
-        return this;
+        vkDescriptorPoolSize.type = vkDescriptorType;
+        vkDescriptorPoolSize.descriptorCount = count;
+        m_vkDescriptorPoolSizes.emplace_back(vkDescriptorPoolSize);
+        poolSizeCount = static_cast<uint32_t>(m_vkDescriptorPoolSizes.size());
+        pPoolSizes = m_vkDescriptorPoolSizes.data();
     }
+
 };
 
 class DescriptorPool : public HandleWithOwner<VkDescriptorPool> {
@@ -2797,10 +2786,20 @@ class DescriptorPool : public HandleWithOwner<VkDescriptorPool> {
 public:
     DescriptorPool() = default;
 
-    DescriptorPool(DescriptorPoolCreateInfo& poolCreateInfo, VkDevice vkDevice)
+    DescriptorPool(const DescriptorPoolCreateInfo& descriptorPoolCreateInfo, VkDevice vkDevice)
     {
         VkDescriptorPool vkDescriptorPool;
-        VkResult vkResult = vkCreateDescriptorPool(vkDevice, poolCreateInfo.assemble(), nullptr, &vkDescriptorPool);
+        VkResult vkResult = vkCreateDescriptorPool(vkDevice, &descriptorPoolCreateInfo, nullptr, &vkDescriptorPool);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) DescriptorPool(vkDescriptorPool, vkDevice, &destroy);
+    }
+
+    DescriptorPool(const VkDescriptorPoolCreateInfo& vkDescriptorPoolCreateInfo, VkDevice vkDevice)
+    {
+        VkDescriptorPool vkDescriptorPool;
+        VkResult vkResult = vkCreateDescriptorPool(vkDevice, &vkDescriptorPoolCreateInfo, nullptr, &vkDescriptorPool);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
