@@ -56,7 +56,7 @@ public:
         vkcpp::Buffer m_bufferOriginal;
         // The descriptor set stores the resources bound to the binding points in a shader
         // It connects the binding points of the different shaders with the buffers and images used for those bindings
-        VkDescriptorSet descriptorSet { VK_NULL_HANDLE };
+        vkcpp::DescriptorSet m_descriptorSet;
         // We keep a pointer to the mapped buffer, so we can easily update it's contents via a memcpy
         uint8_t* m_pMappedMemory { nullptr };
     };
@@ -93,7 +93,7 @@ public:
 
     // The descriptor set layout describes the shader binding layout (without actually referencing descriptor)
     // Like the m_vkPipeline layout it's pretty much a blueprint and can be used with different descriptor sets as long as their layout matches
-    VkDescriptorSetLayout m_vkDescriptorSetLayout { VK_NULL_HANDLE };
+    vkcpp::DescriptorSetLayout m_descriptorSetLayout;
 
     // Synchronization primitives
     // Synchronization is an important concept of Vulkan that OpenGL mostly hid away. Getting this right is crucial to using Vulkan.
@@ -128,7 +128,7 @@ public:
         // Clean up used Vulkan resources
         // Note: Inherited destructor cleans up resources stored in base class
         if (m_deviceOriginal) {
-            vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
+//            vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
             vkDestroyCommandPool(m_deviceOriginal, m_vkCommandPool, nullptr);
             for (size_t i = 0; i < m_vkPresentCompleteSemaphores.size(); i++) {
                 vkDestroySemaphore(m_deviceOriginal, m_vkPresentCompleteSemaphores[i], nullptr);
@@ -328,7 +328,7 @@ public:
     {
 		vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
 		descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_CONCURRENT_FRAMES);
-        // Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
+		// Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
         // Our sample will create one set per uniform buffer per frame
 		descriptorPoolCreateInfo.maxSets = MAX_CONCURRENT_FRAMES;
 		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo, m_deviceOriginal);
@@ -340,18 +340,9 @@ public:
     void createDescriptorSetLayout()
     {
         // Binding 0: Uniform buffer (Vertex shader)
-        VkDescriptorSetLayoutBinding layoutBinding {};
-        layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        layoutBinding.descriptorCount = 1;
-        layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        layoutBinding.pImmutableSamplers = nullptr;
-
-        VkDescriptorSetLayoutCreateInfo descriptorLayoutCI {};
-        descriptorLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        descriptorLayoutCI.pNext = nullptr;
-        descriptorLayoutCI.bindingCount = 1;
-        descriptorLayoutCI.pBindings = &layoutBinding;
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayoutCI, nullptr, &m_vkDescriptorSetLayout));
+        vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+		descriptorSetLayoutCreateInfo.addDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, vkcpp::SHADER_STAGE_VERTEX);
+		m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo, m_deviceOriginal);
     }
 
     // Shaders access data using descriptor sets that "point" at our uniform buffers
@@ -360,30 +351,15 @@ public:
     {
         // Allocate one descriptor set per frame from the global descriptor pool
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            VkDescriptorSetAllocateInfo allocInfo {};
-            allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            allocInfo.descriptorPool = m_descriptorPool;
-            allocInfo.descriptorSetCount = 1;
-            allocInfo.pSetLayouts = &m_vkDescriptorSetLayout;
-            VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &m_uniformBuffers[i].descriptorSet));
+			m_uniformBuffers[i].m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
             // Update the descriptor set determining the shader binding points
             // For every binding point used in a shader there needs to be one
             // descriptor set matching that binding point
 
-            // The buffer's information is passed using a descriptor info structure
-            VkDescriptorBufferInfo vkDescriptorBufferInfo {};
-            vkDescriptorBufferInfo.buffer = m_uniformBuffers[i].m_bufferOriginal;
-            vkDescriptorBufferInfo.range = sizeof(ShaderData);
+			vkcpp::WriteDescriptorSet writeDescriptorSet(m_uniformBuffers[i].m_descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+			writeDescriptorSet.addBufferInfo(m_uniformBuffers[i].m_bufferOriginal, 0, sizeof(ShaderData));
 
-            // Binding 0 : Uniform buffer
-            VkWriteDescriptorSet writeDescriptorSet {};
-            writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeDescriptorSet.dstSet = m_uniformBuffers[i].descriptorSet;
-            writeDescriptorSet.descriptorCount = 1;
-            writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            writeDescriptorSet.pBufferInfo = &vkDescriptorBufferInfo;
-            writeDescriptorSet.dstBinding = 0;
             vkUpdateDescriptorSets(m_deviceOriginal, 1, &writeDescriptorSet, 0, nullptr);
         }
     }
@@ -614,7 +590,7 @@ public:
         // Create the m_vkPipeline layout that is used to generate the rendering pipelines that are based on this descriptor set layout
         // In a more complex scenario you would have different m_vkPipeline layouts for different descriptor set layouts that could be reused
         vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
-        pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayout);
+        pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
         m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo, m_deviceOriginal);
 
         // Create the graphics m_vkPipeline used in this example
@@ -898,7 +874,7 @@ public:
             .cmdBeginRenderPass(renderPassBeginInfo)
             .cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
             .cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
-            .cmdBindDescriptorSet(m_pipelineLayout, m_uniformBuffers[m_currentFrameIndex].descriptorSet)
+            .cmdBindDescriptorSet(m_pipelineLayout, m_uniformBuffers[m_currentFrameIndex].m_descriptorSet)
             .cmdBindPipeline(m_graphicsPipeline)
             .cmdBindVertexBuffer(m_vertices.m_buffer)
             .cmdBindIndexBuffer(m_indices.m_buffer, VK_INDEX_TYPE_UINT32)

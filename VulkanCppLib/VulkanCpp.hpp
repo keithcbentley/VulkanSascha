@@ -2741,9 +2741,6 @@ public:
 
 class DescriptorPoolCreateInfo : public VkDescriptorPoolCreateInfo {
 
-    //	The map allows us to collect the size info in any order.
-    //	When it's time to assemble, we'll put the collected info
-    //	into the vector so that it's ready for the create call.
     std::vector<VkDescriptorPoolSize> m_vkDescriptorPoolSizes;
 
 public:
@@ -2768,7 +2765,6 @@ public:
         poolSizeCount = static_cast<uint32_t>(m_vkDescriptorPoolSizes.size());
         pPoolSizes = m_vkDescriptorPoolSizes.data();
     }
-
 };
 
 class DescriptorPool : public HandleWithOwner<VkDescriptorPool> {
@@ -2834,7 +2830,7 @@ public:
         addDescriptorSetLayoutBindings(descriptorSetLayoutBindings);
     }
 
-    DescriptorSetLayoutCreateInfo& addBinding(
+    DescriptorSetLayoutCreateInfo& addDescriptorSetLayoutBinding(
         int bindingIndex,
         VkDescriptorType vkDescriptorType,
         ShaderStageFlags shaderStageFlags)
@@ -2846,8 +2842,8 @@ public:
         layoutBinding.descriptorCount = 1;
         layoutBinding.stageFlags = static_cast<VkShaderStageFlags>(shaderStageFlags);
         layoutBinding.pImmutableSamplers = nullptr;
-
         m_bindings.push_back(layoutBinding);
+
         return *this;
     }
 
@@ -2855,7 +2851,7 @@ public:
         std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
     {
         for (DescriptorSetLayoutBinding& descriptorSetLayoutBinding : descriptorSetLayoutBindings) {
-            addBinding(
+            addDescriptorSetLayoutBinding(
                 descriptorSetLayoutBinding.m_bindingIndex,
                 descriptorSetLayoutBinding.m_vkDescriptorType,
                 descriptorSetLayoutBinding.m_shaderStage);
@@ -2875,15 +2871,11 @@ public:
 
 class DescriptorSetLayout : public HandleWithOwner<VkDescriptorSetLayout> {
 
-    DescriptorSetLayoutCreateInfo m_descriptorSetLayoutCreateInfo;
-
     DescriptorSetLayout(
         VkDescriptorSetLayout vkDescriptorSetLayout,
         VkDevice vkDevice,
-        DestroyFunc_t pfnDestroy,
-        const DescriptorSetLayoutCreateInfo& descriptorSetLayoutCreateInfo)
+        DestroyFunc_t pfnDestroy)
         : HandleWithOwner(vkDescriptorSetLayout, vkDevice, pfnDestroy)
-        , m_descriptorSetLayoutCreateInfo(descriptorSetLayoutCreateInfo)
     {
     }
 
@@ -2908,15 +2900,50 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) DescriptorSetLayout(vkDescriptorSetLayout, vkDevice, &destroy, descriptorSetLayoutCreateInfo);
+        new (this) DescriptorSetLayout(vkDescriptorSetLayout, vkDevice, &destroy);
     }
 
-    static DescriptorSetLayout create(
-        std::vector<vkcpp::DescriptorSetLayoutBinding>& descriptorSetLayoutBindings,
-        Device device)
+    DescriptorSetLayout(
+        const VkDescriptorSetLayoutCreateInfo& vkDescriptorSetLayoutCreateInfo,
+        VkDevice vkDevice)
     {
-        DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo(descriptorSetLayoutBindings);
-        return vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo, device);
+        VkDescriptorSetLayout vkDescriptorSetLayout;
+        VkResult vkResult = vkCreateDescriptorSetLayout(
+            vkDevice,
+            &vkDescriptorSetLayoutCreateInfo,
+            nullptr,
+            &vkDescriptorSetLayout);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) DescriptorSetLayout(vkDescriptorSetLayout, vkDevice, &destroy);
+    }
+};
+
+class WriteDescriptorSet : public VkWriteDescriptorSet {
+    std::vector<VkDescriptorImageInfo> m_vkDescriptorImageInfos;
+    std::vector<VkDescriptorBufferInfo> m_vkDescriptorBufferInfos;
+    std::vector<VkBufferView> m_vkBufferViewTexels;
+
+public:
+    WriteDescriptorSet(VkDescriptorSet vkDescriptorSet, uint32_t bindingIndex, VkDescriptorType vkDescriptorType)
+        : VkWriteDescriptorSet {}
+    {
+        sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        dstSet = vkDescriptorSet;
+        dstBinding = bindingIndex;
+        descriptorType = vkDescriptorType;
+    }
+
+    void addBufferInfo(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range)
+    {
+        VkDescriptorBufferInfo vkDescriptorBufferInfo {};
+        vkDescriptorBufferInfo.buffer = buffer;
+        vkDescriptorBufferInfo.offset = offset;
+        vkDescriptorBufferInfo.range = range;
+        m_vkDescriptorBufferInfos.emplace_back(vkDescriptorBufferInfo);
+        descriptorCount = m_vkDescriptorBufferInfos.size();
+        pBufferInfo = m_vkDescriptorBufferInfos.data();
     }
 };
 
@@ -3068,7 +3095,6 @@ public:
 
     DescriptorSet(DescriptorSetLayout descriptorSetLayout, DescriptorPool descriptorPool)
     {
-
         VkDescriptorSetLayout vkDescriptorSetLayout = descriptorSetLayout;
         VkDescriptorSetAllocateInfo vkDescriptorSetAllocateInfo {};
         vkDescriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
