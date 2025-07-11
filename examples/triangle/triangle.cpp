@@ -128,7 +128,6 @@ public:
         // Clean up used Vulkan resources
         // Note: Inherited destructor cleans up resources stored in base class
         if (m_deviceOriginal) {
-//            vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
             vkDestroyCommandPool(m_deviceOriginal, m_vkCommandPool, nullptr);
             for (size_t i = 0; i < m_vkPresentCompleteSemaphores.size(); i++) {
                 vkDestroySemaphore(m_deviceOriginal, m_vkPresentCompleteSemaphores[i], nullptr);
@@ -449,37 +448,64 @@ public:
     void setupRenderPass() override
     {
         // This example will use a single render pass with one subpass
+		constexpr int attachmentCount = 2;
+		constexpr int colorAttachmentIndex = 0;
+		constexpr int depthStencilAttachmentIndex = 1;
+
+		vkcpp::RenderPassCreateInfo renderPassCreateInfo(attachmentCount);
+		renderPassCreateInfo.attachmentDescription(colorAttachmentIndex)
+			.setFormat(m_swapChain.colorFormat)
+			.setSamples(VK_SAMPLE_COUNT_1_BIT)
+			.setLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE)
+			.setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			.setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+		renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex)
+			.setFormat(m_vkFormatDepth)
+			.setSamples(VK_SAMPLE_COUNT_1_BIT)
+			.setLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			.setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			.setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+
+
+
 
         // Descriptors for the attachments used by this renderpass
         std::array<VkAttachmentDescription, 2> attachments {};
 
         // Color attachment
-        attachments[0].format = m_swapChain.colorFormat; // Use the color format selected by the swapchain
-        attachments[0].samples = VK_SAMPLE_COUNT_1_BIT; // We don't use multi sampling in this example
-        attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear this attachment at the start of the render pass
-        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Keep its contents after the render pass is finished (for displaying it)
-        attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // We don't use stencil, so don't care for load
-        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Same for store
-        attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout at render pass start. Initial doesn't matter, so we use undefined
-        attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Layout to which the attachment is transitioned when the render pass is finished
+        attachments[colorAttachmentIndex].format = m_swapChain.colorFormat; // Use the color format selected by the swapchain
+        attachments[colorAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT; // We don't use multi sampling in this example
+        attachments[colorAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear this attachment at the start of the render pass
+        attachments[colorAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Keep its contents after the render pass is finished (for displaying it)
+        attachments[colorAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // We don't use stencil, so don't care for load
+        attachments[colorAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Same for store
+        attachments[colorAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout at render pass start. Initial doesn't matter, so we use undefined
+        attachments[colorAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Layout to which the attachment is transitioned when the render pass is finished
                                                                       // As we want to present the color buffer to the swapchain, we transition to PRESENT_KHR
         // Depth attachment
-        attachments[1].format = m_vkFormatDepth; // A proper depth format is selected in the example base
-        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear depth at start of first subpass
-        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // We don't need depth after render pass has finished (DONT_CARE may result in better performance)
-        attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // No stencil
-        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // No Stencil
-        attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout at render pass start. Initial doesn't matter, so we use undefined
-        attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Transition to depth/stencil attachment
+        attachments[depthStencilAttachmentIndex].format = m_vkFormatDepth; // A proper depth format is selected in the example base
+        attachments[depthStencilAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[depthStencilAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear depth at start of first subpass
+        attachments[depthStencilAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // We don't need depth after render pass has finished (DONT_CARE may result in better performance)
+        attachments[depthStencilAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // No stencil
+        attachments[depthStencilAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // No Stencil
+        attachments[depthStencilAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout at render pass start. Initial doesn't matter, so we use undefined
+		//	TODO: can this be don't care? We don't use the depth stencil again.  Maybe an issue for multiple render passes?
+        attachments[depthStencilAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Transition to depth/stencil attachment
+
+		//	test assignment
+		renderPassCreateInfo.attachmentDescription(colorAttachmentIndex) = attachments[colorAttachmentIndex];
+		renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex) = attachments[depthStencilAttachmentIndex];
 
         // Setup attachment references
         VkAttachmentReference colorReference {};
-        colorReference.attachment = 0; // Attachment 0 is color
+        colorReference.attachment = colorAttachmentIndex; // Attachment 0 is color
         colorReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Attachment layout used as color during the subpass
 
         VkAttachmentReference depthReference {};
-        depthReference.attachment = 1; // Attachment 1 is color
+        depthReference.attachment = depthStencilAttachmentIndex; // Attachment 1 depth stencil
         depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Attachment used as depth/stencil used during the subpass
 
         // Setup a single subpass reference
@@ -521,6 +547,7 @@ public:
         dependencies[1].dependencyFlags = 0;
 
         // Create the actual renderpass
+
         VkRenderPassCreateInfo renderPassCI {};
         renderPassCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassCI.attachmentCount = static_cast<uint32_t>(attachments.size()); // Number of attachments used by this render pass
