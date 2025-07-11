@@ -92,8 +92,6 @@ void VulkanRaytracingSample::setupRenderPass()
 	vkRenderPassCreateInfo.pDependencies = dependencies.data();
 
 	m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo, m_deviceOriginal);
-
-//	VK_CHECK_RESULT(vkCreateRenderPass(m_deviceOriginal, &renderPassInfo, nullptr, &m_vkRenderPass));
 }
 
 void VulkanRaytracingSample::setupFrameBuffer()
@@ -101,7 +99,7 @@ void VulkanRaytracingSample::setupFrameBuffer()
 	VkImageView attachments[2];
 
 	// Depth/Stencil attachment is the same for all frame buffers
-	attachments[1] = m_defaultDepthStencil.m_vkImageView;
+	attachments[1] = m_defaultDepthStencil.m_imageView;
 
 	VkFramebufferCreateInfo frameBufferCreateInfo = {};
 	frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

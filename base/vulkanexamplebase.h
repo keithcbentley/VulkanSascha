@@ -243,8 +243,8 @@ public:
 	/** @brief Default depth stencil attachment used by the default render pass */
 	struct {
 		vkcpp::Image m_image;
-		VkDeviceMemory m_vkDeviceMemory;
-		VkImageView m_vkImageView;
+		vkcpp::DeviceMemory m_deviceMemory;
+		vkcpp::ImageView m_imageView;
 	} m_defaultDepthStencil{};
 
 	// OS specific
