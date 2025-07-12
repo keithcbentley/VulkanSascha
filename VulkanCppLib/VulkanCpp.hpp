@@ -1761,7 +1761,7 @@ public:
 
     SubpassDescription& addInputAttachmentReference(const VkAttachmentReference& vkAttachmentReference)
     {
-        m_inputAttachmentReferences.push_back(vkAttachmentReference);
+        m_inputAttachmentReferences.emplace_back(vkAttachmentReference);
         m_vkSubpassDescription.inputAttachmentCount = static_cast<uint32_t>(m_inputAttachmentReferences.size());
         m_vkSubpassDescription.pInputAttachments = m_inputAttachmentReferences.data();
         return *this;
@@ -1769,7 +1769,7 @@ public:
 
     SubpassDescription& addColorAttachmentReference(const VkAttachmentReference& vkAttachmentReference)
     {
-        m_colorAttachmentReferences.push_back(vkAttachmentReference);
+        m_colorAttachmentReferences.emplace_back(vkAttachmentReference);
         m_vkSubpassDescription.colorAttachmentCount = static_cast<uint32_t>(m_colorAttachmentReferences.size());
         m_vkSubpassDescription.pColorAttachments = m_colorAttachmentReferences.data();
         return *this;
@@ -1801,6 +1801,11 @@ public:
     SubpassDependency& operator=(const SubpassDependency&) = default;
     SubpassDependency(SubpassDependency&&) noexcept = default;
     SubpassDependency& operator=(SubpassDependency&&) noexcept = default;
+
+    SubpassDependency(const VkSubpassDependency& other)
+        : VkSubpassDependency(other)
+    {
+    }
 
     SubpassDependency& setDependency(
         uint32_t srcSubpassArg,
@@ -1873,14 +1878,21 @@ class RenderPassCreateInfo : public VkRenderPassCreateInfo {
     std::vector<SubpassDependency> m_subpassDependencies;
 
 public:
-    RenderPassCreateInfo(int attachmentCount)
+    RenderPassCreateInfo(int attachmentCountArg, int subpassCountArg)
         : VkRenderPassCreateInfo {}
     {
-        m_attachmentDescriptions.resize(attachmentCount);
+        sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        m_attachmentDescriptions.resize(attachmentCountArg);
         attachmentCount = static_cast<uint32_t>(m_attachmentDescriptions.size());
         pAttachments = m_attachmentDescriptions.data();
+
+		m_subpassDescriptions.resize(subpassCountArg);
+		//	TODO: VkRenderPassCreateInfo is updated during assemble step.
+
     }
+
     ~RenderPassCreateInfo() = default;
+
     RenderPassCreateInfo(const RenderPassCreateInfo&) = delete;
     RenderPassCreateInfo& operator=(const RenderPassCreateInfo&) = delete;
     RenderPassCreateInfo(RenderPassCreateInfo&&) noexcept = delete;
@@ -1888,7 +1900,7 @@ public:
 
     const VkRenderPassCreateInfo* operator&() = delete;
 
-    void addAttachment(
+    void addAttachmentDescription(
         int attachmentIndex,
         const AttachmentDescription& attachmentDescription)
     {
@@ -1905,23 +1917,19 @@ public:
         return m_attachmentDescriptions.at(index);
     }
 
-    SubpassDescription& addSubpass()
+    SubpassDescription& subpassDescription(int index)
     {
-        SubpassDescription& subpassDescription = m_subpassDescriptions.emplace_back();
-        subpassDescription.setPipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS);
+		SubpassDescription& subpassDescription = m_subpassDescriptions.at(index);
+//        subpassDescription.setPipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS);
         return subpassDescription;
     }
 
-    SubpassDependency& addSubpassDependency(
-        uint32_t srcSubpass,
-        uint32_t dstSubpass)
+
+    void addSubpassDependency(const VkSubpassDependency& vkSubpassDependency)
     {
-        SubpassDependency& subpassDependency = m_subpassDependencies.emplace_back();
-        subpassDependency.setDependency(srcSubpass, dstSubpass);
+        m_subpassDependencies.emplace_back(vkSubpassDependency);
         dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
         pDependencies = m_subpassDependencies.data();
-
-        return subpassDependency;
     }
 
     VkRenderPassCreateInfo* assemble()

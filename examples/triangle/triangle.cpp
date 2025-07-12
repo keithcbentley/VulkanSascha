@@ -224,7 +224,6 @@ public:
         m_indicesCount = static_cast<uint32_t>(indexBuffer.size());
         uint32_t indexBufferSize = m_indicesCount * sizeof(uint32_t);
 
-
         // Static data like vertex and index buffer should be stored on the m_vkDevice m_vkDeviceMemory for optimal (and fastest) access by the GPU
         //
         // To achieve this we use so-called "staging buffers" :
@@ -319,18 +318,17 @@ public:
 
         vkDestroyFence(m_deviceOriginal, fence, nullptr);
         vkFreeCommandBuffers(m_deviceOriginal, m_vkCommandPool, 1, &vkCommandBuffer);
-
     }
 
     // Descriptors are allocated from a pool, that tells the implementation how many and what types of descriptors we are going to use (at maximum)
     void createDescriptorPool()
     {
-		vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
-		descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_CONCURRENT_FRAMES);
-		// Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
+        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_CONCURRENT_FRAMES);
+        // Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
         // Our sample will create one set per uniform buffer per frame
-		descriptorPoolCreateInfo.maxSets = MAX_CONCURRENT_FRAMES;
-		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo, m_deviceOriginal);
+        descriptorPoolCreateInfo.maxSets = MAX_CONCURRENT_FRAMES;
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo, m_deviceOriginal);
     }
 
     // Descriptor set layouts define the interface between our application and the shader
@@ -340,8 +338,8 @@ public:
     {
         // Binding 0: Uniform buffer (Vertex shader)
         vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
-		descriptorSetLayoutCreateInfo.addDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, vkcpp::SHADER_STAGE_VERTEX);
-		m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo, m_deviceOriginal);
+        descriptorSetLayoutCreateInfo.addDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, vkcpp::SHADER_STAGE_VERTEX);
+        m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo, m_deviceOriginal);
     }
 
     // Shaders access data using descriptor sets that "point" at our uniform buffers
@@ -350,14 +348,14 @@ public:
     {
         // Allocate one descriptor set per frame from the global descriptor pool
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-			m_uniformBuffers[i].m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
+            m_uniformBuffers[i].m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
             // Update the descriptor set determining the shader binding points
             // For every binding point used in a shader there needs to be one
             // descriptor set matching that binding point
 
-			vkcpp::WriteDescriptorSet writeDescriptorSet(m_uniformBuffers[i].m_descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-			writeDescriptorSet.addBufferInfo(m_uniformBuffers[i].m_bufferOriginal, 0, sizeof(ShaderData));
+            vkcpp::WriteDescriptorSet writeDescriptorSet(m_uniformBuffers[i].m_descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+            writeDescriptorSet.addBufferInfo(m_uniformBuffers[i].m_bufferOriginal, 0, sizeof(ShaderData));
 
             vkUpdateDescriptorSets(m_deviceOriginal, 1, &writeDescriptorSet, 0, nullptr);
         }
@@ -368,49 +366,49 @@ public:
     void setupDepthStencil() override
     {
         // Create an optimal m_vkImage used as the depth stencil attachment
-        VkImageCreateInfo vkImageCreateInfo{};
-		vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		vkImageCreateInfo.format = m_vkFormatDepth;
-		vkImageCreateInfo.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
-		vkImageCreateInfo.mipLevels = 1;
-		vkImageCreateInfo.arrayLayers = 1;
-		vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		vkImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo, m_deviceOriginal);
+        VkImageCreateInfo vkImageCreateInfo {};
+        vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+        vkImageCreateInfo.format = m_vkFormatDepth;
+        vkImageCreateInfo.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
+        vkImageCreateInfo.mipLevels = 1;
+        vkImageCreateInfo.arrayLayers = 1;
+        vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        vkImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo, m_deviceOriginal);
 
         // Allocate m_vkDeviceMemory for the m_vkImage (m_vkDevice local) and bind it to our m_vkImage
-        VkMemoryAllocateInfo vkMemoryAllocateInfo{};
-		vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        VkMemoryAllocateInfo vkMemoryAllocateInfo {};
+        vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         VkMemoryRequirements vkMemoryRequirements;
         vkGetImageMemoryRequirements(m_deviceOriginal, m_defaultDepthStencil.m_image, &vkMemoryRequirements);
-		vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
-		vkMemoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(vkMemoryAllocateInfo, m_deviceOriginal);
+        vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
+        vkMemoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(vkMemoryAllocateInfo, m_deviceOriginal);
 
         VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
 
         // Create a m_vkImageView for the depth stencil m_vkImage
         // Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
         // This allows for multiple views of one m_vkImage with differing ranges (e.g. for different layers)
-        VkImageViewCreateInfo vkImageViewCreateInfo{};
-		vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		vkImageViewCreateInfo.format = m_vkFormatDepth;
-		vkImageViewCreateInfo.subresourceRange = {};
-		vkImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        VkImageViewCreateInfo vkImageViewCreateInfo {};
+        vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        vkImageViewCreateInfo.format = m_vkFormatDepth;
+        vkImageViewCreateInfo.subresourceRange = {};
+        vkImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         // Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT)
         if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
-			vkImageViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+            vkImageViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
         }
-		vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-		vkImageViewCreateInfo.subresourceRange.levelCount = 1;
-		vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-		vkImageViewCreateInfo.subresourceRange.layerCount = 1;
-		vkImageViewCreateInfo.image = m_defaultDepthStencil.m_image;
-		m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo, m_deviceOriginal);
+        vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+        vkImageViewCreateInfo.subresourceRange.levelCount = 1;
+        vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+        vkImageViewCreateInfo.subresourceRange.layerCount = 1;
+        vkImageViewCreateInfo.image = m_defaultDepthStencil.m_image;
+        m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo, m_deviceOriginal);
     }
 
     // Create a frame buffer for each swap chain m_vkImage
@@ -448,28 +446,26 @@ public:
     void setupRenderPass() override
     {
         // This example will use a single render pass with one subpass
-		constexpr int attachmentCount = 2;
-		constexpr int colorAttachmentIndex = 0;
-		constexpr int depthStencilAttachmentIndex = 1;
+        constexpr int attachmentCount = 2;
+        constexpr int colorAttachmentIndex = 0;
+        constexpr int depthStencilAttachmentIndex = 1;
+		constexpr int subpassCount = 1;
+        constexpr int subpassNumber = 0;
 
-		vkcpp::RenderPassCreateInfo renderPassCreateInfo(attachmentCount);
-		renderPassCreateInfo.attachmentDescription(colorAttachmentIndex)
-			.setFormat(m_swapChain.colorFormat)
-			.setSamples(VK_SAMPLE_COUNT_1_BIT)
-			.setLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE)
-			.setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
-			.setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        vkcpp::RenderPassCreateInfo renderPassCreateInfo(attachmentCount, subpassCount);
+        renderPassCreateInfo.attachmentDescription(colorAttachmentIndex)
+            .setFormat(m_swapChain.colorFormat)
+            .setSamples(VK_SAMPLE_COUNT_1_BIT)
+            .setLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE)
+            .setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
+            .setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-		renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex)
-			.setFormat(m_vkFormatDepth)
-			.setSamples(VK_SAMPLE_COUNT_1_BIT)
-			.setLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE)
-			.setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
-			.setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
-
-
-
+        renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex)
+            .setFormat(m_vkFormatDepth)
+            .setSamples(VK_SAMPLE_COUNT_1_BIT)
+            .setLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE)
+            .setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
+            .setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
         // Descriptors for the attachments used by this renderpass
         std::array<VkAttachmentDescription, 2> attachments {};
@@ -483,7 +479,7 @@ public:
         attachments[colorAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Same for store
         attachments[colorAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout at render pass start. Initial doesn't matter, so we use undefined
         attachments[colorAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Layout to which the attachment is transitioned when the render pass is finished
-                                                                      // As we want to present the color buffer to the swapchain, we transition to PRESENT_KHR
+                                                                                         // As we want to present the color buffer to the swapchain, we transition to PRESENT_KHR
         // Depth attachment
         attachments[depthStencilAttachmentIndex].format = m_vkFormatDepth; // A proper depth format is selected in the example base
         attachments[depthStencilAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -492,33 +488,41 @@ public:
         attachments[depthStencilAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // No stencil
         attachments[depthStencilAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // No Stencil
         attachments[depthStencilAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout at render pass start. Initial doesn't matter, so we use undefined
-		//	TODO: can this be don't care? We don't use the depth stencil again.  Maybe an issue for multiple render passes?
+                                                                                            //	TODO: can this be don't care? We don't use the depth stencil again.  Maybe an issue for multiple render passes?
         attachments[depthStencilAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Transition to depth/stencil attachment
 
-		//	test assignment
-		renderPassCreateInfo.attachmentDescription(colorAttachmentIndex) = attachments[colorAttachmentIndex];
-		renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex) = attachments[depthStencilAttachmentIndex];
+        //	test assignment
+        //renderPassCreateInfo.attachmentDescription(colorAttachmentIndex) = attachments[colorAttachmentIndex];
+        //renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex) = attachments[depthStencilAttachmentIndex];
 
-        // Setup attachment references
-        VkAttachmentReference colorReference {};
-        colorReference.attachment = colorAttachmentIndex; // Attachment 0 is color
-        colorReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Attachment layout used as color during the subpass
+        // Setup attachment references for use in subpass descriptions.
+        VkAttachmentReference vkAttachmentReferenceColor {};
+		vkAttachmentReferenceColor.attachment = colorAttachmentIndex; // Attachment 0 is color
+		vkAttachmentReferenceColor.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Attachment layout used as color during the subpass
 
-        VkAttachmentReference depthReference {};
-        depthReference.attachment = depthStencilAttachmentIndex; // Attachment 1 depth stencil
-        depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Attachment used as depth/stencil used during the subpass
+        VkAttachmentReference vkAttachmentReferenceDepth {};
+		vkAttachmentReferenceDepth.attachment = depthStencilAttachmentIndex; // Attachment 1 depth stencil
+		vkAttachmentReferenceDepth.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Attachment used as depth/stencil used during the subpass
 
         // Setup a single subpass reference
-        VkSubpassDescription subpassDescription {};
-        subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpassDescription.colorAttachmentCount = 1; // Subpass uses one color attachment
-        subpassDescription.pColorAttachments = &colorReference; // Reference to the color attachment in slot 0
-        subpassDescription.pDepthStencilAttachment = &depthReference; // Reference to the depth attachment in slot 1
-        subpassDescription.inputAttachmentCount = 0; // Input attachments can be used to sample from contents of a previous subpass
-        subpassDescription.pInputAttachments = nullptr; // (Input attachments not used by this example)
-        subpassDescription.preserveAttachmentCount = 0; // Preserved attachments can be used to loop (and preserve) attachments through subpasses
-        subpassDescription.pPreserveAttachments = nullptr; // (Preserve attachments not used by this example)
-        subpassDescription.pResolveAttachments = nullptr; // Resolve attachments are resolved at the end of a sub pass and can be used for e.g. multi sampling
+        VkSubpassDescription vkSubpassDescription{};
+		vkSubpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		vkSubpassDescription.colorAttachmentCount = 1; // Subpass uses one color attachment
+		vkSubpassDescription.pColorAttachments = &vkAttachmentReferenceColor; // Reference to the color attachment in slot 0
+		vkSubpassDescription.pDepthStencilAttachment = &vkAttachmentReferenceDepth; // Reference to the depth attachment in slot 1
+		vkSubpassDescription.inputAttachmentCount = 0; // Input attachments can be used to sample from contents of a previous subpass
+		vkSubpassDescription.pInputAttachments = nullptr; // (Input attachments not used by this example)
+		vkSubpassDescription.preserveAttachmentCount = 0; // Preserved attachments can be used to loop (and preserve) attachments through subpasses
+		vkSubpassDescription.pPreserveAttachments = nullptr; // (Preserve attachments not used by this example)
+		vkSubpassDescription.pResolveAttachments = nullptr; // Resolve attachments are resolved at the end of a sub pass and can be used for e.g. multi sampling
+
+		vkcpp::SubpassDescription subpassDescription;
+		subpassDescription
+			.setPipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
+			.addColorAttachmentReference(vkAttachmentReferenceColor)
+			.setDepthStencilAttachmentReference(vkAttachmentReferenceDepth);
+
+		renderPassCreateInfo.subpassDescription(0) = subpassDescription;
 
         // Setup subpass dependencies
         // These will add the implicit attachment layout transitions specified by the attachment descriptions
@@ -526,25 +530,34 @@ public:
         // Each subpass dependency will introduce a m_vkDeviceMemory and execution dependency between the source and dest subpass described by
         // srcStageMask, dstStageMask, srcAccessMask, dstAccessMask (and dependencyFlags is set)
         // Note: VK_SUBPASS_EXTERNAL is a special constant that refers to all commands executed outside of the actual renderpass)
-        std::array<VkSubpassDependency, 2> dependencies {};
+        std::array<VkSubpassDependency, 2> vkSubpassDependencies {};
 
         // Does the transition from final to initial layout for the depth an color attachments
+
         // Depth attachment
-        dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependencies[0].dstSubpass = 0;
-        dependencies[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dependencies[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-        dependencies[0].dependencyFlags = 0;
+        vkSubpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        vkSubpassDependencies[0].dstSubpass = subpassNumber;
+
+        vkSubpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        vkSubpassDependencies[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        vkSubpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        vkSubpassDependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+        vkSubpassDependencies[0].dependencyFlags = 0;
+
         // Color attachment
-        dependencies[1].srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependencies[1].dstSubpass = 0;
-        dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependencies[1].srcAccessMask = 0;
-        dependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-        dependencies[1].dependencyFlags = 0;
+        vkSubpassDependencies[1].srcSubpass = VK_SUBPASS_EXTERNAL;
+        vkSubpassDependencies[1].dstSubpass = subpassNumber;
+
+        vkSubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        vkSubpassDependencies[1].srcAccessMask = 0;
+
+        vkSubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        vkSubpassDependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+        vkSubpassDependencies[1].dependencyFlags = 0;
+
+        renderPassCreateInfo.addSubpassDependency(vkSubpassDependencies[0]);
+        renderPassCreateInfo.addSubpassDependency(vkSubpassDependencies[1]);
 
         // Create the actual renderpass
 
@@ -553,13 +566,13 @@ public:
         renderPassCI.attachmentCount = static_cast<uint32_t>(attachments.size()); // Number of attachments used by this render pass
         renderPassCI.pAttachments = attachments.data(); // Descriptions of the attachments used by the render pass
         renderPassCI.subpassCount = 1; // We only use one subpass in this example
-        renderPassCI.pSubpasses = &subpassDescription; // Description of that subpass
-        renderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size()); // Number of subpass dependencies
-        renderPassCI.pDependencies = dependencies.data(); // Subpass dependencies used by the render pass
+        renderPassCI.pSubpasses = &vkSubpassDescription; // Description of that subpass
+        renderPassCI.dependencyCount = static_cast<uint32_t>(vkSubpassDependencies.size()); // Number of subpass dependencies
+        renderPassCI.pDependencies = vkSubpassDependencies.data(); // Subpass dependencies used by the render pass
 
-        m_renderPassOriginal = vkcpp::RenderPass(renderPassCI, m_deviceOriginal);
+        m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo, m_deviceOriginal);
+		//m_renderPassOriginal = vkcpp::RenderPass(renderPassCI, m_deviceOriginal);
 
-        // VK_CHECK_RESULT(vkCreateRenderPass(m_deviceOriginal, &renderPassCI, nullptr, &m_vkRenderPass));
     }
 
     // Vulkan loads its shaders from an immediate binary representation called SPIR-V
