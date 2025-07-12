@@ -467,34 +467,6 @@ public:
             .setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
             .setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-        // Descriptors for the attachments used by this renderpass
-        std::array<VkAttachmentDescription, 2> attachments {};
-
-        // Color attachment
-        attachments[colorAttachmentIndex].format = m_swapChain.colorFormat; // Use the color format selected by the swapchain
-        attachments[colorAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT; // We don't use multi sampling in this example
-        attachments[colorAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear this attachment at the start of the render pass
-        attachments[colorAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Keep its contents after the render pass is finished (for displaying it)
-        attachments[colorAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // We don't use stencil, so don't care for load
-        attachments[colorAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Same for store
-        attachments[colorAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout at render pass start. Initial doesn't matter, so we use undefined
-        attachments[colorAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Layout to which the attachment is transitioned when the render pass is finished
-                                                                                         // As we want to present the color buffer to the swapchain, we transition to PRESENT_KHR
-        // Depth attachment
-        attachments[depthStencilAttachmentIndex].format = m_vkFormatDepth; // A proper depth format is selected in the example base
-        attachments[depthStencilAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[depthStencilAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear depth at start of first subpass
-        attachments[depthStencilAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // We don't need depth after render pass has finished (DONT_CARE may result in better performance)
-        attachments[depthStencilAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // No stencil
-        attachments[depthStencilAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // No Stencil
-        attachments[depthStencilAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout at render pass start. Initial doesn't matter, so we use undefined
-                                                                                            //	TODO: can this be don't care? We don't use the depth stencil again.  Maybe an issue for multiple render passes?
-        attachments[depthStencilAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Transition to depth/stencil attachment
-
-        //	test assignment
-        //renderPassCreateInfo.attachmentDescription(colorAttachmentIndex) = attachments[colorAttachmentIndex];
-        //renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex) = attachments[depthStencilAttachmentIndex];
-
         // Setup attachment references for use in subpass descriptions.
         VkAttachmentReference vkAttachmentReferenceColor {};
 		vkAttachmentReferenceColor.attachment = colorAttachmentIndex; // Attachment 0 is color
@@ -504,74 +476,36 @@ public:
 		vkAttachmentReferenceDepth.attachment = depthStencilAttachmentIndex; // Attachment 1 depth stencil
 		vkAttachmentReferenceDepth.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Attachment used as depth/stencil used during the subpass
 
-        // Setup a single subpass reference
-        VkSubpassDescription vkSubpassDescription{};
-		vkSubpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		vkSubpassDescription.colorAttachmentCount = 1; // Subpass uses one color attachment
-		vkSubpassDescription.pColorAttachments = &vkAttachmentReferenceColor; // Reference to the color attachment in slot 0
-		vkSubpassDescription.pDepthStencilAttachment = &vkAttachmentReferenceDepth; // Reference to the depth attachment in slot 1
-		vkSubpassDescription.inputAttachmentCount = 0; // Input attachments can be used to sample from contents of a previous subpass
-		vkSubpassDescription.pInputAttachments = nullptr; // (Input attachments not used by this example)
-		vkSubpassDescription.preserveAttachmentCount = 0; // Preserved attachments can be used to loop (and preserve) attachments through subpasses
-		vkSubpassDescription.pPreserveAttachments = nullptr; // (Preserve attachments not used by this example)
-		vkSubpassDescription.pResolveAttachments = nullptr; // Resolve attachments are resolved at the end of a sub pass and can be used for e.g. multi sampling
-
-		vkcpp::SubpassDescription subpassDescription;
-		subpassDescription
+		renderPassCreateInfo.subpassDescription(subpassNumber)
 			.setPipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
 			.addColorAttachmentReference(vkAttachmentReferenceColor)
 			.setDepthStencilAttachmentReference(vkAttachmentReferenceDepth);
 
-		renderPassCreateInfo.subpassDescription(0) = subpassDescription;
 
-        // Setup subpass dependencies
-        // These will add the implicit attachment layout transitions specified by the attachment descriptions
-        // The actual usage layout is preserved through the layout specified in the attachment reference
-        // Each subpass dependency will introduce a m_vkDeviceMemory and execution dependency between the source and dest subpass described by
-        // srcStageMask, dstStageMask, srcAccessMask, dstAccessMask (and dependencyFlags is set)
-        // Note: VK_SUBPASS_EXTERNAL is a special constant that refers to all commands executed outside of the actual renderpass)
-        std::array<VkSubpassDependency, 2> vkSubpassDependencies {};
+		// Setup subpass dependencies
+		// These will add the implicit attachment layout transitions specified by the attachment descriptions
+		// The actual usage layout is preserved through the layout specified in the attachment reference
+		// Each subpass dependency will introduce a m_vkDeviceMemory and execution dependency between the source and dest subpass described by
+		// srcStageMask, dstStageMask, srcAccessMask, dstAccessMask (and dependencyFlags is set)
+		// Note: VK_SUBPASS_EXTERNAL is a special constant that refers to all commands executed outside of the actual renderpass)
+		renderPassCreateInfo
+			.addSubpassDependency(VK_SUBPASS_EXTERNAL, subpassNumber)
+			.addSrc(
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
+			.addDst(
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT);
 
-        // Does the transition from final to initial layout for the depth an color attachments
-
-        // Depth attachment
-        vkSubpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-        vkSubpassDependencies[0].dstSubpass = subpassNumber;
-
-        vkSubpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        vkSubpassDependencies[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-        vkSubpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        vkSubpassDependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-        vkSubpassDependencies[0].dependencyFlags = 0;
-
-        // Color attachment
-        vkSubpassDependencies[1].srcSubpass = VK_SUBPASS_EXTERNAL;
-        vkSubpassDependencies[1].dstSubpass = subpassNumber;
-
-        vkSubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        vkSubpassDependencies[1].srcAccessMask = 0;
-
-        vkSubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        vkSubpassDependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-        vkSubpassDependencies[1].dependencyFlags = 0;
-
-        renderPassCreateInfo.addSubpassDependency(vkSubpassDependencies[0]);
-        renderPassCreateInfo.addSubpassDependency(vkSubpassDependencies[1]);
+		renderPassCreateInfo
+			.addSubpassDependency(VK_SUBPASS_EXTERNAL, subpassNumber)
+			.addSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,0)
+			.addDst(
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
 
         // Create the actual renderpass
-
-        VkRenderPassCreateInfo renderPassCI {};
-        renderPassCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassCI.attachmentCount = static_cast<uint32_t>(attachments.size()); // Number of attachments used by this render pass
-        renderPassCI.pAttachments = attachments.data(); // Descriptions of the attachments used by the render pass
-        renderPassCI.subpassCount = 1; // We only use one subpass in this example
-        renderPassCI.pSubpasses = &vkSubpassDescription; // Description of that subpass
-        renderPassCI.dependencyCount = static_cast<uint32_t>(vkSubpassDependencies.size()); // Number of subpass dependencies
-        renderPassCI.pDependencies = vkSubpassDependencies.data(); // Subpass dependencies used by the render pass
-
         m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo, m_deviceOriginal);
-		//m_renderPassOriginal = vkcpp::RenderPass(renderPassCI, m_deviceOriginal);
 
     }
 

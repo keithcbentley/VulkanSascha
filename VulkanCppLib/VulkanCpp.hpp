@@ -1882,7 +1882,6 @@ class RenderPassCreateInfo {
 public:
     RenderPassCreateInfo(int attachmentCountArg, int subpassCountArg)
     {
-
 		m_attachmentDescriptions.resize(attachmentCountArg);
 		m_subpassDescriptions.resize(subpassCountArg);
 
@@ -1928,6 +1927,16 @@ public:
 		m_vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
 		m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
     }
+
+	SubpassDependency& addSubpassDependency(
+		uint32_t srcSubpassArg,
+		uint32_t dstSubpassArg) {
+		SubpassDependency& subpassDependency = m_subpassDependencies.emplace_back();
+		m_vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
+		m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
+		subpassDependency.setDependency(srcSubpassArg, dstSubpassArg);
+		return subpassDependency;
+	}
 
     VkRenderPassCreateInfo* assemble()
     {
