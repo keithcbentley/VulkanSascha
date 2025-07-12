@@ -1856,7 +1856,7 @@ public:
 //	in RenderPassCreateInfo, so they need to be the same size.
 static_assert(sizeof(SubpassDependency) == sizeof(VkSubpassDependency));
 
-class RenderPassCreateInfo : public VkRenderPassCreateInfo {
+class RenderPassCreateInfo {
 
     //	Attachments are referenced by an index number after being
     //	added to the render pass.  The application knows the
@@ -1867,6 +1867,8 @@ class RenderPassCreateInfo : public VkRenderPassCreateInfo {
     //	we would need to keep track of the index, tell the application
     //	the index, have the application keep track of the index, etc.
     //	That get way too confusing for the application.
+
+	VkRenderPassCreateInfo	m_vkRenderPassCreateInfo{};
 
     std::vector<AttachmentDescription> m_attachmentDescriptions;
 
@@ -1879,15 +1881,16 @@ class RenderPassCreateInfo : public VkRenderPassCreateInfo {
 
 public:
     RenderPassCreateInfo(int attachmentCountArg, int subpassCountArg)
-        : VkRenderPassCreateInfo {}
     {
-        sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        m_attachmentDescriptions.resize(attachmentCountArg);
-        attachmentCount = static_cast<uint32_t>(m_attachmentDescriptions.size());
-        pAttachments = m_attachmentDescriptions.data();
 
+		m_attachmentDescriptions.resize(attachmentCountArg);
 		m_subpassDescriptions.resize(subpassCountArg);
-		//	TODO: VkRenderPassCreateInfo is updated during assemble step.
+
+		//	Watch out for name collisions between args and member variables.
+		m_vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		m_vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(m_attachmentDescriptions.size());
+		m_vkRenderPassCreateInfo.pAttachments = m_attachmentDescriptions.data();
+
 
     }
 
@@ -1904,12 +1907,7 @@ public:
         int attachmentIndex,
         const AttachmentDescription& attachmentDescription)
     {
-        //	Always up to date.
         m_attachmentDescriptions.at(attachmentIndex) = attachmentDescription;
-
-        //	TODO: Probably redundant since the vector is sized at create time.
-        attachmentCount = static_cast<uint32_t>(m_attachmentDescriptions.size());
-        pAttachments = m_attachmentDescriptions.data();
     }
 
     AttachmentDescription& attachmentDescription(int index)
@@ -1920,7 +1918,6 @@ public:
     SubpassDescription& subpassDescription(int index)
     {
 		SubpassDescription& subpassDescription = m_subpassDescriptions.at(index);
-//        subpassDescription.setPipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS);
         return subpassDescription;
     }
 
@@ -1928,28 +1925,26 @@ public:
     void addSubpassDependency(const VkSubpassDependency& vkSubpassDependency)
     {
         m_subpassDependencies.emplace_back(vkSubpassDependency);
-        dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
-        pDependencies = m_subpassDependencies.data();
+		m_vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
+		m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
     }
 
     VkRenderPassCreateInfo* assemble()
     {
-        sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-
-        pSubpasses = nullptr;
+		m_vkRenderPassCreateInfo.pSubpasses = nullptr;
         m_vkSubpassDescriptions.clear();
-        subpassCount = static_cast<uint32_t>(m_subpassDescriptions.size());
-        if (subpassCount > 0) {
+		m_vkRenderPassCreateInfo.subpassCount = static_cast<uint32_t>(m_subpassDescriptions.size());
+        if (m_vkRenderPassCreateInfo.subpassCount > 0) {
             for (SubpassDescription& subpassDescription : m_subpassDescriptions) {
                 //	TODO: investigate.  This is either really clever or really risky.
                 //	We assemble the subpass description and then push back
                 //	a copy of the VkSubpassDescription part of our structure.
                 m_vkSubpassDescriptions.emplace_back(subpassDescription.vkSubpassDescription());
             }
-            pSubpasses = m_vkSubpassDescriptions.data();
+			m_vkRenderPassCreateInfo.pSubpasses = m_vkSubpassDescriptions.data();
         }
 
-        return this;
+        return &m_vkRenderPassCreateInfo;
     }
 };
 
