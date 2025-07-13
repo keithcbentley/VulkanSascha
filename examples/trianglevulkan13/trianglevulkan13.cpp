@@ -354,7 +354,8 @@ public:
         // Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
         // Our sample will create one set per uniform buffer per frame
         descriptorPoolCI.maxSets = MAX_CONCURRENT_FRAMES;
-        VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolCI, nullptr, &m_vkDescriptorPool));
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCI, m_deviceOriginal);
+        //VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolCI, nullptr, &m_vkDescriptorPool));
 
         // Descriptor set layouts define the interface between our application and the shader
         // Basically connects the different shader stages to descriptors for binding uniform buffers, m_vkImage samplers, etc.
@@ -374,7 +375,7 @@ public:
         // Descriptors that are changed per frame need to be multiplied, so we can update descriptor n+1 while n is still used by the GPU, so we create one per max frame in flight
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
             VkDescriptorSetAllocateInfo allocInfo { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-            allocInfo.descriptorPool = m_vkDescriptorPool;
+            allocInfo.descriptorPool = m_descriptorPool;
             allocInfo.descriptorSetCount = 1;
             allocInfo.pSetLayouts = &m_vkDescriptorSetLayout;
             VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &uniformBuffers[i].descriptorSet));
@@ -414,16 +415,18 @@ public:
         imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
         imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCI, nullptr, &m_defaultDepthStencil.m_vkImage));
+		m_defaultDepthStencil.m_image = vkcpp::Image(imageCI, m_deviceOriginal);
+        //VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCI, nullptr, &m_defaultDepthStencil.m_vkImage));
 
         // Allocate m_vkDeviceMemory for the m_vkImage (m_vkDevice local) and bind it to our m_vkImage
         VkMemoryAllocateInfo memAlloc { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
         VkMemoryRequirements memReqs;
-        vkGetImageMemoryRequirements(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, &memReqs);
+        vkGetImageMemoryRequirements(m_deviceOriginal, m_defaultDepthStencil.m_image, &memReqs);
         memAlloc.allocationSize = memReqs.size;
         memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAlloc, nullptr, &m_defaultDepthStencil.m_vkDeviceMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, m_defaultDepthStencil.m_vkDeviceMemory, 0));
+		m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(memAlloc, m_deviceOriginal);
+        //VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAlloc, nullptr, &m_defaultDepthStencil.m_vkDeviceMemory));
+        VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
 
         // Create a m_vkImageView for the depth stencil m_vkImage
         // Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
@@ -441,8 +444,9 @@ public:
         depthStencilViewCI.subresourceRange.levelCount = 1;
         depthStencilViewCI.subresourceRange.baseArrayLayer = 0;
         depthStencilViewCI.subresourceRange.layerCount = 1;
-        depthStencilViewCI.image = m_defaultDepthStencil.m_vkImage;
-        VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &depthStencilViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
+        depthStencilViewCI.image = m_defaultDepthStencil.m_image;
+		m_defaultDepthStencil.m_imageView = vkcpp::ImageView(depthStencilViewCI, m_deviceOriginal);
+        //VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &depthStencilViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
     }
 
     // Vulkan loads its shaders from an immediate binary representation called SPIR-V
@@ -504,6 +508,7 @@ public:
 		graphicsPipelineCreateInfo.setInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
 		vkcpp::PipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo;
+		pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
 		graphicsPipelineCreateInfo.setRasterizationStateCreateInfo(
 			pipelineRasterizationStateCreateInfo);
 
@@ -642,7 +647,7 @@ public:
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             vkcpp::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT));
         commandBuffer.cmdInsertImageMemoryBarrier(
-            m_defaultDepthStencil.m_vkImage,
+            m_defaultDepthStencil.m_image,
             VK_ACCESS_NONE,
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED,
@@ -661,7 +666,7 @@ public:
         colorAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
         // Depth/stencil attachment
         vkcpp::RenderingAttachmentInfo depthStencilAttachment;
-        depthStencilAttachment.imageView = m_defaultDepthStencil.m_vkImageView;
+        depthStencilAttachment.imageView = m_defaultDepthStencil.m_imageView;
         depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -708,7 +713,7 @@ public:
         //  We don't really care about the image layout, we just want the memory sync.
         //	Not sure if this is the minimum required but it's close.
         commandBuffer.cmdInsertImageMemoryBarrier(
-            m_defaultDepthStencil.m_vkImage,
+            m_defaultDepthStencil.m_image,
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             VK_ACCESS_NONE,
             VK_IMAGE_LAYOUT_UNDEFINED,
