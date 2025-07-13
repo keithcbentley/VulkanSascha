@@ -27,10 +27,11 @@ public:
 		glm::mat4 modelView;
 		glm::vec4 lightPos{ 0.0f, -2.0f, 1.0f, 0.0f };
 	} uniformData;
+
 	vks::Buffer uniformBuffer;
 
 	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
-	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
+	VkDescriptorSet m_vkDescriptorSet{ VK_NULL_HANDLE };
 	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
 
 	struct Pipelines{
@@ -63,7 +64,7 @@ public:
 
 	void buildCommandBuffers()
 	{
-		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
+		VkCommandBufferBeginInfo vkCommandBufferBeginInfo = vks::initializers::commandBufferBeginInfo();
 
 		VkClearValue clearValues[2];
 		clearValues[0].color = m_vkClearColorValueDefault;
@@ -83,38 +84,34 @@ public:
 			// Set target frame buffer
 			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
-
-			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight,	0, 0);
-			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
-
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(drawCmdBuffers[i]);
+			commandBuffer.begin();
+			commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
+			commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
+			commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSet, m_vkPipelineLayout);
 
 			// Left
 			VkViewport viewport = vks::initializers::viewport((float) m_drawAreaWidth / 3.0f, (float) m_drawAreaHeight, 0.0f, 1.0f);
-			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.phong);
-			scene.draw(drawCmdBuffers[i]);
+			commandBuffer.cmdSetViewport(viewport);
+			commandBuffer.cmdBindPipeline(pipelines.phong);
+			scene.draw(commandBuffer);
 			
 			// Center
 			viewport.x = (float)m_drawAreaWidth / 3.0f;
-			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.toon);
-			scene.draw(drawCmdBuffers[i]);
+			commandBuffer.cmdSetViewport(viewport);
+			commandBuffer.cmdBindPipeline(pipelines.toon);
+			scene.draw(commandBuffer);
 
 			// Right
 			viewport.x = (float)m_drawAreaWidth / 3.0f + (float)m_drawAreaWidth / 3.0f;
-			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.textured);
-			scene.draw(drawCmdBuffers[i]);
+			commandBuffer.cmdSetViewport(viewport);
+			commandBuffer.cmdBindPipeline(pipelines.textured);
+			scene.draw(commandBuffer);
 
-			drawUI(drawCmdBuffers[i]);
+			drawUI(commandBuffer);
 
-			vkCmdEndRenderPass(drawCmdBuffers[i]);
-
-			VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
+			commandBuffer.cmdEndRenderPass();
+			commandBuffer.end();
 		}
 	}
 
@@ -133,7 +130,6 @@ public:
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
 		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo, m_deviceOriginal);
-		//VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -145,10 +141,10 @@ public:
 
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &m_vkDescriptorSet));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &colormap.descriptor),
+			vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
+			vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &colormap.m_vkDescriptorImageInfo),
 		};
 		vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
 	}

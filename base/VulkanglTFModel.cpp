@@ -1437,7 +1437,12 @@ void vkglTF::Model::bindBuffers(VkCommandBuffer commandBuffer)
     buffersBound = true;
 }
 
-void vkglTF::Model::drawNode(Node* node, VkCommandBuffer commandBuffer, uint32_t renderFlags, VkPipelineLayout pipelineLayout, uint32_t bindImageSet)
+void vkglTF::Model::drawNode(
+	Node* node,
+	VkCommandBuffer commandBuffer,
+	uint32_t renderFlags,
+	VkPipelineLayout pipelineLayout,
+	uint32_t bindImageSet)
 {
     if (node->mesh) {
         for (Primitive* primitive : node->mesh->primitives) {
@@ -1465,7 +1470,11 @@ void vkglTF::Model::drawNode(Node* node, VkCommandBuffer commandBuffer, uint32_t
     }
 }
 
-void vkglTF::Model::draw(VkCommandBuffer commandBuffer, uint32_t renderFlags, VkPipelineLayout pipelineLayout, uint32_t bindImageSet)
+void vkglTF::Model::draw(
+	VkCommandBuffer commandBuffer,
+	uint32_t renderFlags,
+	VkPipelineLayout pipelineLayout,
+	uint32_t bindImageSet)
 {
     if (!buffersBound) {
         const VkDeviceSize offsets[1] = { 0 };

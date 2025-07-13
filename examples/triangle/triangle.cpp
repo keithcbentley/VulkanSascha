@@ -853,7 +853,7 @@ public:
             .cmdBeginRenderPass(renderPassBeginInfo)
             .cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
             .cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
-            .cmdBindDescriptorSet(m_pipelineLayout, m_uniformBuffers[m_currentFrameIndex].m_descriptorSet)
+            .cmdBindDescriptorSet(m_uniformBuffers[m_currentFrameIndex].m_descriptorSet, m_pipelineLayout)
             .cmdBindPipeline(m_graphicsPipeline)
             .cmdBindVertexBuffer(m_vertices.m_buffer)
             .cmdBindIndexBuffer(m_indices.m_buffer, VK_INDEX_TYPE_UINT32)

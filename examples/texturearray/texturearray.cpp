@@ -69,10 +69,10 @@ public:
 	~VulkanExample()
 	{
 		if (m_deviceOriginal) {
-			vkDestroyImageView(m_deviceOriginal, textureArray.view, nullptr);
-			vkDestroyImage(m_deviceOriginal, textureArray.image, nullptr);
-			vkDestroySampler(m_deviceOriginal, textureArray.sampler, nullptr);
-			vkFreeMemory(m_deviceOriginal, textureArray.deviceMemory, nullptr);
+			vkDestroyImageView(m_deviceOriginal, textureArray.m_vkImageView, nullptr);
+			vkDestroyImage(m_deviceOriginal, textureArray.m_vkImage, nullptr);
+			vkDestroySampler(m_deviceOriginal, textureArray.m_vkSampler, nullptr);
+			vkFreeMemory(m_deviceOriginal, textureArray.m_vkDeviceMemory, nullptr);
 			vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
 			vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
@@ -174,7 +174,9 @@ public:
 		}
 
 		// Create optimal tiled target m_vkImage
-		VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
+		//VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
+		VkImageCreateInfo imageCreateInfo {};
+		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageCreateInfo.format = format;
 		imageCreateInfo.mipLevels = 1;
@@ -186,15 +188,15 @@ public:
 		imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		imageCreateInfo.arrayLayers = layerCount;
 
-		VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCreateInfo, nullptr, &textureArray.image));
+		VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCreateInfo, nullptr, &textureArray.m_vkImage));
 
-		vkGetImageMemoryRequirements(m_deviceOriginal, textureArray.image, &memReqs);
+		vkGetImageMemoryRequirements(m_deviceOriginal, textureArray.m_vkImage, &memReqs);
 
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &textureArray.deviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, textureArray.image, textureArray.deviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &textureArray.m_vkDeviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, textureArray.m_vkImage, textureArray.m_vkDeviceMemory, 0));
 
 		VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
@@ -208,7 +210,7 @@ public:
 
 		vks::tools::setImageLayout(
 			copyCmd,
-			textureArray.image,
+			textureArray.m_vkImage,
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			subresourceRange);
@@ -217,47 +219,47 @@ public:
 		vkCmdCopyBufferToImage(
 			copyCmd,
 			stagingBuffer,
-			textureArray.image,
+			textureArray.m_vkImage,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			static_cast<uint32_t>(bufferCopyRegions.size()),
 			bufferCopyRegions.data());
 
 		// Change texture m_vkImage layout to shader read after all faces have been copied
-		textureArray.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		textureArray.m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		vks::tools::setImageLayout(
 			copyCmd,
-			textureArray.image,
+			textureArray.m_vkImage,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			textureArray.imageLayout,
+			textureArray.m_vkImageLayout,
 			subresourceRange);
 
 		m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 		// Create sampler
-		VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
-		sampler.magFilter = VK_FILTER_LINEAR;
-		sampler.minFilter = VK_FILTER_LINEAR;
-		sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sampler.addressModeV = sampler.addressModeU;
-		sampler.addressModeW = sampler.addressModeU;
-		sampler.mipLodBias = 0.0f;
-		sampler.maxAnisotropy = 8;
-		sampler.compareOp = VK_COMPARE_OP_NEVER;
-		sampler.minLod = 0.0f;
-		sampler.maxLod = 0.0f;
-		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &sampler, nullptr, &textureArray.sampler));
+		VkSamplerCreateInfo vkSamplerCreateInfo = vks::initializers::samplerCreateInfo();
+		vkSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+		vkSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+		vkSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		vkSamplerCreateInfo.addressModeV = vkSamplerCreateInfo.addressModeU;
+		vkSamplerCreateInfo.addressModeW = vkSamplerCreateInfo.addressModeU;
+		vkSamplerCreateInfo.mipLodBias = 0.0f;
+		vkSamplerCreateInfo.maxAnisotropy = 8;
+		vkSamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+		vkSamplerCreateInfo.minLod = 0.0f;
+		vkSamplerCreateInfo.maxLod = 0.0f;
+		vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &vkSamplerCreateInfo, nullptr, &textureArray.m_vkSampler));
 
 		// Create m_vkImage m_vkImageView
-		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
-		view.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-		view.format = format;
-		view.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-		view.subresourceRange.layerCount = layerCount;
-		view.subresourceRange.levelCount = 1;
-		view.image = textureArray.image;
-		VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &textureArray.view));
+		VkImageViewCreateInfo VkImageViewCreateInfo = vks::initializers::imageViewCreateInfo();
+		VkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+		VkImageViewCreateInfo.format = format;
+		VkImageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		VkImageViewCreateInfo.subresourceRange.layerCount = layerCount;
+		VkImageViewCreateInfo.subresourceRange.levelCount = 1;
+		VkImageViewCreateInfo.image = textureArray.m_vkImage;
+		VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &VkImageViewCreateInfo, nullptr, &textureArray.m_vkImageView));
 
 		// Clean up staging resources
 		vkFreeMemory(m_deviceOriginal, stagingMemory, nullptr);
@@ -411,9 +413,9 @@ public:
 		// Image descriptor for the texture array
 		VkDescriptorImageInfo textureDescriptor =
 			vks::initializers::descriptorImageInfo(
-				textureArray.sampler,
-				textureArray.view,
-				textureArray.imageLayout);
+				textureArray.m_vkSampler,
+				textureArray.m_vkImageView,
+				textureArray.m_vkImageLayout);
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer

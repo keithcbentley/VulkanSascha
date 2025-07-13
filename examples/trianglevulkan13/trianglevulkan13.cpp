@@ -686,7 +686,7 @@ public:
 
         // Bind descriptor set for the current frame's uniform buffer,
         // so the shader uses the data from that buffer for this draw
-        commandBuffer.cmdBindDescriptorSet(m_pipelineLayoutOriginal, uniformBuffers[m_currentFrameIndex].descriptorSet);
+        commandBuffer.cmdBindDescriptorSet(uniformBuffers[m_currentFrameIndex].descriptorSet, m_pipelineLayoutOriginal);
 
         // The m_vkPipeline (state object) contains all states of the rendering m_vkPipeline,
         // binding it will set all the states specified at m_vkPipeline creation time

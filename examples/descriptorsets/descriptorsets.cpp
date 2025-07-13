@@ -96,7 +96,7 @@ public:
             */
             for (auto cube : cubes) {
                 // Bind the cube's descriptor set. This tells the command buffer to use the uniform buffer and m_vkImage set for this cube
-                commandBuffer.cmdBindDescriptorSet(m_pipelineLayout, cube.m_descriptorSet);
+                commandBuffer.cmdBindDescriptorSet(cube.m_descriptorSet, m_pipelineLayout);
                 model.draw(drawCmdBuffers[i]);
             }
 
@@ -207,7 +207,7 @@ public:
             writeDescriptorSets[1].dstBinding = combinedImageSamplerBindingIndex;
             writeDescriptorSets[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             // Images use a different descriptor structure, so we use pImageInfo instead of pBufferInfo
-            writeDescriptorSets[1].pImageInfo = &cube.texture.descriptor;
+			writeDescriptorSets[1].pImageInfo = &cube.texture.m_vkDescriptorImageInfo;
             writeDescriptorSets[1].descriptorCount = 1;
 
             // Execute the writes to update descriptors for this set
@@ -226,7 +226,7 @@ public:
                 cube.m_descriptorSet,
                 combinedImageSamplerBindingIndex,
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                cube.texture.descriptor);
+                cube.texture.m_vkDescriptorImageInfo);
 
             descriptorSetUpdater.updateDescriptorSets(m_deviceOriginal);
 

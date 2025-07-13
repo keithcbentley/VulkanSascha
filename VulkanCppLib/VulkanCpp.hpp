@@ -2439,8 +2439,8 @@ public:
 
     const CommandBuffer& begin() const
     {
-        VkCommandBufferBeginInfo vkCommandBufferBeginInfo{};
-		vkCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        VkCommandBufferBeginInfo vkCommandBufferBeginInfo {};
+        vkCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
         VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
         if (vkResult != VK_SUCCESS) {
@@ -2449,42 +2449,46 @@ public:
         return *this;
     }
 
-	const CommandBuffer& begin(const VkCommandBufferBeginInfo& vkCommandBufferBeginInfo) const {
-		VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-		return *this;
-	}
+    const CommandBuffer& begin(const VkCommandBufferBeginInfo& vkCommandBufferBeginInfo) const
+    {
+        VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        return *this;
+    }
 
-
-    void beginOneTimeSubmit() const
+    const CommandBuffer& beginOneTimeSubmit() const
     {
         VkCommandBufferBeginInfo beginInfo {};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(*this, &beginInfo);
+        return *this;
     }
 
-    void end() const
+    const CommandBuffer& end() const
     {
         VkResult vkResult = vkEndCommandBuffer(*this);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
+        return *this;
     }
 
-    void cmdBeginRendering(const VkRenderingInfo& vkRenderingInfo) const
+    const CommandBuffer& cmdBeginRendering(const VkRenderingInfo& vkRenderingInfo) const
     {
         vkCmdBeginRendering(*this, &vkRenderingInfo);
+        return *this;
     }
 
-    void cmdEndRendering() const
+    const CommandBuffer& cmdEndRendering() const
     {
         vkCmdEndRendering(*this);
+        return *this;
     }
 
-    void cmdCopyBufferToImage(
+    const CommandBuffer& cmdCopyBufferToImage(
         Buffer buffer,
         Image image,
         uint32_t width,
@@ -2506,10 +2510,11 @@ public:
         };
 
         vkCmdCopyBufferToImage(*this, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        return *this;
     }
 
     //	TODO: do we need to implement cmdCopyBuffer2?
-    void cmdCopyBuffer(
+    const CommandBuffer& cmdCopyBuffer(
         Buffer srcBuffer,
         Buffer dstBuffer,
         VkDeviceSize size) const
@@ -2518,34 +2523,37 @@ public:
         VkBufferCopy vkBufferCopy { .srcOffset = 0, .dstOffset = 0, .size = size };
 
         vkCmdCopyBuffer(*this, srcBuffer, dstBuffer, 1, &vkBufferCopy);
+        return *this;
     }
 
-    void cmdCopyBuffer(
+    const CommandBuffer& cmdCopyBuffer(
         Buffer srcBuffer,
         Buffer dstBuffer) const
     {
         cmdCopyBuffer(srcBuffer, dstBuffer, srcBuffer.size());
+        return *this;
     }
 
-    void cmdPipelineBarrier2(
+    const CommandBuffer& cmdPipelineBarrier2(
         DependencyInfo& dependencyInfo) const
     {
         vkCmdPipelineBarrier2(*this, dependencyInfo.assemble());
+        *this;
     }
 
-    const CommandBuffer cmdBeginRenderPass(const VkRenderPassBeginInfo& vkRenderPassBeginInfo) const
+    const CommandBuffer& cmdBeginRenderPass(const VkRenderPassBeginInfo& vkRenderPassBeginInfo) const
     {
         vkCmdBeginRenderPass(*this, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
         return *this;
     }
 
-    const CommandBuffer cmdEndRenderPass() const
+    const CommandBuffer& cmdEndRenderPass() const
     {
         vkCmdEndRenderPass(*this);
         return *this;
     }
 
-    const CommandBuffer cmdSetViewport(
+    const CommandBuffer& cmdSetViewport(
         VkExtent2D vkExtent2D) const
     {
         VkViewport viewport {};
@@ -2557,7 +2565,7 @@ public:
         return *this;
     }
 
-    const CommandBuffer cmdSetViewport(uint32_t width, uint32_t height) const
+    const CommandBuffer& cmdSetViewport(uint32_t width, uint32_t height) const
     {
         VkViewport viewport {};
         viewport.width = static_cast<float>(width);
@@ -2568,13 +2576,13 @@ public:
         return *this;
     }
 
-    const CommandBuffer cmdSetViewport(const VkViewport& vkViewport) const
+    const CommandBuffer& cmdSetViewport(const VkViewport& vkViewport) const
     {
         vkCmdSetViewport(*this, 0, 1, &vkViewport);
         return *this;
     }
 
-    const CommandBuffer cmdSetScissor(VkExtent2D vkExtent2D) const
+    const CommandBuffer& cmdSetScissor(VkExtent2D vkExtent2D) const
     {
         VkRect2D scissor {};
         scissor.extent = vkExtent2D;
@@ -2582,13 +2590,13 @@ public:
         return *this;
     }
 
-    const CommandBuffer cmdSetScissor(const VkRect2D& scissor) const
+    const CommandBuffer& cmdSetScissor(const VkRect2D& scissor) const
     {
         vkCmdSetScissor(*this, 0, 1, &scissor);
         return *this;
     }
 
-    const CommandBuffer cmdSetScissor(uint32_t width, uint32_t height) const
+    const CommandBuffer& cmdSetScissor(uint32_t width, uint32_t height) const
     {
         VkRect2D scissor {};
         scissor.extent.width = width;
@@ -2597,42 +2605,59 @@ public:
         return *this;
     }
 
-    const CommandBuffer cmdBindPipeline(
+    const CommandBuffer& cmdBindPipeline(
         VkPipeline vkPipeline) const
     {
         vkCmdBindPipeline(*this, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
         return *this;
     }
 
-    const CommandBuffer cmdBindDescriptorSet(
-        VkPipelineLayout vkPipelineLayout,
-        VkDescriptorSet vkDescriptorSet) const
+    const CommandBuffer& cmdBindDescriptorSet(
+        VkDescriptorSet vkDescriptorSet,
+        VkPipelineLayout vkPipelineLayout) const
     {
         vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
             vkPipelineLayout, 0, 1, &vkDescriptorSet, 0, nullptr);
         return *this;
     }
 
-    const CommandBuffer cmdBindVertexBuffer(VkBuffer vkBuffer) const
+    const CommandBuffer& cmdBindVertexBuffer(VkBuffer vkBuffer) const
     {
         VkDeviceSize offsets[1] { 0 };
         vkCmdBindVertexBuffers(*this, 0, 1, &vkBuffer, offsets);
         return *this;
     }
 
-    const CommandBuffer cmdBindIndexBuffer(VkBuffer vkBuffer, VkIndexType vkIndexType) const
+    const CommandBuffer& cmdBindIndexBuffer(VkBuffer vkBuffer, VkIndexType vkIndexType) const
     {
         vkCmdBindIndexBuffer(*this, vkBuffer, 0, vkIndexType);
         return *this;
     }
 
-    const CommandBuffer cmdDrawIndexed(uint32_t indexCount) const
+    const CommandBuffer& cmdDrawIndexed(uint32_t indexCount) const
     {
         vkCmdDrawIndexed(*this, indexCount, 1, 0, 0, 0);
         return *this;
     }
 
-    const CommandBuffer cmdInsertImageMemoryBarrier(
+    const CommandBuffer& cmdPushConstant(
+        void* pData,
+        uint32_t size,
+        VkPipelineLayout vkPipelineLayout,
+        VkShaderStageFlagBits vkShaderStage) const
+    {
+        vkCmdPushConstants(
+            *this,
+            vkPipelineLayout,
+            vkShaderStage,
+            0,
+            size,
+            pData);
+
+        return *this;
+    }
+
+    const CommandBuffer& cmdInsertImageMemoryBarrier(
         VkImage vkImage,
         VkAccessFlags vkSrcAccessMask,
         VkAccessFlags vkDstAccessMask,
@@ -3041,7 +3066,7 @@ class DescriptorSetLayout : public HandleWithOwner<VkDescriptorSetLayout> {
 
 public:
     DescriptorSetLayout() = default;
-	~DescriptorSetLayout() = default;
+    ~DescriptorSetLayout() = default;
 
     DescriptorSetLayout(const DescriptorSetLayout& other)
         : HandleWithOwner(other)
