@@ -1868,7 +1868,7 @@ class RenderPassCreateInfo {
     //	the index, have the application keep track of the index, etc.
     //	That get way too confusing for the application.
 
-	VkRenderPassCreateInfo	m_vkRenderPassCreateInfo{};
+    VkRenderPassCreateInfo m_vkRenderPassCreateInfo {};
 
     std::vector<AttachmentDescription> m_attachmentDescriptions;
 
@@ -1882,15 +1882,13 @@ class RenderPassCreateInfo {
 public:
     RenderPassCreateInfo(int attachmentCountArg, int subpassCountArg)
     {
-		m_attachmentDescriptions.resize(attachmentCountArg);
-		m_subpassDescriptions.resize(subpassCountArg);
+        m_attachmentDescriptions.resize(attachmentCountArg);
+        m_subpassDescriptions.resize(subpassCountArg);
 
-		//	Watch out for name collisions between args and member variables.
-		m_vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		m_vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(m_attachmentDescriptions.size());
-		m_vkRenderPassCreateInfo.pAttachments = m_attachmentDescriptions.data();
-
-
+        //	Watch out for name collisions between args and member variables.
+        m_vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        m_vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(m_attachmentDescriptions.size());
+        m_vkRenderPassCreateInfo.pAttachments = m_attachmentDescriptions.data();
     }
 
     ~RenderPassCreateInfo() = default;
@@ -1916,33 +1914,33 @@ public:
 
     SubpassDescription& subpassDescription(int index)
     {
-		SubpassDescription& subpassDescription = m_subpassDescriptions.at(index);
+        SubpassDescription& subpassDescription = m_subpassDescriptions.at(index);
         return subpassDescription;
     }
-
 
     void addSubpassDependency(const VkSubpassDependency& vkSubpassDependency)
     {
         m_subpassDependencies.emplace_back(vkSubpassDependency);
-		m_vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
-		m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
+        m_vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
+        m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
     }
 
-	SubpassDependency& addSubpassDependency(
-		uint32_t srcSubpassArg,
-		uint32_t dstSubpassArg) {
-		SubpassDependency& subpassDependency = m_subpassDependencies.emplace_back();
-		m_vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
-		m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
-		subpassDependency.setDependency(srcSubpassArg, dstSubpassArg);
-		return subpassDependency;
-	}
+    SubpassDependency& addSubpassDependency(
+        uint32_t srcSubpassArg,
+        uint32_t dstSubpassArg)
+    {
+        SubpassDependency& subpassDependency = m_subpassDependencies.emplace_back();
+        m_vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
+        m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
+        subpassDependency.setDependency(srcSubpassArg, dstSubpassArg);
+        return subpassDependency;
+    }
 
     VkRenderPassCreateInfo* assemble()
     {
-		m_vkRenderPassCreateInfo.pSubpasses = nullptr;
+        m_vkRenderPassCreateInfo.pSubpasses = nullptr;
         m_vkSubpassDescriptions.clear();
-		m_vkRenderPassCreateInfo.subpassCount = static_cast<uint32_t>(m_subpassDescriptions.size());
+        m_vkRenderPassCreateInfo.subpassCount = static_cast<uint32_t>(m_subpassDescriptions.size());
         if (m_vkRenderPassCreateInfo.subpassCount > 0) {
             for (SubpassDescription& subpassDescription : m_subpassDescriptions) {
                 //	TODO: investigate.  This is either really clever or really risky.
@@ -1950,7 +1948,7 @@ public:
                 //	a copy of the VkSubpassDescription part of our structure.
                 m_vkSubpassDescriptions.emplace_back(subpassDescription.vkSubpassDescription());
             }
-			m_vkRenderPassCreateInfo.pSubpasses = m_vkSubpassDescriptions.data();
+            m_vkRenderPassCreateInfo.pSubpasses = m_vkSubpassDescriptions.data();
         }
 
         return &m_vkRenderPassCreateInfo;
@@ -2216,6 +2214,31 @@ class Sampler : public HandleWithOwner<VkSampler, Device> {
 
 public:
     Sampler() = default;
+    ~Sampler() = default;
+
+    Sampler(const Sampler& other)
+        : HandleWithOwner(other)
+    {
+    }
+
+    Sampler& operator=(const Sampler& other)
+    {
+        this->~Sampler();
+        new (this) Sampler(other);
+        return *this;
+    }
+
+    Sampler(Sampler&& other) noexcept
+        : HandleWithOwner(std::move(other))
+    {
+    }
+
+    Sampler& operator=(Sampler&& other) noexcept
+    {
+        this->~Sampler();
+        new (this) Sampler(std::move(other));
+        return *this;
+    }
 
     Sampler(const SamplerCreateInfo& samplerCreateInfo, Device device)
     {
@@ -2416,15 +2439,24 @@ public:
 
     const CommandBuffer& begin() const
     {
-        VkCommandBufferBeginInfo beginInfo {};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        VkCommandBufferBeginInfo vkCommandBufferBeginInfo{};
+		vkCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-        VkResult vkResult = vkBeginCommandBuffer(*this, &beginInfo);
+        VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
         return *this;
     }
+
+	const CommandBuffer& begin(const VkCommandBufferBeginInfo& vkCommandBufferBeginInfo) const {
+		VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
+		if (vkResult != VK_SUCCESS) {
+			throw Exception(vkResult);
+		}
+		return *this;
+	}
+
 
     void beginOneTimeSubmit() const
     {
@@ -2874,7 +2906,7 @@ public:
     DescriptorPoolCreateInfo(DescriptorPoolCreateInfo&&) noexcept = delete;
     DescriptorPoolCreateInfo& operator=(DescriptorPoolCreateInfo&&) noexcept = delete;
 
-    void addDescriptorCount(VkDescriptorType vkDescriptorType, int count)
+    void addDescriptorCount(VkDescriptorType vkDescriptorType, uint32_t count)
     {
         VkDescriptorPoolSize vkDescriptorPoolSize;
         vkDescriptorPoolSize.type = vkDescriptorType;
@@ -2882,6 +2914,11 @@ public:
         m_vkDescriptorPoolSizes.emplace_back(vkDescriptorPoolSize);
         poolSizeCount = static_cast<uint32_t>(m_vkDescriptorPoolSizes.size());
         pPoolSizes = m_vkDescriptorPoolSizes.data();
+    }
+
+    void setMaxSets(uint32_t maxSetsArg)
+    {
+        maxSets = maxSetsArg;
     }
 };
 
@@ -3004,6 +3041,31 @@ class DescriptorSetLayout : public HandleWithOwner<VkDescriptorSetLayout> {
 
 public:
     DescriptorSetLayout() = default;
+	~DescriptorSetLayout() = default;
+
+    DescriptorSetLayout(const DescriptorSetLayout& other)
+        : HandleWithOwner(other)
+    {
+    }
+
+    DescriptorSetLayout& operator=(const DescriptorSetLayout& other)
+    {
+        this->~DescriptorSetLayout();
+        new (this) DescriptorSetLayout(other);
+        return *this;
+    }
+
+    DescriptorSetLayout(DescriptorSetLayout&& other) noexcept
+        : HandleWithOwner(std::move(other))
+    {
+    }
+
+    DescriptorSetLayout& operator=(DescriptorSetLayout&& other) noexcept
+    {
+        this->~DescriptorSetLayout();
+        new (this) DescriptorSetLayout(std::move(other));
+        return *this;
+    }
 
     DescriptorSetLayout(
         DescriptorSetLayoutCreateInfo& descriptorSetLayoutCreateInfo,
@@ -3038,12 +3100,23 @@ public:
     }
 };
 
+//	TODO: incomplete
+//	This is the smart version of VkWriteDescriptorSet to use with VkUpdateDescriptorSets.
+//	There is also a DescriptorSetUpdater that wraps everything.  Not sure which is better.
+//	Maybe keep both.
 class WriteDescriptorSet : public VkWriteDescriptorSet {
+
     std::vector<VkDescriptorImageInfo> m_vkDescriptorImageInfos;
     std::vector<VkDescriptorBufferInfo> m_vkDescriptorBufferInfos;
     std::vector<VkBufferView> m_vkBufferViewTexels;
 
 public:
+    ~WriteDescriptorSet() = default;
+    WriteDescriptorSet(const WriteDescriptorSet&) = delete;
+    WriteDescriptorSet& operator=(const WriteDescriptorSet&) = delete;
+    WriteDescriptorSet(WriteDescriptorSet&&) noexcept = delete;
+    WriteDescriptorSet& operator=(WriteDescriptorSet&&) noexcept = delete;
+
     WriteDescriptorSet(VkDescriptorSet vkDescriptorSet, uint32_t bindingIndex, VkDescriptorType vkDescriptorType)
         : VkWriteDescriptorSet {}
     {
@@ -3072,6 +3145,10 @@ class DescriptorSetUpdater {
     //	data that are described by descriptors and that
     //	can need to be written/updated.
 
+    //	TODO: can this be made always up to date?
+    //	Use vector for each type of info, and then set pointer
+    //	after saving info.
+
     //	Union to hold each type of info that can be updated/written.
     union WriteDescriptorInfo {
         VkDescriptorBufferInfo m_vkDescriptorBufferInfo;
@@ -3099,14 +3176,23 @@ class DescriptorSetUpdater {
     std::vector<WriteDescriptorInfo> m_writeDescriptorInfos;
 
 public:
-    void addWriteDescriptor(
+    DescriptorSetUpdater() = default;
+    ~DescriptorSetUpdater() = default;
+    DescriptorSetUpdater(const DescriptorSetUpdater&) = delete;
+    DescriptorSetUpdater& operator=(const DescriptorSetUpdater&) = delete;
+    DescriptorSetUpdater(DescriptorSetUpdater&&) noexcept = delete;
+    DescriptorSetUpdater& operator=(DescriptorSetUpdater&&) noexcept = delete;
+
+    void addBufferWriteDescriptor(
         VkDescriptorSet vkDescriptorSet,
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
-        vkcpp::Buffer buffer,
-        VkDeviceSize size)
+        vkcpp::Buffer bufferArg,
+        VkDeviceSize offsetArg,
+        VkDeviceSize rangeArg)
     {
-        const VkDescriptorBufferInfo* marker = reinterpret_cast<VkDescriptorBufferInfo*>(-1);
+        //	Just need a non-zero marker
+        const VkDescriptorBufferInfo* bufferMarker = reinterpret_cast<VkDescriptorBufferInfo*>(-1);
 
         VkWriteDescriptorSet vkWriteDescriptorSet {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -3115,27 +3201,29 @@ public:
             .dstArrayElement = 0,
             .descriptorCount = 1,
             .descriptorType = vkDescriptorType,
-            .pBufferInfo = marker
+            .pBufferInfo = bufferMarker
         };
 
         VkDescriptorBufferInfo vkDescriptorBufferInfo {
-            .buffer = buffer,
-            .offset = 0,
-            .range = size
+            .buffer = bufferArg,
+            .offset = offsetArg,
+            .range = rangeArg
         };
 
-        m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
-        m_writeDescriptorInfos.push_back(vkDescriptorBufferInfo);
+        m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
+        m_writeDescriptorInfos.emplace_back(vkDescriptorBufferInfo);
     }
 
-    void addWriteDescriptor(
+    //	Handy version for Sascha Willems demos.
+    void addBufferWriteDescriptor(
         VkDescriptorSet vkDescriptorSet,
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
-        ImageView imageView,
-        Sampler sampler)
+        const VkDescriptorBufferInfo& vkDescriptorBufferInfo)
     {
-        const VkDescriptorImageInfo* marker = reinterpret_cast<VkDescriptorImageInfo*>(-1);
+
+        //	Just need a non-zero marker
+        const VkDescriptorBufferInfo* bufferMarker = reinterpret_cast<VkDescriptorBufferInfo*>(-1);
 
         VkWriteDescriptorSet vkWriteDescriptorSet {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -3144,14 +3232,62 @@ public:
             .dstArrayElement = 0,
             .descriptorCount = 1,
             .descriptorType = vkDescriptorType,
-            .pImageInfo = marker
+            .pBufferInfo = bufferMarker
         };
 
-        //	TODO: m_vkImage layout should probably be a parameter.
+        m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
+        m_writeDescriptorInfos.emplace_back(vkDescriptorBufferInfo);
+    }
+
+    void addImageWriteDescriptor(
+        VkDescriptorSet vkDescriptorSet,
+        uint32_t bindingIndex,
+        VkDescriptorType vkDescriptorType,
+        ImageView imageViewArg,
+        VkImageLayout vkImageLayout,
+        Sampler samplerArg)
+    {
+        //	Just need a non-zero marker
+        const VkDescriptorImageInfo* imageMarker = reinterpret_cast<VkDescriptorImageInfo*>(-1);
+
+        VkWriteDescriptorSet vkWriteDescriptorSet {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vkDescriptorSet,
+            .dstBinding = bindingIndex,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vkDescriptorType,
+            .pImageInfo = imageMarker
+        };
+
         VkDescriptorImageInfo vkDescriptorImageInfo {
-            .sampler = sampler,
-            .imageView = imageView,
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            .sampler = samplerArg,
+            .imageView = imageViewArg,
+            .imageLayout = vkImageLayout,
+        };
+
+        m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
+        m_writeDescriptorInfos.emplace_back(vkDescriptorImageInfo);
+    }
+
+    void addImageWriteDescriptor(
+        VkDescriptorSet vkDescriptorSet,
+        uint32_t bindingIndex,
+        VkDescriptorType vkDescriptorType,
+        const VkDescriptorImageInfo& vkDescriptorImageInfo)
+    {
+
+        //	Just need a non-zero marker
+        const VkDescriptorImageInfo* imageMarker = reinterpret_cast<VkDescriptorImageInfo*>(-1);
+
+        VkWriteDescriptorSet vkWriteDescriptorSet {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vkDescriptorSet,
+            .dstBinding = bindingIndex,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vkDescriptorType,
+            .pImageInfo = imageMarker
         };
 
         m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
@@ -3190,16 +3326,12 @@ public:
 
 class DescriptorSet : public HandleWithOwner<VkDescriptorSet, DescriptorPool> {
 
-    DescriptorSetLayout m_descriptorSetLayout;
-    DescriptorSetUpdater m_descriptorSetUpdater;
-
     DescriptorSet(
         VkDescriptorSet vkDescriptorSet,
         DescriptorPool descriptorPool,
         DestroyFunc_t pfnDestroy,
         const DescriptorSetLayout& descriptorSetLayout)
         : HandleWithOwner(vkDescriptorSet, descriptorPool, pfnDestroy)
-        , m_descriptorSetLayout(descriptorSetLayout)
     {
     }
 
@@ -3210,6 +3342,31 @@ class DescriptorSet : public HandleWithOwner<VkDescriptorSet, DescriptorPool> {
 
 public:
     DescriptorSet() = default;
+    ~DescriptorSet() = default;
+
+    DescriptorSet(const DescriptorSet& other)
+        : HandleWithOwner(other)
+    {
+    }
+
+    DescriptorSet& operator=(const DescriptorSet& other)
+    {
+        this->~DescriptorSet();
+        new (this) DescriptorSet(other);
+        return *this;
+    }
+
+    DescriptorSet(DescriptorSet&& other) noexcept
+        : HandleWithOwner(std::move(other))
+    {
+    }
+
+    DescriptorSet& operator=(DescriptorSet&& other) noexcept
+    {
+        this->~DescriptorSet();
+        new (this) DescriptorSet(std::move(other));
+        return *this;
+    }
 
     DescriptorSet(DescriptorSetLayout descriptorSetLayout, DescriptorPool descriptorPool)
     {
@@ -3229,41 +3386,6 @@ public:
             throw Exception(vkResult);
         }
         new (this) DescriptorSet(vkDescriptorSet, descriptorPool, &destroy, descriptorSetLayout);
-    }
-
-    //	TODO: should the descriptor type be checked against
-    //	the descriptor type in the descriptor set layout info?
-    void addWriteDescriptor(
-        uint32_t bindingIndex,
-        VkDescriptorType vkDescriptorType,
-        vkcpp::Buffer buffer,
-        VkDeviceSize size)
-    {
-        m_descriptorSetUpdater.addWriteDescriptor(
-            *this,
-            bindingIndex,
-            vkDescriptorType,
-            buffer,
-            size);
-    }
-
-    void addWriteDescriptor(
-        uint32_t bindingIndex,
-        VkDescriptorType vkDescriptorType,
-        ImageView imageView,
-        Sampler sampler)
-    {
-        m_descriptorSetUpdater.addWriteDescriptor(
-            *this,
-            bindingIndex,
-            vkDescriptorType,
-            imageView,
-            sampler);
-    }
-
-    void updateDescriptors()
-    {
-        m_descriptorSetUpdater.updateDescriptorSets(getOwner().getVkDevice());
     }
 };
 

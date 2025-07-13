@@ -796,7 +796,13 @@ public:
         // Get the next swap chain m_vkImage from the implementation
         // Note that the implementation is free to return the images in any order, so we must use the acquire function and can't just cycle through the images/imageIndex on our own
         uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(m_deviceOriginal, m_swapChain.swapChain, UINT64_MAX, m_vkPresentCompleteSemaphores[m_currentFrameIndex], VK_NULL_HANDLE, &imageIndex);
+        VkResult result = vkAcquireNextImageKHR(
+			m_deviceOriginal,
+			m_swapChain.swapChain,
+			UINT64_MAX,
+			m_vkPresentCompleteSemaphores[m_currentFrameIndex],
+			VK_NULL_HANDLE,
+			&imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
             windowResize();
             return;
@@ -892,7 +898,6 @@ public:
 // OS specific main entry points
 // Most of the code base is shared for the different supported operating systems, but stuff like message handling differs
 
-#if defined(_WIN32)
 // Windows entry point
 VulkanExample* vulkanExample;
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -907,130 +912,17 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
     for (size_t i = 0; i < __argc; i++) {
         VulkanExample::args.push_back(__argv[i]);
     };
-    vulkanExample = new VulkanExample();
-    vulkanExample->initVulkan();
-    vulkanExample->setupWindow(hInstance, WndProc);
-    vulkanExample->prepare();
-    vulkanExample->renderLoop();
-    delete (vulkanExample);
+	try {
+		vulkanExample = new VulkanExample();
+		vulkanExample->initVulkan();
+		vulkanExample->setupWindow(hInstance, WndProc);
+		vulkanExample->prepare();
+		vulkanExample->renderLoop();
+		delete (vulkanExample);
+	}
+	catch (std::exception& e) {
+		std::cout << std::format("exception: %s\n", e.what());
+	}
     return 0;
 }
 
-#elif defined(__ANDROID__)
-// Android entry point
-VulkanExample* vulkanExample;
-void android_main(android_app* state)
-{
-    vulkanExample = new VulkanExample();
-    state->userData = vulkanExample;
-    state->onAppCmd = VulkanExample::handleAppCommand;
-    state->onInputEvent = VulkanExample::handleAppInput;
-    androidApp = state;
-    vulkanExample->renderLoop();
-    delete (vulkanExample);
-}
-#elif defined(_DIRECT2DISPLAY)
-
-// Linux entry point with direct to display wsi
-// Direct to Displays (D2D) is used on embedded platforms
-VulkanExample* vulkanExample;
-static void handleEvent()
-{
-}
-int main(const int argc, const char* argv[])
-{
-    for (size_t i = 0; i < argc; i++) {
-        VulkanExample::args.push_back(argv[i]);
-    };
-    vulkanExample = new VulkanExample();
-    vulkanExample->initVulkan();
-    vulkanExample->prepare();
-    vulkanExample->renderLoop();
-    delete (vulkanExample);
-    return 0;
-}
-#elif defined(VK_USE_PLATFORM_DIRECTFB_EXT)
-VulkanExample* vulkanExample;
-static void handleEvent(const DFBWindowEvent* event)
-{
-    if (vulkanExample != NULL) {
-        vulkanExample->handleEvent(event);
-    }
-}
-int main(const int argc, const char* argv[])
-{
-    for (size_t i = 0; i < argc; i++) {
-        VulkanExample::args.push_back(argv[i]);
-    };
-    vulkanExample = new VulkanExample();
-    vulkanExample->initVulkan();
-    vulkanExample->setupWindow();
-    vulkanExample->prepare();
-    vulkanExample->renderLoop();
-    delete (vulkanExample);
-    return 0;
-}
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-VulkanExample* vulkanExample;
-int main(const int argc, const char* argv[])
-{
-    for (size_t i = 0; i < argc; i++) {
-        VulkanExample::args.push_back(argv[i]);
-    };
-    vulkanExample = new VulkanExample();
-    vulkanExample->initVulkan();
-    vulkanExample->setupWindow();
-    vulkanExample->prepare();
-    vulkanExample->renderLoop();
-    delete (vulkanExample);
-    return 0;
-}
-#elif defined(__linux__) || defined(__FreeBSD__)
-
-// Linux entry point
-VulkanExample* vulkanExample;
-#if defined(VK_USE_PLATFORM_XCB_KHR)
-static void handleEvent(const xcb_generic_event_t* event)
-{
-    if (vulkanExample != NULL) {
-        vulkanExample->handleEvent(event);
-    }
-}
-#else
-static void handleEvent()
-{
-}
-#endif
-int main(const int argc, const char* argv[])
-{
-    for (size_t i = 0; i < argc; i++) {
-        VulkanExample::args.push_back(argv[i]);
-    };
-    vulkanExample = new VulkanExample();
-    vulkanExample->initVulkan();
-    vulkanExample->setupWindow();
-    vulkanExample->prepare();
-    vulkanExample->renderLoop();
-    delete (vulkanExample);
-    return 0;
-}
-#elif (defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT)) && defined(VK_EXAMPLE_XCODE_GENERATED)
-VulkanExample* vulkanExample;
-int main(const int argc, const char* argv[])
-{
-    @autoreleasepool {
-        for (size_t i = 0; i < argc; i++) {
-            VulkanExample::args.push_back(argv[i]);
-        };
-        vulkanExample = new VulkanExample();
-        vulkanExample->initVulkan();
-        vulkanExample->setupWindow(nullptr);
-        vulkanExample->prepare();
-        vulkanExample->renderLoop();
-        delete (vulkanExample);
-    }
-    return 0;
-}
-#elif defined(VK_USE_PLATFORM_SCREEN_QNX)
-VULKAN_EXAMPLE_MAIN()
-#endif

@@ -302,7 +302,7 @@ void Texture2D::loadFromFile(std::string filename, VkFormat format, vks::VulkanD
     // samplerCreateInfo.maxAnisotropy = device->m_vkPhysicalDeviceFeaturesEnabled.samplerAnisotropy ? device->m_vkPhysicalDeviceProperties.limits.maxSamplerAnisotropy : 1.0f;
     // samplerCreateInfo.anisotropyEnable = device->m_vkPhysicalDeviceFeaturesEnabled.samplerAnisotropy;
     samplerCreateInfo.maxAnisotropy = 1.0f;
-    samplerCreateInfo.anisotropyEnable = device->m_vkPhysicalDeviceFeaturesEnabled.samplerAnisotropy;
+    samplerCreateInfo.anisotropyEnable = FALSE;
 
     samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
     VK_CHECK_RESULT(vkCreateSampler(device->m_device, &samplerCreateInfo, nullptr, &sampler));
