@@ -356,7 +356,9 @@ void vkglTF::Texture::fromglTfImage(tinygltf::Image& gltfimage, std::string path
         }
 
         // Create optimal tiled target image
-        VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
+        //VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
+		VkImageCreateInfo imageCreateInfo{};
+		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
         imageCreateInfo.format = format;
         imageCreateInfo.mipLevels = mipLevels;
@@ -690,7 +692,9 @@ void vkglTF::Model::createEmptyTexture(VkQueue transferQueue)
     bufferCopyRegion.imageExtent.depth = 1;
 
     // Create optimal tiled target image
-    VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
+    //VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
+	VkImageCreateInfo imageCreateInfo{};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
     imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
     imageCreateInfo.mipLevels = 1;

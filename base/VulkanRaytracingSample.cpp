@@ -240,17 +240,19 @@ void VulkanRaytracingSample::createStorageImage(VkFormat format, VkExtent3D exte
 		storageImage = {};
 	}
 
-	VkImageCreateInfo image = vks::initializers::imageCreateInfo();
-	image.imageType = VK_IMAGE_TYPE_2D;
-	image.format = format;
-	image.extent = extent;
-	image.mipLevels = 1;
-	image.arrayLayers = 1;
-	image.samples = VK_SAMPLE_COUNT_1_BIT;
-	image.tiling = VK_IMAGE_TILING_OPTIMAL;
-	image.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
-	image.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VK_CHECK_RESULT(vkCreateImage(m_pVulkanDevice->m_device, &image, nullptr, &storageImage.image));
+	//VkImageCreateInfo image = vks::initializers::imageCreateInfo();
+	VkImageCreateInfo imageCreateInfo{};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.format = format;
+	imageCreateInfo.extent = extent;
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VK_CHECK_RESULT(vkCreateImage(m_pVulkanDevice->m_device, &imageCreateInfo, nullptr, &storageImage.image));
 
 	VkMemoryRequirements memReqs;
 	vkGetImageMemoryRequirements(m_pVulkanDevice->m_device, storageImage.image, &memReqs);

@@ -88,20 +88,22 @@ namespace vks
 		style.ScaleAllSizes(scale);
 
 		// Create target image for copy
-		VkImageCreateInfo imageInfo = vks::initializers::imageCreateInfo();
-		imageInfo.imageType = VK_IMAGE_TYPE_2D;
-		imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-		imageInfo.extent.width = texWidth;
-		imageInfo.extent.height = texHeight;
-		imageInfo.extent.depth = 1;
-		imageInfo.mipLevels = 1;
-		imageInfo.arrayLayers = 1;
-		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_CHECK_RESULT(vkCreateImage(device->m_device, &imageInfo, nullptr, &fontImage));
+		//VkImageCreateInfo imageInfo = vks::initializers::imageCreateInfo();
+		VkImageCreateInfo imageCreateInfo{};
+		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+		imageCreateInfo.extent.width = texWidth;
+		imageCreateInfo.extent.height = texHeight;
+		imageCreateInfo.extent.depth = 1;
+		imageCreateInfo.mipLevels = 1;
+		imageCreateInfo.arrayLayers = 1;
+		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VK_CHECK_RESULT(vkCreateImage(device->m_device, &imageCreateInfo, nullptr, &fontImage));
 		VkMemoryRequirements memReqs;
 		vkGetImageMemoryRequirements(device->m_device, fontImage, &memReqs);
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();

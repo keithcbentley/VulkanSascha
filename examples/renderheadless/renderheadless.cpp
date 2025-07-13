@@ -435,22 +435,25 @@ public:
 		vks::tools::getSupportedDepthFormat(physicalDevice, &depthFormat);
 		{
 			// Color attachment
-			VkImageCreateInfo image = vks::initializers::imageCreateInfo();
-			image.imageType = VK_IMAGE_TYPE_2D;
-			image.format = colorFormat;
-			image.extent.width = width;
-			image.extent.height = height;
-			image.extent.depth = 1;
-			image.mipLevels = 1;
-			image.arrayLayers = 1;
-			image.samples = VK_SAMPLE_COUNT_1_BIT;
-			image.tiling = VK_IMAGE_TILING_OPTIMAL;
-			image.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+			//VkImageCreateInfo image = vks::initializers::imageCreateInfo();
+			VkImageCreateInfo imageCreateInfo {};
+			imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+
+			imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+			imageCreateInfo.format = colorFormat;
+			imageCreateInfo.extent.width = width;
+			imageCreateInfo.extent.height = height;
+			imageCreateInfo.extent.depth = 1;
+			imageCreateInfo.mipLevels = 1;
+			imageCreateInfo.arrayLayers = 1;
+			imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+			imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+			imageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
 			VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 			VkMemoryRequirements memReqs;
 
-			VK_CHECK_RESULT(vkCreateImage(device, &image, nullptr, &colorAttachment.image));
+			VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &colorAttachment.image));
 			vkGetImageMemoryRequirements(device, colorAttachment.image, &memReqs);
 			memAlloc.allocationSize = memReqs.size;
 			memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -470,10 +473,10 @@ public:
 			VK_CHECK_RESULT(vkCreateImageView(device, &colorImageView, nullptr, &colorAttachment.view));
 
 			// Depth stencil attachment
-			image.format = depthFormat;
-			image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+			imageCreateInfo.format = depthFormat;
+			imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-			VK_CHECK_RESULT(vkCreateImage(device, &image, nullptr, &depthAttachment.image));
+			VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &depthAttachment.image));
 			vkGetImageMemoryRequirements(device, depthAttachment.image, &memReqs);
 			memAlloc.allocationSize = memReqs.size;
 			memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -758,21 +761,24 @@ public:
 		const char* imagedata;
 		{
 			// Create the linear tiled destination image to copy to and to read the memory from
-			VkImageCreateInfo imgCreateInfo(vks::initializers::imageCreateInfo());
-			imgCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-			imgCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-			imgCreateInfo.extent.width = width;
-			imgCreateInfo.extent.height = height;
-			imgCreateInfo.extent.depth = 1;
-			imgCreateInfo.arrayLayers = 1;
-			imgCreateInfo.mipLevels = 1;
-			imgCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			imgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-			imgCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
-			imgCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+			//VkImageCreateInfo imgCreateInfo(vks::initializers::imageCreateInfo());
+			VkImageCreateInfo imageCreateInfo{};
+			imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+
+			imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+			imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+			imageCreateInfo.extent.width = width;
+			imageCreateInfo.extent.height = height;
+			imageCreateInfo.extent.depth = 1;
+			imageCreateInfo.arrayLayers = 1;
+			imageCreateInfo.mipLevels = 1;
+			imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+			imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
+			imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 			// Create the image
 			VkImage dstImage;
-			VK_CHECK_RESULT(vkCreateImage(device, &imgCreateInfo, nullptr, &dstImage));
+			VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &dstImage));
 			// Create memory to back up the image
 			VkMemoryRequirements memRequirements;
 			VkMemoryAllocateInfo memAllocInfo(vks::initializers::memoryAllocateInfo());

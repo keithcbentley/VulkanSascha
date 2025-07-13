@@ -111,18 +111,18 @@ public:
 
 	~VulkanExample()
 	{
-		if (m_vkDevice) {
-			vkDestroyPipeline(m_vkDevice, pipelines.terrain, nullptr);
+		if (m_deviceOriginal) {
+			vkDestroyPipeline(m_deviceOriginal, pipelines.terrain, nullptr);
 			if (pipelines.wireframe != VK_NULL_HANDLE) {
-				vkDestroyPipeline(m_vkDevice, pipelines.wireframe, nullptr);
+				vkDestroyPipeline(m_deviceOriginal, pipelines.wireframe, nullptr);
 			}
-			vkDestroyPipeline(m_vkDevice, pipelines.skysphere, nullptr);
+			vkDestroyPipeline(m_deviceOriginal, pipelines.skysphere, nullptr);
 
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.skysphere, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.terrain, nullptr);
+			vkDestroyPipelineLayout(m_deviceOriginal, pipelineLayouts.skysphere, nullptr);
+			vkDestroyPipelineLayout(m_deviceOriginal, pipelineLayouts.terrain, nullptr);
 
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.terrain, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.skysphere, nullptr);
+			vkDestroyDescriptorSetLayout(m_deviceOriginal, descriptorSetLayouts.terrain, nullptr);
+			vkDestroyDescriptorSetLayout(m_deviceOriginal, descriptorSetLayouts.skysphere, nullptr);
 
 			uniformBuffers.skysphereVertex.destroy();
 			uniformBuffers.terrainTessellation.destroy();
@@ -131,15 +131,15 @@ public:
 			textures.skySphere.destroy();
 			textures.terrainArray.destroy();
 
-			vkDestroyBuffer(m_vkDevice, terrain.vertices.buffer, nullptr);
-			vkFreeMemory(m_vkDevice, terrain.vertices.memory, nullptr);
-			vkDestroyBuffer(m_vkDevice, terrain.indices.buffer, nullptr);
-			vkFreeMemory(m_vkDevice, terrain.indices.memory, nullptr);
+			vkDestroyBuffer(m_deviceOriginal, terrain.vertices.buffer, nullptr);
+			vkFreeMemory(m_deviceOriginal, terrain.vertices.memory, nullptr);
+			vkDestroyBuffer(m_deviceOriginal, terrain.indices.buffer, nullptr);
+			vkFreeMemory(m_deviceOriginal, terrain.indices.memory, nullptr);
 
 			if (queryPool != VK_NULL_HANDLE) {
-				vkDestroyQueryPool(m_vkDevice, queryPool, nullptr);
-				vkDestroyBuffer(m_vkDevice, queryResult.buffer, nullptr);
-				vkFreeMemory(m_vkDevice, queryResult.memory, nullptr);
+				vkDestroyQueryPool(m_deviceOriginal, queryPool, nullptr);
+				vkDestroyBuffer(m_deviceOriginal, queryResult.buffer, nullptr);
+				vkFreeMemory(m_deviceOriginal, queryResult.memory, nullptr);
 			}
 		}
 	}
@@ -180,12 +180,12 @@ public:
 				bufSize);
 
 		// Results are saved in a host visible buffer for easy access by the application
-		VK_CHECK_RESULT(vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, &queryResult.buffer));
-		vkGetBufferMemoryRequirements(m_vkDevice, queryResult.buffer, &memReqs);
+		VK_CHECK_RESULT(vkCreateBuffer(m_deviceOriginal, &bufferCreateInfo, nullptr, &queryResult.buffer));
+		vkGetBufferMemoryRequirements(m_deviceOriginal, queryResult.buffer, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &queryResult.memory));
-		VK_CHECK_RESULT(vkBindBufferMemory(m_vkDevice, queryResult.buffer, queryResult.memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAlloc, nullptr, &queryResult.memory));
+		VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, queryResult.buffer, queryResult.memory, 0));
 
 		// Create query pool
 		if (m_vkPhysicalDeviceFeatures.pipelineStatisticsQuery) {
@@ -230,7 +230,7 @@ public:
 		VkSamplerCreateInfo samplerInfo = vks::initializers::samplerCreateInfo();
 
 		// Setup a mirroring sampler for the m_drawAreaHeight map
-		vkDestroySampler(m_vkDevice, textures.heightMap.sampler, nullptr);
+		vkDestroySampler(m_deviceOriginal, textures.heightMap.sampler, nullptr);
 		samplerInfo.magFilter = VK_FILTER_LINEAR;
 		samplerInfo.minFilter = VK_FILTER_LINEAR;
 		samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
@@ -245,7 +245,7 @@ public:
 		textures.heightMap.descriptor.sampler = textures.heightMap.sampler;
 
 		// Setup a repeating sampler for the terrain texture layers
-		vkDestroySampler(m_vkDevice, textures.terrainArray.sampler, nullptr);
+		vkDestroySampler(m_deviceOriginal, textures.terrainArray.sampler, nullptr);
 		samplerInfo = vks::initializers::samplerCreateInfo();
 		samplerInfo.magFilter = VK_FILTER_LINEAR;
 		samplerInfo.minFilter = VK_FILTER_LINEAR;
@@ -261,7 +261,7 @@ public:
 			samplerInfo.maxAnisotropy = 4.0f;
 			samplerInfo.anisotropyEnable = VK_TRUE;
 		}
-		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &samplerInfo, nullptr, &textures.terrainArray.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &samplerInfo, nullptr, &textures.terrainArray.sampler));
 		textures.terrainArray.descriptor.sampler = textures.terrainArray.sampler;
 	}
 
@@ -502,10 +502,10 @@ public:
 
 		m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
-		vkDestroyBuffer(m_vkDevice, vertexStaging.buffer, nullptr);
-		vkFreeMemory(m_vkDevice, vertexStaging.memory, nullptr);
-		vkDestroyBuffer(m_vkDevice, indexStaging.buffer, nullptr);
-		vkFreeMemory(m_vkDevice, indexStaging.memory, nullptr);
+		vkDestroyBuffer(m_deviceOriginal, vertexStaging.buffer, nullptr);
+		vkFreeMemory(m_deviceOriginal, vertexStaging.memory, nullptr);
+		vkDestroyBuffer(m_deviceOriginal, indexStaging.buffer, nullptr);
+		vkFreeMemory(m_deviceOriginal, indexStaging.memory, nullptr);
 
 		delete[] vertices;
 		delete[] indices;
@@ -546,7 +546,7 @@ public:
 		};
 		descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings.data(), static_cast<uint32_t>(setLayoutBindings.size()));
 		
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayouts.skysphere));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &descriptorSetLayouts.skysphere));
 		// Sets
 		VkDescriptorSetAllocateInfo allocInfo;
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets;

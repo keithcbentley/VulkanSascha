@@ -82,24 +82,24 @@ public:
 
 	~VulkanExample()
 	{
-		if (m_vkDevice) {
+		if (m_deviceOriginal) {
 			for (uint32_t i = 0; i < attachments.size(); i++) {
-				vkDestroyImageView(m_vkDevice, attachments[i].color.view, nullptr);
-				vkDestroyImage(m_vkDevice, attachments[i].color.image, nullptr);
-				vkFreeMemory(m_vkDevice, attachments[i].color.memory, nullptr);
-				vkDestroyImageView(m_vkDevice, attachments[i].depth.view, nullptr);
-				vkDestroyImage(m_vkDevice, attachments[i].depth.image, nullptr);
-				vkFreeMemory(m_vkDevice, attachments[i].depth.memory, nullptr);
+				vkDestroyImageView(m_deviceOriginal, attachments[i].color.view, nullptr);
+				vkDestroyImage(m_deviceOriginal, attachments[i].color.image, nullptr);
+				vkFreeMemory(m_deviceOriginal, attachments[i].color.memory, nullptr);
+				vkDestroyImageView(m_deviceOriginal, attachments[i].depth.view, nullptr);
+				vkDestroyImage(m_deviceOriginal, attachments[i].depth.image, nullptr);
+				vkFreeMemory(m_deviceOriginal, attachments[i].depth.memory, nullptr);
 			}
 
-			vkDestroyPipeline(m_vkDevice, pipelines.attachmentRead, nullptr);
-			vkDestroyPipeline(m_vkDevice, pipelines.attachmentWrite, nullptr);
+			vkDestroyPipeline(m_deviceOriginal, pipelines.attachmentRead, nullptr);
+			vkDestroyPipeline(m_deviceOriginal, pipelines.attachmentWrite, nullptr);
 
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentWrite, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentRead, nullptr);
+			vkDestroyPipelineLayout(m_deviceOriginal, pipelineLayouts.attachmentWrite, nullptr);
+			vkDestroyPipelineLayout(m_deviceOriginal, pipelineLayouts.attachmentRead, nullptr);
 
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentWrite, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentRead, nullptr);
+			vkDestroyDescriptorSetLayout(m_deviceOriginal, descriptorSetLayouts.attachmentWrite, nullptr);
+			vkDestroyDescriptorSetLayout(m_deviceOriginal, descriptorSetLayouts.attachmentRead, nullptr);
 
 			uniformBuffers.matrices.destroy();
 			uniformBuffers.params.destroy();
@@ -108,9 +108,9 @@ public:
 
 	void clearAttachment(FrameBufferAttachment* attachment)
 	{
-		vkDestroyImageView(m_vkDevice, attachment->view, nullptr);
-		vkDestroyImage(m_vkDevice, attachment->image, nullptr);
-		vkFreeMemory(m_vkDevice, attachment->memory, nullptr);
+		vkDestroyImageView(m_deviceOriginal, attachment->view, nullptr);
+		vkDestroyImage(m_deviceOriginal, attachment->image, nullptr);
+		vkFreeMemory(m_deviceOriginal, attachment->memory, nullptr);
 	}
 
 	// Create a frame buffer attachment
@@ -130,28 +130,31 @@ public:
 			imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		}
 
-		VkImageCreateInfo imageCI = vks::initializers::imageCreateInfo();
-		imageCI.imageType = VK_IMAGE_TYPE_2D;
-		imageCI.format = format;
-		imageCI.extent.width = m_drawAreaWidth;
-		imageCI.extent.height = m_drawAreaHeight;
-		imageCI.extent.depth = 1;
-		imageCI.mipLevels = 1;
-		imageCI.arrayLayers = 1;
-		imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+		//VkImageCreateInfo imageCI = vks::initializers::imageCreateInfo();
+				VkImageCreateInfo imageCreateInfo {};
+		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+
+		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageCreateInfo.format = format;
+		imageCreateInfo.extent.width = m_drawAreaWidth;
+		imageCreateInfo.extent.height = m_drawAreaHeight;
+		imageCreateInfo.extent.depth = 1;
+		imageCreateInfo.mipLevels = 1;
+		imageCreateInfo.arrayLayers = 1;
+		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT flag is required for input attachments;
-		imageCI.usage = usage | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-		imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageCI, nullptr, &attachment->image));
+		imageCreateInfo.usage = usage | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCreateInfo, nullptr, &attachment->image));
 
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(m_vkDevice, attachment->image, &memReqs);
+		vkGetImageMemoryRequirements(m_deviceOriginal, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &attachment->memory));
-		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, attachment->image, attachment->memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAlloc, nullptr, &attachment->memory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, attachment->image, attachment->memory, 0));
 
 		VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
 		imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -163,7 +166,7 @@ public:
 		imageViewCI.subresourceRange.baseArrayLayer = 0;
 		imageViewCI.subresourceRange.layerCount = 1;
 		imageViewCI.image = attachment->image;
-		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &imageViewCI, nullptr, &attachment->view));
+		VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &imageViewCI, nullptr, &attachment->view));
 	}
 
 	// Override framebuffer setup from base class
@@ -186,11 +189,11 @@ public:
 				createAttachment(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments[i].depth);
 			}
 
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentWrite, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, pipelineLayouts.attachmentRead, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentWrite, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.attachmentRead, nullptr);
-			vkDestroyDescriptorPool(m_vkDevice, m_vkDescriptorPool, nullptr);
+			vkDestroyPipelineLayout(m_deviceOriginal, pipelineLayouts.attachmentWrite, nullptr);
+			vkDestroyPipelineLayout(m_deviceOriginal, pipelineLayouts.attachmentRead, nullptr);
+			vkDestroyDescriptorSetLayout(m_deviceOriginal, descriptorSetLayouts.attachmentWrite, nullptr);
+			vkDestroyDescriptorSetLayout(m_deviceOriginal, descriptorSetLayouts.attachmentRead, nullptr);
+//			vkDestroyDescriptorPool(m_deviceOriginal, m_vkDescriptorPool, nullptr);
 
 			// Since the framebuffers/attachments are referred in the descriptor sets, these need to be updated on resize
 			setupDescriptors();
@@ -200,7 +203,7 @@ public:
 
 		VkFramebufferCreateInfo frameBufferCI{};
 		frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		frameBufferCI.renderPass = m_vkRenderPass;
+		frameBufferCI.renderPass = m_renderPassOriginal;
 		frameBufferCI.attachmentCount = 3;
 		frameBufferCI.pAttachments = views;
 		frameBufferCI.width = m_drawAreaWidth;
@@ -213,7 +216,7 @@ public:
 			views[0] = m_swapChain.imageViews[i];
 			views[1] = attachments[i].color.view;
 			views[2] = attachments[i].depth.view;
-			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &frameBufferCI, nullptr, &m_vkFrameBuffers[i]));
+			VK_CHECK_RESULT(vkCreateFramebuffer(m_deviceOriginal, &frameBufferCI, nullptr, &m_vkFrameBuffers[i]));
 		}
 	}
 
@@ -337,7 +340,8 @@ public:
 		renderPassInfoCI.pSubpasses = subpassDescriptions.data();
 		renderPassInfoCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		renderPassInfoCI.pDependencies = dependencies.data();
-		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassInfoCI, nullptr, &m_vkRenderPass));
+		m_renderPassOriginal = vkcpp::RenderPass(renderPassInfoCI, m_deviceOriginal);
+		//VK_CHECK_RESULT(vkCreateRenderPass(m_deviceOriginal, &renderPassInfoCI, nullptr, &m_vkRenderPass));
 	}
 
 	void buildCommandBuffers()
@@ -350,7 +354,7 @@ public:
 		clearValues[2].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = m_vkRenderPass;
+		renderPassBeginInfo.renderPass = m_renderPassOriginal;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -430,7 +434,7 @@ public:
 			// Binding 2: Display parameters uniform buffer
 			vks::initializers::writeDescriptorSet(descriptorSets.attachmentRead[index], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers.params.descriptor),
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void setupDescriptors()
@@ -444,7 +448,8 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, static_cast<uint32_t>(attachments.size()) * 2 + 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), static_cast<uint32_t>(attachments.size()) + 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo, m_deviceOriginal);
+		//VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		/*
 			Attachment write
@@ -454,16 +459,16 @@ public:
 				vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
 			};
 			VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &descriptorSetLayouts.attachmentWrite));
+			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &descriptorSetLayouts.attachmentWrite));
 
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.attachmentWrite, 1);
-			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.attachmentWrite));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.attachmentWrite));
 
-			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.attachmentWrite, 1);
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.attachmentWrite));
+			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.attachmentWrite, 1);
+			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSets.attachmentWrite));
 
 			VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSets.attachmentWrite, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.matrices.descriptor);
-			vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
+			vkUpdateDescriptorSets(m_deviceOriginal, 1, &writeDescriptorSet, 0, nullptr);
 		}
 
 		/*
@@ -478,15 +483,15 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, 2),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.attachmentRead));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayoutCI, nullptr, &descriptorSetLayouts.attachmentRead));
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.attachmentRead, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &pipelineLayouts.attachmentRead));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCI, nullptr, &pipelineLayouts.attachmentRead));
 
 		descriptorSets.attachmentRead.resize(attachments.size());
 		for (auto i = 0; i < descriptorSets.attachmentRead.size(); i++) {
-			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.attachmentRead, 1);
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.attachmentRead[i]));
+			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.attachmentRead, 1);
+			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSets.attachmentRead[i]));
 			updateAttachmentReadDescriptors(i);
 		}
 
@@ -507,7 +512,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo();
 
-		pipelineCI.renderPass = m_vkRenderPass;
+		pipelineCI.renderPass = m_renderPassOriginal;
 		pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 		pipelineCI.pRasterizationState = &rasterizationStateCI;
 		pipelineCI.pColorBlendState = &colorBlendStateCI;
@@ -530,7 +535,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "inputattachments/attachmentwrite.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inputattachments/attachmentwrite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentWrite));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentWrite));
 
 		/*
 			Attachment read
@@ -550,7 +555,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "inputattachments/attachmentread.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inputattachments/attachmentread.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentRead));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.attachmentRead));
 	}
 
 	void prepareUniformBuffers()

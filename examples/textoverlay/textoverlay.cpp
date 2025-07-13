@@ -85,17 +85,17 @@ public:
 	~TextOverlay()
 	{
 		// Free up all Vulkan resources requested by the text overlay
-		vkDestroySampler(vulkanDevice->m_vkDevice, sampler, nullptr);
-		vkDestroyImage(vulkanDevice->m_vkDevice, image, nullptr);
-		vkDestroyImageView(vulkanDevice->m_vkDevice, view, nullptr);
-		vkDestroyBuffer(vulkanDevice->m_vkDevice, buffer, nullptr);
-		vkFreeMemory(vulkanDevice->m_vkDevice, memory, nullptr);
-		vkFreeMemory(vulkanDevice->m_vkDevice, imageMemory, nullptr);
-		vkDestroyDescriptorSetLayout(vulkanDevice->m_vkDevice, descriptorSetLayout, nullptr);
-		vkDestroyDescriptorPool(vulkanDevice->m_vkDevice, descriptorPool, nullptr);
-		vkDestroyPipelineLayout(vulkanDevice->m_vkDevice, pipelineLayout, nullptr);
-		vkDestroyPipelineCache(vulkanDevice->m_vkDevice, pipelineCache, nullptr);
-		vkDestroyPipeline(vulkanDevice->m_vkDevice, pipeline, nullptr);
+		vkDestroySampler(vulkanDevice->m_device, sampler, nullptr);
+		vkDestroyImage(vulkanDevice->m_device, image, nullptr);
+		vkDestroyImageView(vulkanDevice->m_device, view, nullptr);
+		vkDestroyBuffer(vulkanDevice->m_device, buffer, nullptr);
+		vkFreeMemory(vulkanDevice->m_device, memory, nullptr);
+		vkFreeMemory(vulkanDevice->m_device, imageMemory, nullptr);
+		vkDestroyDescriptorSetLayout(vulkanDevice->m_device, descriptorSetLayout, nullptr);
+		vkDestroyDescriptorPool(vulkanDevice->m_device, descriptorPool, nullptr);
+		vkDestroyPipelineLayout(vulkanDevice->m_device, pipelineLayout, nullptr);
+		vkDestroyPipelineCache(vulkanDevice->m_device, pipelineCache, nullptr);
+		vkDestroyPipeline(vulkanDevice->m_device, pipeline, nullptr);
 	}
 
 	// Prepare all vulkan resources required to render the font
@@ -112,12 +112,12 @@ public:
 		VkDeviceSize bufferSize = TEXTOVERLAY_MAX_CHAR_COUNT * sizeof(glm::vec4);
 
 		VkBufferCreateInfo bufferInfo = vks::initializers::bufferCreateInfo(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, bufferSize);
-		VK_CHECK_RESULT(vkCreateBuffer(vulkanDevice->m_vkDevice, &bufferInfo, nullptr, &buffer));
+		VK_CHECK_RESULT(vkCreateBuffer(vulkanDevice->m_device, &bufferInfo, nullptr, &buffer));
 
 		VkMemoryRequirements memReqs;
 		VkMemoryAllocateInfo allocInfo = vks::initializers::memoryAllocateInfo();
 
-		vkGetBufferMemoryRequirements(vulkanDevice->m_vkDevice, buffer, &memReqs);
+		vkGetBufferMemoryRequirements(vulkanDevice->m_device, buffer, &memReqs);
 		allocInfo.allocationSize = memReqs.size;
 		allocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 

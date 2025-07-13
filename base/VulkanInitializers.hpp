@@ -107,12 +107,12 @@ namespace vks
 			return memoryBarrier;
 		}
 
-		inline VkImageCreateInfo imageCreateInfo()
-		{
-			VkImageCreateInfo imageCreateInfo {};
-			imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-			return imageCreateInfo;
-		}
+		//inline VkImageCreateInfo imageCreateInfo()
+		//{
+		//	VkImageCreateInfo imageCreateInfo {};
+		//	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		//	return imageCreateInfo;
+		//}
 
 		inline VkSamplerCreateInfo samplerCreateInfo()
 		{
