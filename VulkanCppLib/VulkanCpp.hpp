@@ -1277,6 +1277,16 @@ public:
     }
 };
 
+class MemoryAllocateInfo : public VkMemoryAllocateInfo {
+
+public:
+    MemoryAllocateInfo()
+        : VkMemoryAllocateInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    }
+};
+
 class DeviceMemory : public HandleWithOwner<VkDeviceMemory> {
 
     static void destroy(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice)
@@ -1315,6 +1325,16 @@ public:
         vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
         vkMemoryAllocateInfo.memoryTypeIndex = device.findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, requiredMemoryPropertyFlags);
         new (this) DeviceMemory(vkMemoryAllocateInfo, device);
+    }
+};
+
+class BufferCreateInfo : public VkBufferCreateInfo {
+
+public:
+    BufferCreateInfo()
+        : VkBufferCreateInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     }
 };
 
