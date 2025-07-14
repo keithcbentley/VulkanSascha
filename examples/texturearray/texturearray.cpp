@@ -308,8 +308,8 @@ public:
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.buffer, offsets);
-			vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.m_vkBuffer, offsets);
+			vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, layerCount, 0, 0, 0);
 
@@ -419,7 +419,7 @@ public:
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
+			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo),
 			// Binding 1 : Fragment shader texture sampler
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
 		};
@@ -499,9 +499,9 @@ public:
 		uint8_t *pData;
 		uint32_t dataOffset = sizeof(uniformData.matrices);
 		uint32_t dataSize = layerCount * sizeof(PerInstanceData);
-		VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, uniformBuffer.memory, dataOffset, dataSize, 0, (void **)&pData));
+		VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, uniformBuffer.m_vkMemory, dataOffset, dataSize, 0, (void **)&pData));
 		memcpy(pData, uniformData.instance, dataSize);
-		vkUnmapMemory(m_deviceOriginal, uniformBuffer.memory);
+		vkUnmapMemory(m_deviceOriginal, uniformBuffer.m_vkMemory);
 
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffer.map());
@@ -511,7 +511,7 @@ public:
 	{
 		uniformData.matrices.projection = camera.matrices.perspective;
 		uniformData.matrices.view = camera.matrices.view;
-		memcpy(uniformBuffer.mapped, &uniformData.matrices, sizeof(uniformData.matrices));
+		memcpy(uniformBuffer.m_pMapped, &uniformData.matrices, sizeof(uniformData.matrices));
 	}
 
 	void prepare()

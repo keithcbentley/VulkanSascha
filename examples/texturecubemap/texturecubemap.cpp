@@ -360,7 +360,7 @@ public:
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets =
 		{
 			// Binding 0 : Vertex shader uniform buffer
-			vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
+			vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo),
 			// Binding 1 : Fragment shader cubemap sampler
 			vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
 		};
@@ -426,7 +426,7 @@ public:
 		// Note: Both the object and skybox use the same uniform data, the translation part of the skybox is removed in the shader (see skybox.vert)
 		uboVS.modelView = camera.matrices.view;
 		uboVS.inverseModelview = glm::inverse(camera.matrices.view);
-		memcpy(uniformBuffer.mapped, &uboVS, sizeof(uboVS));
+		memcpy(uniformBuffer.m_pMapped, &uboVS, sizeof(uboVS));
 	}
 
 	void prepare()

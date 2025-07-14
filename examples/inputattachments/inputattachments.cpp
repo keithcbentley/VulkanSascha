@@ -432,7 +432,7 @@ public:
 			// Binding 1: Depth input attachment
 			vks::initializers::writeDescriptorSet(descriptorSets.attachmentRead[index], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &descriptors[1]),
 			// Binding 2: Display parameters uniform buffer
-			vks::initializers::writeDescriptorSet(descriptorSets.attachmentRead[index], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers.params.descriptor),
+			vks::initializers::writeDescriptorSet(descriptorSets.attachmentRead[index], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers.params.m_vkDescriptorBufferInfo),
 		};
 		vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
@@ -467,7 +467,7 @@ public:
 			VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.attachmentWrite, 1);
 			VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSets.attachmentWrite));
 
-			VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSets.attachmentWrite, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.matrices.descriptor);
+			VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSets.attachmentWrite, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.matrices.m_vkDescriptorBufferInfo);
 			vkUpdateDescriptorSets(m_deviceOriginal, 1, &writeDescriptorSet, 0, nullptr);
 		}
 
@@ -572,8 +572,8 @@ public:
 		uboMatrices.projection = camera.matrices.perspective;
 		uboMatrices.view = camera.matrices.view;
 		uboMatrices.model = glm::mat4(1.0f);
-		memcpy(uniformBuffers.matrices.mapped, &uboMatrices, sizeof(uboMatrices));
-		memcpy(uniformBuffers.params.mapped, &uboParams, sizeof(uboParams));
+		memcpy(uniformBuffers.matrices.m_pMapped, &uboMatrices, sizeof(uboMatrices));
+		memcpy(uniformBuffers.params.m_pMapped, &uboParams, sizeof(uboParams));
 	}
 
 	void draw()

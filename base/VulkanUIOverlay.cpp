@@ -132,7 +132,7 @@ namespace vks
 			uploadSize));
 
 		stagingBuffer.map();
-		memcpy(stagingBuffer.mapped, fontData, uploadSize);
+		memcpy(stagingBuffer.m_pMapped, fontData, uploadSize);
 		stagingBuffer.unmap();
 
 		// Copy buffer data to font image
@@ -158,7 +158,7 @@ namespace vks
 
 		vkCmdCopyBufferToImage(
 			copyCmd,
-			stagingBuffer.buffer,
+			stagingBuffer.m_vkBuffer,
 			fontImage,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			1,
@@ -330,7 +330,7 @@ namespace vks
 		}
 
 		// Vertex buffer
-		if ((vertexBuffer.buffer == VK_NULL_HANDLE) || (vertexCount != imDrawData->TotalVtxCount)) {
+		if ((vertexBuffer.m_vkBuffer == VK_NULL_HANDLE) || (vertexCount != imDrawData->TotalVtxCount)) {
 			vertexBuffer.unmap();
 			vertexBuffer.destroy();
 			VK_CHECK_RESULT(device->createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &vertexBuffer, vertexBufferSize));
@@ -341,7 +341,7 @@ namespace vks
 		}
 
 		// Index buffer
-		if ((indexBuffer.buffer == VK_NULL_HANDLE) || (indexCount < imDrawData->TotalIdxCount)) {
+		if ((indexBuffer.m_vkBuffer == VK_NULL_HANDLE) || (indexCount < imDrawData->TotalIdxCount)) {
 			indexBuffer.unmap();
 			indexBuffer.destroy();
 			VK_CHECK_RESULT(device->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &indexBuffer, indexBufferSize));
@@ -351,8 +351,8 @@ namespace vks
 		}
 
 		// Upload data
-		ImDrawVert* vtxDst = (ImDrawVert*)vertexBuffer.mapped;
-		ImDrawIdx* idxDst = (ImDrawIdx*)indexBuffer.mapped;
+		ImDrawVert* vtxDst = (ImDrawVert*)vertexBuffer.m_pMapped;
+		ImDrawIdx* idxDst = (ImDrawIdx*)indexBuffer.m_pMapped;
 
 		for (int n = 0; n < imDrawData->CmdListsCount; n++) {
 			const ImDrawList* cmd_list = imDrawData->CmdLists[n];
@@ -389,8 +389,8 @@ namespace vks
 		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
 
 		VkDeviceSize offsets[1] = { 0 };
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, offsets);
-		vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.m_vkBuffer, offsets);
+		vkCmdBindIndexBuffer(commandBuffer, indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT16);
 
 		for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
 		{

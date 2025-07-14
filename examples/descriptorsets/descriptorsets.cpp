@@ -196,7 +196,7 @@ public:
             writeDescriptorSets[0].dstSet = cube.m_descriptorSet;
             writeDescriptorSets[0].dstBinding = uniformBufferBindingIndex;
             writeDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            writeDescriptorSets[0].pBufferInfo = &cube.uniformBuffer.descriptor;
+            writeDescriptorSets[0].pBufferInfo = &cube.uniformBuffer.m_vkDescriptorBufferInfo;
             writeDescriptorSets[0].descriptorCount = 1;
 
             /*
@@ -220,7 +220,7 @@ public:
                 cube.m_descriptorSet,
                 uniformBufferBindingIndex,
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                cube.uniformBuffer.descriptor);
+                cube.uniformBuffer.m_vkDescriptorBufferInfo);
 
             descriptorSetUpdater.addImageWriteDescriptor(
                 cube.m_descriptorSet,
@@ -301,7 +301,7 @@ public:
             cube.matrices.model = glm::rotate(cube.matrices.model, glm::radians(cube.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
             cube.matrices.model = glm::rotate(cube.matrices.model, glm::radians(cube.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
             cube.matrices.model = glm::scale(cube.matrices.model, glm::vec3(0.25f));
-            memcpy(cube.uniformBuffer.mapped, &cube.matrices, sizeof(cube.matrices));
+            memcpy(cube.uniformBuffer.m_pMapped, &cube.matrices, sizeof(cube.matrices));
         }
     }
 

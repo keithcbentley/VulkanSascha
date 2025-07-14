@@ -34,6 +34,7 @@ public:
         // Used by the fragment shader to select the cubemap from the array cubemap
         int cubeMapIndex = 1;
     } uniformData;
+
     vks::Buffer uniformBuffer;
 
     struct {
@@ -130,23 +131,23 @@ public:
         bufferCreateInfo.size = ktxTextureSize;
         bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
         bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VK_CHECK_RESULT(vkCreateBuffer(m_deviceOriginal, &bufferCreateInfo, nullptr, &sourceData.buffer));
+        VK_CHECK_RESULT(vkCreateBuffer(m_deviceOriginal, &bufferCreateInfo, nullptr, &sourceData.m_vkBuffer));
 
         // Get m_vkDeviceMemory requirements for the source buffer (alignment, m_vkDeviceMemory type bits)
         VkMemoryRequirements memReqs;
-        vkGetBufferMemoryRequirements(m_deviceOriginal, sourceData.buffer, &memReqs);
+        vkGetBufferMemoryRequirements(m_deviceOriginal, sourceData.m_vkBuffer, &memReqs);
         VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
         memAllocInfo.allocationSize = memReqs.size;
         // Get m_vkDeviceMemory type index for a host visible buffer
         memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &sourceData.memory));
-        VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, sourceData.buffer, sourceData.memory, 0));
+        VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &sourceData.m_vkMemory));
+        VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, sourceData.m_vkBuffer, sourceData.m_vkMemory, 0));
 
         // Copy the ktx m_vkImage data into the source buffer
         uint8_t* data;
-        VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, sourceData.memory, 0, memReqs.size, 0, (void**)&data));
+        VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, sourceData.m_vkMemory, 0, memReqs.size, 0, (void**)&data));
         memcpy(data, ktxTextureData, ktxTextureSize);
-        vkUnmapMemory(m_deviceOriginal, sourceData.memory);
+        vkUnmapMemory(m_deviceOriginal, sourceData.m_vkMemory);
 
         // Create optimal tiled target m_vkImage
         // VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
@@ -235,7 +236,7 @@ public:
         // Copy the cube map array buffer parts from the staging buffer to the optimal tiled m_vkImage
         vkCmdCopyBufferToImage(
             copyCmd,
-            sourceData.buffer,
+            sourceData.m_vkBuffer,
             cubeMapArray.m_vkImage,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             static_cast<uint32_t>(bufferCopyRegions.size()),
@@ -279,8 +280,8 @@ public:
         VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &cubeMapArray.m_vkImageView));
 
         // Clean up staging resources
-        vkFreeMemory(m_deviceOriginal, sourceData.memory, nullptr);
-        vkDestroyBuffer(m_deviceOriginal, sourceData.buffer, nullptr);
+        vkFreeMemory(m_deviceOriginal, sourceData.m_vkMemory, nullptr);
+        vkDestroyBuffer(m_deviceOriginal, sourceData.m_vkBuffer, nullptr);
         ktxTexture_Destroy(ktxTexture);
     }
 
@@ -382,7 +383,7 @@ public:
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             // Binding 0 : Vertex shader uniform buffer
-            vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
+            vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo),
             // Binding 1 : Fragment shader cubemap sampler
             vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
         };
@@ -449,7 +450,7 @@ public:
         uniformData.projection = camera.matrices.perspective;
         uniformData.modelView = camera.matrices.view;
         uniformData.inverseModelview = glm::inverse(camera.matrices.view);
-        memcpy(uniformBuffer.mapped, &uniformData, sizeof(UniformData));
+        memcpy(uniformBuffer.m_pMapped, &uniformData, sizeof(UniformData));
     }
 
     void prepare()

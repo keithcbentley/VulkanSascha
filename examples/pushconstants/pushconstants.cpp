@@ -152,7 +152,7 @@ public:
         VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
         VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &m_vkDescriptorSet));
 
-        VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor);
+        VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo);
         vkUpdateDescriptorSets(m_deviceOriginal, 1, &writeDescriptorSet, 0, nullptr);
     }
 
@@ -212,7 +212,7 @@ public:
         uniformData.projection = camera.matrices.perspective;
         uniformData.view = camera.matrices.view;
         uniformData.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
-        memcpy(uniformBuffer.mapped, &uniformData, sizeof(UniformData));
+        memcpy(uniformBuffer.m_pMapped, &uniformData, sizeof(UniformData));
     }
 
     void prepare()

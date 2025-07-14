@@ -24,16 +24,18 @@ namespace vks
 	struct Buffer
 	{
 		VkDevice device;
-		VkBuffer buffer = VK_NULL_HANDLE;
-		VkDeviceMemory memory = VK_NULL_HANDLE;
-		VkDescriptorBufferInfo descriptor;
-		VkDeviceSize size = 0;
-		VkDeviceSize alignment = 0;
-		void* mapped = nullptr;
+		VkBuffer m_vkBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory m_vkMemory = VK_NULL_HANDLE;
+		VkDescriptorBufferInfo m_vkDescriptorBufferInfo;
+		VkDeviceSize m_size = 0;
+		VkDeviceSize m_alignment = 0;
+		void* m_pMapped = nullptr;
 		/** @brief Usage flags to be filled by external source at buffer creation (to query at some later point) */
-		VkBufferUsageFlags usageFlags;
+		VkBufferUsageFlags m_vkBufferUsageFlags;
 		/** @brief Memory property flags to be filled by external source at buffer creation (to query at some later point) */
-		VkMemoryPropertyFlags memoryPropertyFlags;
+		VkMemoryPropertyFlags m_vkMemoryPropertyFlags;
+
+
 		VkResult map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 		void unmap();
 		VkResult bind(VkDeviceSize offset = 0);

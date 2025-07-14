@@ -145,8 +145,8 @@ public:
 			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.buffer, offsets);
-			vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.m_vkBuffer, offsets);
+			vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 			// Render multiple objects using different model matrices by dynamically offsetting into one uniform buffer
 			for (uint32_t j = 0; j < OBJECT_INSTANCES; j++)
@@ -234,9 +234,9 @@ public:
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Projection/View matrix as uniform buffer
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.view.descriptor),
+			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.view.m_vkDescriptorBufferInfo),
 			// Binding 1 : Instance matrix as dynamic uniform buffer
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, &uniformBuffers.dynamic.descriptor),
+			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, &uniformBuffers.dynamic.m_vkDescriptorBufferInfo),
 		};
 		vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
@@ -329,7 +329,7 @@ public:
 			bufferSize));
 
 		// Override descriptor range to [base, base + dynamicAlignment]
-		uniformBuffers.dynamic.descriptor.range = dynamicAlignment;
+		uniformBuffers.dynamic.m_vkDescriptorBufferInfo.range = dynamicAlignment;
 
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffers.view.map());
@@ -353,7 +353,7 @@ public:
 		uboVS.projection = camera.matrices.perspective;
 		uboVS.view = camera.matrices.view;
 
-		memcpy(uniformBuffers.view.mapped, &uboVS, sizeof(uboVS));
+		memcpy(uniformBuffers.view.m_pMapped, &uboVS, sizeof(uboVS));
 	}
 
 	void updateDynamicUniformBuffer()
@@ -394,11 +394,11 @@ public:
 
 		animationTimer = 0.0f;
 
-		memcpy(uniformBuffers.dynamic.mapped, uboDataDynamic.model, uniformBuffers.dynamic.size);
+		memcpy(uniformBuffers.dynamic.m_pMapped, uboDataDynamic.model, uniformBuffers.dynamic.m_size);
 		// Flush to make changes visible to the host
 		VkMappedMemoryRange memoryRange = vks::initializers::mappedMemoryRange();
-		memoryRange.memory = uniformBuffers.dynamic.memory;
-		memoryRange.size = uniformBuffers.dynamic.size;
+		memoryRange.memory = uniformBuffers.dynamic.m_vkMemory;
+		memoryRange.size = uniformBuffers.dynamic.m_size;
 		vkFlushMappedMemoryRanges(m_deviceOriginal, 1, &memoryRange);
 	}
 

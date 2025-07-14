@@ -437,8 +437,8 @@ public:
             vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
             VkDeviceSize offsets[1] = { 0 };
-            vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.buffer, offsets);
-            vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.m_vkBuffer, offsets);
+            vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
             vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, 1, 0, 0, 0);
 
             drawUI(drawCmdBuffers[i]);
@@ -521,7 +521,7 @@ public:
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             // Binding 0 : Vertex shader uniform buffer
-            vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor),
+            vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo),
             // Binding 1 : Fragment shader texture sampler
             vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
         };
@@ -599,7 +599,7 @@ public:
                 uniformData.depth = uniformData.depth - 1.0f;
             }
         }
-        memcpy(uniformBuffer.mapped, &uniformData, sizeof(UniformData));
+        memcpy(uniformBuffer.m_pMapped, &uniformData, sizeof(UniformData));
     }
 
     void prepare()

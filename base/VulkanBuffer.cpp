@@ -22,7 +22,7 @@ namespace vks
 	*/
 	VkResult Buffer::map(VkDeviceSize size, VkDeviceSize offset)
 	{
-		return vkMapMemory(device, memory, offset, size, 0, &mapped);
+		return vkMapMemory(device, m_vkMemory, offset, size, 0, &m_pMapped);
 	}
 
 	/**
@@ -32,10 +32,10 @@ namespace vks
 	*/
 	void Buffer::unmap()
 	{
-		if (mapped)
+		if (m_pMapped)
 		{
-			vkUnmapMemory(device, memory);
-			mapped = nullptr;
+			vkUnmapMemory(device, m_vkMemory);
+			m_pMapped = nullptr;
 		}
 	}
 
@@ -48,7 +48,7 @@ namespace vks
 	*/
 	VkResult Buffer::bind(VkDeviceSize offset)
 	{
-		return vkBindBufferMemory(device, buffer, memory, offset);
+		return vkBindBufferMemory(device, m_vkBuffer, m_vkMemory, offset);
 	}
 
 	/**
@@ -60,9 +60,9 @@ namespace vks
 	*/
 	void Buffer::setupDescriptor(VkDeviceSize size, VkDeviceSize offset)
 	{
-		descriptor.offset = offset;
-		descriptor.buffer = buffer;
-		descriptor.range = size;
+		m_vkDescriptorBufferInfo.offset = offset;
+		m_vkDescriptorBufferInfo.buffer = m_vkBuffer;
+		m_vkDescriptorBufferInfo.range = size;
 	}
 
 	/**
@@ -74,8 +74,8 @@ namespace vks
 	*/
 	void Buffer::copyTo(void* data, VkDeviceSize size)
 	{
-		assert(mapped);
-		memcpy(mapped, data, size);
+		assert(m_pMapped);
+		memcpy(m_pMapped, data, size);
 	}
 
 	/** 
@@ -92,7 +92,7 @@ namespace vks
 	{
 		VkMappedMemoryRange mappedRange = {};
 		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-		mappedRange.memory = memory;
+		mappedRange.memory = m_vkMemory;
 		mappedRange.offset = offset;
 		mappedRange.size = size;
 		return vkFlushMappedMemoryRanges(device, 1, &mappedRange);
@@ -112,7 +112,7 @@ namespace vks
 	{
 		VkMappedMemoryRange mappedRange = {};
 		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-		mappedRange.memory = memory;
+		mappedRange.memory = m_vkMemory;
 		mappedRange.offset = offset;
 		mappedRange.size = size;
 		return vkInvalidateMappedMemoryRanges(device, 1, &mappedRange);
@@ -123,13 +123,13 @@ namespace vks
 	*/
 	void Buffer::destroy()
 	{
-		if (buffer)
+		if (m_vkBuffer)
 		{
-			vkDestroyBuffer(device, buffer, nullptr);
+			vkDestroyBuffer(device, m_vkBuffer, nullptr);
 		}
-		if (memory)
+		if (m_vkMemory)
 		{
-			vkFreeMemory(device, memory, nullptr);
+			vkFreeMemory(device, m_vkMemory, nullptr);
 		}
 	}
 };

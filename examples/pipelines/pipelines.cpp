@@ -21,6 +21,7 @@ public:
         glm::mat4 modelView;
         glm::vec4 lightPos { 0.0f, 2.0f, 1.0f, 0.0f };
     } uniformData;
+
     vks::Buffer uniformBuffer;
 
     vkcpp::PipelineLayout m_pipelineLayoutOriginal;
@@ -164,7 +165,7 @@ public:
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             // Binding 0 : Vertex shader uniform buffer
-            vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor)
+            vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo)
         };
         vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
     }
@@ -258,7 +259,7 @@ public:
         camera.setPerspective(60.0f, (float)(m_drawAreaWidth / 3.0f) / (float)m_drawAreaHeight, 0.1f, 256.0f);
         uniformData.projection = camera.matrices.perspective;
         uniformData.modelView = camera.matrices.view;
-        memcpy(uniformBuffer.mapped, &uniformData, sizeof(UniformData));
+        memcpy(uniformBuffer.m_pMapped, &uniformData, sizeof(UniformData));
     }
 
     void prepare()
