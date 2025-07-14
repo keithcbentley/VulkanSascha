@@ -135,58 +135,46 @@ public:
             useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
         }
 
-
         if (useStaging) {
-            // Copy data to an optimal tiled m_vkImage
-            // This loads the texture data into a host local buffer that is copied to the optimal tiled m_vkImage on the m_vkDevice
 
-            // Create a host-visible staging buffer that contains the raw m_vkImage data
-            // This buffer will be the data source for copying texture data to the optimal tiled m_vkImage on the m_vkDevice
-
-			vkcpp::BufferCreateInfo bufferCreateInfo;
-            bufferCreateInfo.size = ktxTextureSize;
-            bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-            bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			vkcpp::Buffer stagingBuffer = vkcpp::Buffer(bufferCreateInfo, m_deviceOriginal);
-
-            // Get m_vkDeviceMemory requirements for the staging buffer (alignment, m_vkDeviceMemory type bits)
-			VkMemoryRequirements vkMemoryRequirementsBuffer = stagingBuffer.getMemoryRequirements();
-			vkcpp::DeviceMemory stagingMemory = vkcpp::DeviceMemory(
-				vkMemoryRequirementsBuffer, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT, m_deviceOriginal);
+			vkcpp::Buffer_DeviceMemory stagingBufferAndMemory
+				= vkcpp::Buffer_DeviceMemory::withCopy(
+					VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+					ktxTextureSize,
+					0,	//	Queue family index.  Does this matter?
+					vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+					ktxTextureData,
+					m_deviceOriginal
+				);
+			stagingBufferAndMemory.unmapMemory();
 
 
-            VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, stagingBuffer, stagingMemory, 0));
-
-            // Copy texture data into host local staging buffer
-            uint8_t* data;
-            VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, stagingMemory, 0, vkMemoryRequirementsBuffer.size, 0, (void**)&data));
-            memcpy(data, ktxTextureData, ktxTextureSize);
-            vkUnmapMemory(m_deviceOriginal, stagingMemory);
-
-            // Setup buffer copy regions for each mip level
+            // Setup buffer copy regions for each mip level.
             std::vector<VkBufferImageCopy> bufferCopyRegions;
-            uint32_t offset = 0;
-
-            for (uint32_t i = 0; i < m_texture.m_mipLevels; i++) {
-                // Calculate offset into staging buffer for the current mip level
+            for (uint32_t mipLevel = 0; mipLevel < m_texture.m_mipLevels; mipLevel++) {
+                // Calculate offset into staging buffer for the current mip level.
+				//	Note that we are using offsets.  We get the offset from the original
+				//	memory, and then use it as the offset from the staging buffer base
+				//	when doing the copy.  This works because the staging buffer memory
+				//	is an exact copy of the original memory.
                 ktx_size_t offset;
-                KTX_error_code ret = ktxTexture_GetImageOffset(ktxTexture, i, 0, 0, &offset);
+                KTX_error_code ret = ktxTexture_GetImageOffset(ktxTexture, mipLevel, 0, 0, &offset);
                 assert(ret == KTX_SUCCESS);
                 // Setup a buffer m_vkImage copy structure for the current mip level
-                VkBufferImageCopy bufferCopyRegion = {};
-                bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                bufferCopyRegion.imageSubresource.mipLevel = i;
-                bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
+                vkcpp::BufferImageCopy bufferCopyRegion;
+				bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				bufferCopyRegion.imageSubresource.layerCount = 1;
+                bufferCopyRegion.imageSubresource.mipLevel = mipLevel;
                 bufferCopyRegion.imageSubresource.layerCount = 1;
-                bufferCopyRegion.imageExtent.width = ktxTexture->baseWidth >> i;
-                bufferCopyRegion.imageExtent.height = ktxTexture->baseHeight >> i;
+				//	TODO: this is screwy.  Is this some magic value stuff with widths and heights?
+                bufferCopyRegion.imageExtent.width = ktxTexture->baseWidth >> mipLevel;
+                bufferCopyRegion.imageExtent.height = ktxTexture->baseHeight >> mipLevel;
                 bufferCopyRegion.imageExtent.depth = 1;
                 bufferCopyRegion.bufferOffset = offset;
-                bufferCopyRegions.push_back(bufferCopyRegion);
+                bufferCopyRegions.emplace_back(bufferCopyRegion);
             }
 
-            // Create optimal tiled target m_vkImage on the m_vkDevice
-            // VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
+            // Create optimal tiled target image on the m_vkDevice
             VkImageCreateInfo imageCreateInfo {};
             imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -196,7 +184,6 @@ public:
             imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
             imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            // Set initial layout of the m_vkImage to undefined
             imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             imageCreateInfo.extent = { m_texture.m_width, m_texture.m_height, 1 };
             imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -210,31 +197,30 @@ public:
 
             VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
-            // Image m_vkDeviceMemory barriers for the texture m_vkImage
+            // Image barriers for the texture m_vkImage
 
             // The sub resource range describes the regions of the m_vkImage that will be transitioned using the m_vkDeviceMemory barriers below
-            VkImageSubresourceRange subresourceRange = {};
-            // Image only contains color data
-            subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            // Start at first mip level
-            subresourceRange.baseMipLevel = 0;
-            // We will transition on all mip levels
-            subresourceRange.levelCount = m_texture.m_mipLevels;
-            // The 2D texture only has one layer
-            subresourceRange.layerCount = 1;
+			// Image only contains color data
+			// Start at first mip level
+			// We will transition on all mip levels
+			// The 2D texture only has one layer
+			VkImageSubresourceRange vkImageSubresourceRange = {};
+			vkImageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			vkImageSubresourceRange.baseMipLevel = 0;
+			vkImageSubresourceRange.levelCount = m_texture.m_mipLevels;
+			vkImageSubresourceRange.layerCount = 1;
 
-            // Transition the texture m_vkImage layout to transfer target, so we can safely copy our buffer data to it.
-            VkImageMemoryBarrier imageMemoryBarrier = vks::initializers::imageMemoryBarrier();
-            imageMemoryBarrier.image = m_texture.m_image;
-            imageMemoryBarrier.subresourceRange = subresourceRange;
-            imageMemoryBarrier.srcAccessMask = 0;
-            imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            //	Use an image memory barrier to transition the texture image layout to transfer target
+			//	so we can copy our buffer data to it.
+			vkcpp::ImageMemoryBarrier imageMemoryBarrier;
+			imageMemoryBarrier
+				.setImage(m_texture.m_image)
+				.setOldNewImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+				.setSubresourceRange(vkImageSubresourceRange)
+				.setSrcDstAccessMask(VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT)
+				.setSrcDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED);
 
-            // Insert a m_vkDeviceMemory dependency at the proper m_vkPipeline stages that will execute the m_vkImage layout transition
-            // Source m_vkPipeline stage is host write/read execution (VK_PIPELINE_STAGE_HOST_BIT)
-            // Destination m_vkPipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
+			//	Do the image layout transformation first.
             vkCmdPipelineBarrier(
                 copyCmd,
                 VK_PIPELINE_STAGE_HOST_BIT,
@@ -244,20 +230,19 @@ public:
                 0, nullptr,
                 1, &imageMemoryBarrier);
 
-            // Copy mip levels from staging buffer
+            // Now do the actual memory transfer from staging buffer memory to the image memory.
             vkCmdCopyBufferToImage(
                 copyCmd,
-                stagingBuffer,
+                stagingBufferAndMemory.m_buffer,
                 m_texture.m_image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 static_cast<uint32_t>(bufferCopyRegions.size()),
                 bufferCopyRegions.data());
 
-            // Once the data has been uploaded we transfer to the texture m_vkImage to the shader read layout, so it can be sampled from
-            imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            //	Now do another another layout transition so the shader can be sampled from.
+            imageMemoryBarrier
+				.setSrcDstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)
+				.setOldNewImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
             // Insert a m_vkDeviceMemory dependency at the proper m_vkPipeline stages that will execute the m_vkImage layout transition
             // Source m_vkPipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
@@ -407,9 +392,7 @@ public:
     void destroyTextureImage(Texture texture)
     {
         vkDestroyImageView(m_deviceOriginal, texture.m_vkImageView, nullptr);
-        vkDestroyImage(m_deviceOriginal, texture.m_image, nullptr);
         vkDestroySampler(m_deviceOriginal, texture.m_vkSampler, nullptr);
-        vkFreeMemory(m_deviceOriginal, texture.m_deviceMemory, nullptr);
     }
 
     void buildCommandBuffers()

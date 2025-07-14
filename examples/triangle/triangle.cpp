@@ -517,17 +517,6 @@ public:
         size_t shaderSize;
         char* shaderCode { nullptr };
 
-#if defined(__ANDROID__)
-        // Load shader from compressed asset
-        AAsset* asset = AAssetManager_open(androidApp->activity->assetManager, filename.c_str(), AASSET_MODE_STREAMING);
-        assert(asset);
-        shaderSize = AAsset_getLength(asset);
-        assert(shaderSize > 0);
-
-        shaderCode = new char[shaderSize];
-        AAsset_read(asset, shaderCode, shaderSize);
-        AAsset_close(asset);
-#else
         std::ifstream is(filename, std::ios::binary | std::ios::in | std::ios::ate);
 
         if (is.is_open()) {
@@ -539,8 +528,8 @@ public:
             is.close();
             assert(shaderSize > 0);
         }
-#endif
-        if (shaderCode) {
+
+		if (shaderCode) {
             // Create a new shader module that will be used for m_vkPipeline creation
             VkShaderModuleCreateInfo shaderModuleCI {};
             shaderModuleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -907,12 +896,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
     return (DefWindowProc(hWnd, uMsg, wParam, lParam));
 }
+
+
 int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR, _In_ int)
 {
     for (size_t i = 0; i < __argc; i++) {
         VulkanExample::args.push_back(__argv[i]);
     };
 	try {
+		vkcpp::AppContextCreateInfo appContextCreateInfo;
+		vkcpp::AppContext::init(appContextCreateInfo);
+
 		vulkanExample = new VulkanExample();
 		vulkanExample->initVulkan();
 		vulkanExample->setupWindow(hInstance, WndProc);

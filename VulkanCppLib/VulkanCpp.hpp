@@ -922,6 +922,8 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
+
+        //	TODO: is this still happening?
         //	IMPORTANT: this is crazy.  If we don't call
         //	vkGetPhysicalDeviceQueueFamilyProperties to get the number
         //	of m_vkQueue families, we can't create m_vkDevice queues later without
@@ -941,6 +943,24 @@ public:
         return { vkPhysicalDevices.at(physicalDeviceIndex) };
     }
 };
+
+class AppContextCreateInfo {
+
+public:
+    AppContextCreateInfo() = default;
+};
+
+class AppContext {
+
+public:
+    AppContext() = default;
+
+    static void init(const AppContextCreateInfo& appContextCreateInfo)
+    {
+    }
+};
+
+static inline AppContext s_appContext;
 
 class Win32SurfaceCreateInfo : public VkWin32SurfaceCreateInfoKHR {
 
@@ -1372,6 +1392,14 @@ public:
         new (this) Buffer(vkBufferCreateInfo, device);
     }
 
+    Buffer(
+        VkBufferUsageFlags vkBufferUsageFlags,
+        VkDeviceSize size,
+        const Device& device)
+        : Buffer(vkBufferUsageFlags, size, 0, device)
+    {
+    }
+
     Buffer(const VkBufferCreateInfo& vkBufferCreateInfo, const Device& device)
     {
         VkBuffer vkBuffer;
@@ -1398,6 +1426,14 @@ public:
     {
         VkMemoryRequirements vkMemoryRequirements = getMemoryRequirements();
         return DeviceMemory(vkMemoryRequirements, requiredMemoryPropertyFlags, getOwner());
+    }
+
+    void bindDeviceMemory(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice)
+    {
+        VkResult vkResult = vkBindBufferMemory(vkDevice, *this, vkDeviceMemory, 0);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
     }
 };
 
@@ -2405,13 +2441,64 @@ public:
 };
 
 class ImageMemoryBarrier : public VkImageMemoryBarrier {
+
 public:
     ImageMemoryBarrier()
         : VkImageMemoryBarrier {}
     {
         sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     }
+
+    ImageMemoryBarrier& setSrcDstQueueFamilyIndex(
+        uint32_t srcQueueFamilyIndexArg,
+        uint32_t dstQueueFamilyIndexArg)
+    {
+        srcQueueFamilyIndex = srcQueueFamilyIndexArg;
+        dstQueueFamilyIndex = dstQueueFamilyIndexArg;
+        return *this;
+    }
+
+    ImageMemoryBarrier& setSrcDstAccessMask(
+        VkAccessFlagBits srcAccessMaskArg,
+        VkAccessFlagBits dstAccessMaskArg)
+    {
+        srcAccessMask = srcAccessMaskArg;
+        dstAccessMask = dstAccessMaskArg;
+        return *this;
+    }
+
+    ImageMemoryBarrier& setOldNewImageLayout(
+        VkImageLayout oldImageLayoutArg,
+        VkImageLayout newImageLayoutArg)
+    {
+        oldLayout = oldImageLayoutArg;
+        newLayout = newImageLayoutArg;
+        return *this;
+    }
+
+    ImageMemoryBarrier& setImage(VkImage imageArg)
+    {
+        image = imageArg;
+        return *this;
+    }
+
+    ImageMemoryBarrier& setSubresourceRange(
+        const VkImageSubresourceRange& vkImageSubresourceRangeArg)
+    {
+        subresourceRange = vkImageSubresourceRangeArg;
+        return *this;
+    }
 };
+
+class BufferImageCopy : public VkBufferImageCopy {
+
+public:
+    BufferImageCopy()
+        : VkBufferImageCopy {}
+    {
+    }
+};
+static_assert(sizeof(BufferImageCopy) == sizeof(VkBufferImageCopy));
 
 class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
 
@@ -2514,22 +2601,10 @@ public:
         uint32_t width,
         uint32_t height) const
     {
-        VkBufferImageCopy region {};
-        region.bufferOffset = 0;
-        region.bufferRowLength = 0;
-        region.bufferImageHeight = 0;
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.mipLevel = 0;
-        region.imageSubresource.baseArrayLayer = 0;
-        region.imageSubresource.layerCount = 1;
-        region.imageOffset = { 0, 0, 0 };
-        region.imageExtent = {
-            width,
-            height,
-            1
-        };
+        BufferImageCopy bufferImageCopy;
+        bufferImageCopy.imageExtent = { width, height, 1 };
 
-        vkCmdCopyBufferToImage(*this, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        vkCmdCopyBufferToImage(*this, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopy);
         return *this;
     }
 
