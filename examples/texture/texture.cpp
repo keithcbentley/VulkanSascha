@@ -195,7 +195,8 @@ public:
 
             VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_texture.m_image, m_texture.m_deviceMemory, 0));
 
-            VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+            VkCommandBuffer vkcb = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(vkcb);
 
             // Image barriers for the texture m_vkImage
 
@@ -220,46 +221,33 @@ public:
 				.setSrcDstAccessMask(VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT)
 				.setSrcDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED);
 
-			//	Do the image layout transformation first.
-            vkCmdPipelineBarrier(
-                copyCmd,
-                VK_PIPELINE_STAGE_HOST_BIT,
-                VK_PIPELINE_STAGE_TRANSFER_BIT,
-                0,
-                0, nullptr,
-                0, nullptr,
-                1, &imageMemoryBarrier);
+			//	Transform the image layout so we can transfer to it.
+			//	Note the pipeline stages are from host (memory?) to the transfer stage.
+			commandBuffer.cmdPipelineBarrierImageMemory(
+				imageMemoryBarrier, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
             // Now do the actual memory transfer from staging buffer memory to the image memory.
             vkCmdCopyBufferToImage(
-                copyCmd,
+                commandBuffer,
                 stagingBufferAndMemory.m_buffer,
                 m_texture.m_image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 static_cast<uint32_t>(bufferCopyRegions.size()),
                 bufferCopyRegions.data());
 
-            //	Now do another another layout transition so the shader can be sampled from.
+            //	Now do another another layout transition so the shader can be sample the image.
             imageMemoryBarrier
 				.setSrcDstAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)
 				.setOldNewImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-            // Insert a m_vkDeviceMemory dependency at the proper m_vkPipeline stages that will execute the m_vkImage layout transition
-            // Source m_vkPipeline stage is copy command execution (VK_PIPELINE_STAGE_TRANSFER_BIT)
-            // Destination m_vkPipeline stage fragment shader access (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-            vkCmdPipelineBarrier(
-                copyCmd,
-                VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                0,
-                0, nullptr,
-                0, nullptr,
-                1, &imageMemoryBarrier);
+			//	Note the pipeline stage goes from the transfer stage to the fragment shader stage.
+			commandBuffer.cmdPipelineBarrierImageMemory(
+				imageMemoryBarrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
             // Store current layout for later reuse
             m_texture.m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-            m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+            m_pVulkanDevice->flushCommandBuffer(commandBuffer, m_vkQueue, true);
 
         } else {
             // Copy data to a linear tiled m_vkImage

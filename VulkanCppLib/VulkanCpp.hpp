@@ -2331,7 +2331,6 @@ public:
         //	to be set according to usage.  (To the best of my current knowledge.)
     }
 };
-
 static_assert(sizeof(ImageMemoryBarrier2) == sizeof(VkImageMemoryBarrier2));
 
 class DependencyInfo : public VkDependencyInfo {
@@ -2347,8 +2346,6 @@ public:
     DependencyInfo(DependencyInfo&&) noexcept = delete;
     DependencyInfo& operator=(DependencyInfo&&) noexcept = delete;
 
-    VkDependencyInfo* operator&() = delete;
-
     DependencyInfo()
         : VkDependencyInfo {}
     {
@@ -2358,30 +2355,17 @@ public:
     void addImageMemoryBarrier(const ImageMemoryBarrier2& imageMemoryBarrier)
     {
         m_imageMemoryBarriers.push_back(imageMemoryBarrier);
+        imageMemoryBarrierCount = static_cast<uint32_t>(m_imageMemoryBarriers.size());
+        pImageMemoryBarriers = m_imageMemoryBarriers.data();
     }
 
     void addMemoryBarrier(const MemoryBarrier2& memoryBarrier)
     {
         m_memoryBarriers.push_back(memoryBarrier);
-    }
-
-    VkDependencyInfo* assemble()
-    {
-
-        pMemoryBarriers = nullptr;
         memoryBarrierCount = static_cast<uint32_t>(m_memoryBarriers.size());
-        if (memoryBarrierCount > 0) {
-            pMemoryBarriers = m_memoryBarriers.data();
-        }
-
-        pImageMemoryBarriers = nullptr;
-        imageMemoryBarrierCount = static_cast<uint32_t>(m_imageMemoryBarriers.size());
-        if (imageMemoryBarrierCount > 0) {
-            pImageMemoryBarriers = m_imageMemoryBarriers.data();
-        }
-
-        return this;
+        pMemoryBarriers = m_memoryBarriers.data();
     }
+
 };
 
 //	TODO: should we make some object that has contains a m_vkQueue and command pool
@@ -2632,8 +2616,8 @@ public:
     const CommandBuffer& cmdPipelineBarrier2(
         DependencyInfo& dependencyInfo) const
     {
-        vkCmdPipelineBarrier2(*this, dependencyInfo.assemble());
-        *this;
+        vkCmdPipelineBarrier2(*this, &dependencyInfo);
+        return *this;
     }
 
     const CommandBuffer& cmdBeginRenderPass(const VkRenderPassBeginInfo& vkRenderPassBeginInfo) const
@@ -2752,7 +2736,7 @@ public:
         return *this;
     }
 
-    const CommandBuffer& cmdInsertImageMemoryBarrier(
+    const CommandBuffer& cmdPipelineBarrierImageMemory(
         VkImage vkImage,
         VkAccessFlags vkSrcAccessMask,
         VkAccessFlags vkDstAccessMask,
@@ -2780,6 +2764,24 @@ public:
             1, &imageMemoryBarrier);
         return *this;
     }
+
+	const CommandBuffer& cmdPipelineBarrierImageMemory(
+		const ImageMemoryBarrier& imageMemoryBarrier,
+		VkPipelineStageFlags vkSrcStageMask,
+		VkPipelineStageFlags vkDstStageMask) const {
+
+		vkCmdPipelineBarrier(
+			*this,
+			vkSrcStageMask,
+			vkDstStageMask,
+			0,
+			0, nullptr,
+			0, nullptr,
+			1, &imageMemoryBarrier);
+
+		return *this;
+	}
+
 };
 
 class SubmitInfo : public VkSubmitInfo {
