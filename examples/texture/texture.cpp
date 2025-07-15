@@ -24,11 +24,11 @@ public:
     // Contains all Vulkan objects that are required to store and use a texture
     // Note that this repository contains a texture class (VulkanTexture.hpp) that encapsulates texture loading functionality in a class that is used in subsequent demos
     struct Texture {
-        VkSampler m_vkSampler { VK_NULL_HANDLE };
+        vkcpp::Sampler m_sampler;
         vkcpp::Image m_image;
         VkImageLayout m_vkImageLayout;
         vkcpp::DeviceMemory m_deviceMemory;
-        VkImageView m_vkImageView { VK_NULL_HANDLE };
+        vkcpp::ImageView m_imageView;
         uint32_t m_width { 0 };
         uint32_t m_height { 0 };
         uint32_t m_mipLevels { 0 };
@@ -65,7 +65,6 @@ public:
     ~VulkanExample()
     {
         if (m_deviceOriginal) {
-            destroyTextureImage(m_texture);
             vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
             vertexBuffer.destroy();
             indexBuffer.destroy();
@@ -135,6 +134,7 @@ public:
             useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
         }
 
+		useStaging = false;
         if (useStaging) {
 
 			vkcpp::Buffer_DeviceMemory stagingBufferAndMemory
@@ -148,8 +148,10 @@ public:
 				);
 			stagingBufferAndMemory.unmapMemory();
 
-
-            // Setup buffer copy regions for each mip level.
+            //	Setup buffer copy regions for each mip level.
+			//	We use this later when we finally copy the staging data
+			//	to the properly layed out image memory.
+			//	TODO: need to make a smart version to hold multiple 
             std::vector<VkBufferImageCopy> bufferCopyRegions;
             for (uint32_t mipLevel = 0; mipLevel < m_texture.m_mipLevels; mipLevel++) {
                 // Calculate offset into staging buffer for the current mip level.
@@ -165,7 +167,6 @@ public:
 				bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				bufferCopyRegion.imageSubresource.layerCount = 1;
                 bufferCopyRegion.imageSubresource.mipLevel = mipLevel;
-                bufferCopyRegion.imageSubresource.layerCount = 1;
 				//	TODO: this is screwy.  Is this some magic value stuff with widths and heights?
                 bufferCopyRegion.imageExtent.width = ktxTexture->baseWidth >> mipLevel;
                 bufferCopyRegion.imageExtent.height = ktxTexture->baseHeight >> mipLevel;
@@ -227,13 +228,12 @@ public:
 				imageMemoryBarrier, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
             // Now do the actual memory transfer from staging buffer memory to the image memory.
-            vkCmdCopyBufferToImage(
-                commandBuffer,
-                stagingBufferAndMemory.m_buffer,
-                m_texture.m_image,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                static_cast<uint32_t>(bufferCopyRegions.size()),
-                bufferCopyRegions.data());
+			commandBuffer.cmdCopyBufferToImage(
+				stagingBufferAndMemory.m_buffer,
+				m_texture.m_image,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				static_cast<uint32_t>(bufferCopyRegions.size()),
+				bufferCopyRegions.data());
 
             //	Now do another another layout transition so the shader can be sample the image.
             imageMemoryBarrier
@@ -329,59 +329,55 @@ public:
         // In Vulkan textures are accessed by samplers
         // This separates all the sampling information from the texture data. This means you could have multiple sampler objects for the same texture with different settings
         // Note: Similar to the samplers available with OpenGL 3.3
-        VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
-        sampler.magFilter = VK_FILTER_LINEAR;
-        sampler.minFilter = VK_FILTER_LINEAR;
-        sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler.mipLodBias = 0.0f;
-        sampler.compareOp = VK_COMPARE_OP_NEVER;
-        sampler.minLod = 0.0f;
+        VkSamplerCreateInfo vkSamplerCreateInfo = vks::initializers::samplerCreateInfo();
+		vkSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+		vkSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+		vkSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		vkSamplerCreateInfo.mipLodBias = 0.0f;
+		vkSamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+		vkSamplerCreateInfo.minLod = 0.0f;
         // Set max level-of-detail to mip level count of the texture
-        sampler.maxLod = (useStaging) ? (float)m_texture.m_mipLevels : 0.0f;
+		vkSamplerCreateInfo.maxLod = (useStaging) ? (float)m_texture.m_mipLevels : 0.0f;
         // Enable anisotropic filtering
         // This feature is optional, so we must check if it's supported on the m_vkDevice
         if (m_physicalDeviceFeatures.m_features2.features.samplerAnisotropy) {
             // Use max. level of anisotropy for this example
-            sampler.maxAnisotropy = m_physicalDeviceProperties.m_properties2.properties.limits.maxSamplerAnisotropy;
-            sampler.anisotropyEnable = VK_TRUE;
+			vkSamplerCreateInfo.maxAnisotropy = m_physicalDeviceProperties.m_properties2.properties.limits.maxSamplerAnisotropy;
+			vkSamplerCreateInfo.anisotropyEnable = VK_TRUE;
         } else {
             // The m_vkDevice does not support anisotropic filtering
-            sampler.maxAnisotropy = 1.0;
-            sampler.anisotropyEnable = VK_FALSE;
+			vkSamplerCreateInfo.maxAnisotropy = 1.0;
+			vkSamplerCreateInfo.anisotropyEnable = VK_FALSE;
         }
-        sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-        VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &sampler, nullptr, &m_texture.m_vkSampler));
+		vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		m_texture.m_sampler = vkcpp::Sampler(vkSamplerCreateInfo, m_deviceOriginal);
+        //VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &sampler, nullptr, &m_texture.m_vkSampler));
 
         // Create m_vkImage m_vkImageView
         // Textures are not directly accessed by the shaders and
         // are abstracted by m_vkImage views containing additional
         // information and sub resource ranges
-        VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
-        view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        view.format = format;
+        VkImageViewCreateInfo vkImageViewCreateInfo = vks::initializers::imageViewCreateInfo();
+		vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		vkImageViewCreateInfo.format = format;
         // The subresource range describes the set of mip levels (and array layers) that can be accessed through this m_vkImage m_vkImageView
         // It's possible to create multiple m_vkImage views for a single m_vkImage referring to different (and/or overlapping) ranges of the m_vkImage
-        view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        view.subresourceRange.baseMipLevel = 0;
-        view.subresourceRange.baseArrayLayer = 0;
-        view.subresourceRange.layerCount = 1;
+		vkImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+		vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+		vkImageViewCreateInfo.subresourceRange.layerCount = 1;
         // Linear tiling usually won't support mip maps
         // Only set mip map count if optimal tiling is used
-        view.subresourceRange.levelCount = (useStaging) ? m_texture.m_mipLevels : 1;
+		vkImageViewCreateInfo.subresourceRange.levelCount = (useStaging) ? m_texture.m_mipLevels : 1;
         // The m_vkImageView will be based on the texture's m_vkImage
-        view.image = m_texture.m_image;
-        VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &m_texture.m_vkImageView));
+		vkImageViewCreateInfo.image = m_texture.m_image;
+		m_texture.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo, m_deviceOriginal);
+        //VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &m_texture.m_vkImageView));
     }
 
-    // Free all Vulkan resources used by a texture object
-    void destroyTextureImage(Texture texture)
-    {
-        vkDestroyImageView(m_deviceOriginal, texture.m_vkImageView, nullptr);
-        vkDestroySampler(m_deviceOriginal, texture.m_vkSampler, nullptr);
-    }
 
     void buildCommandBuffers()
     {
@@ -480,7 +476,6 @@ public:
 			combinedImageSamplerIndex, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, vkcpp::SHADER_STAGE_FRAGMENT);
 		m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo, m_deviceOriginal);
         
-		//VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, descriptorSetLayoutCreateInfo, nullptr, &m_vkDescriptorSetLayout));
 
         // Set
         //VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_descriptorSetLayout, 1);
@@ -489,9 +484,9 @@ public:
         // Setup a descriptor m_vkImage info for the current texture to be used as a combined m_vkImage sampler
         VkDescriptorImageInfo textureDescriptor;
         // The m_vkImage's m_vkImageView (images are never directly accessed by the shader, but rather through views defining subresources)
-        textureDescriptor.imageView = m_texture.m_vkImageView;
+        textureDescriptor.imageView = m_texture.m_imageView;
         // The sampler (Telling the m_vkPipeline how to sample the texture, including repeat, border, etc.)
-        textureDescriptor.sampler = m_texture.m_vkSampler;
+        textureDescriptor.sampler = m_texture.m_sampler;
         // The current layout of the m_vkImage(Note: Should always fit the actual use, e.g.shader read)
         textureDescriptor.imageLayout = m_texture.m_vkImageLayout;
 

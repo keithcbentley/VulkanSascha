@@ -2305,6 +2305,18 @@ public:
         }
         new (this) Sampler(vkSampler, device, &destroy);
     }
+
+	Sampler(const VkSamplerCreateInfo& vkSamplerCreateInfo, Device device) {
+		VkSampler vkSampler;
+		VkResult vkResult = vkCreateSampler(device, &vkSamplerCreateInfo, nullptr, &vkSampler);
+		if (vkResult != VK_SUCCESS) {
+			throw Exception(vkResult);
+		}
+		new (this) Sampler(vkSampler, device, &destroy);
+	}
+
+
+
 };
 
 class ImageMemoryBarrier2 : public VkImageMemoryBarrier2 {
@@ -2365,7 +2377,6 @@ public:
         memoryBarrierCount = static_cast<uint32_t>(m_memoryBarriers.size());
         pMemoryBarriers = m_memoryBarriers.data();
     }
-
 };
 
 //	TODO: should we make some object that has contains a m_vkQueue and command pool
@@ -2476,12 +2487,16 @@ public:
 
 class BufferImageCopy : public VkBufferImageCopy {
 
+    //	TODO: need something to hold multiple of these for
+    //	complicated copy operations.
+
 public:
     BufferImageCopy()
         : VkBufferImageCopy {}
     {
     }
 };
+
 static_assert(sizeof(BufferImageCopy) == sizeof(VkBufferImageCopy));
 
 class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
@@ -2589,6 +2604,17 @@ public:
         bufferImageCopy.imageExtent = { width, height, 1 };
 
         vkCmdCopyBufferToImage(*this, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopy);
+        return *this;
+    }
+
+    const CommandBuffer& cmdCopyBufferToImage(
+        Buffer buffer,
+        Image image,
+        VkImageLayout vkImageLayout,
+        uint32_t regionCount,
+        const VkBufferImageCopy* pRegions) const
+    {
+        vkCmdCopyBufferToImage(*this, buffer, image, vkImageLayout, 1, pRegions);
         return *this;
     }
 
@@ -2765,23 +2791,23 @@ public:
         return *this;
     }
 
-	const CommandBuffer& cmdPipelineBarrierImageMemory(
-		const ImageMemoryBarrier& imageMemoryBarrier,
-		VkPipelineStageFlags vkSrcStageMask,
-		VkPipelineStageFlags vkDstStageMask) const {
+    const CommandBuffer& cmdPipelineBarrierImageMemory(
+        const ImageMemoryBarrier& imageMemoryBarrier,
+        VkPipelineStageFlags vkSrcStageMask,
+        VkPipelineStageFlags vkDstStageMask) const
+    {
 
-		vkCmdPipelineBarrier(
-			*this,
-			vkSrcStageMask,
-			vkDstStageMask,
-			0,
-			0, nullptr,
-			0, nullptr,
-			1, &imageMemoryBarrier);
+        vkCmdPipelineBarrier(
+            *this,
+            vkSrcStageMask,
+            vkDstStageMask,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &imageMemoryBarrier);
 
-		return *this;
-	}
-
+        return *this;
+    }
 };
 
 class SubmitInfo : public VkSubmitInfo {
