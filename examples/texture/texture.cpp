@@ -12,6 +12,9 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 // Vertex layout for this example
 struct Vertex {
     float pos[3];
@@ -64,8 +67,8 @@ public:
 
     ~VulkanExample()
     {
-        if (m_deviceOriginal) {
-            vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
+        if (m_device) {
+            vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
             vertexBuffer.destroy();
             indexBuffer.destroy();
             uniformBuffer.destroy();
@@ -130,21 +133,20 @@ public:
             // Don't use linear if format is not supported for (linear) shader sampling
             // Get m_vkDevice m_vkPhysicalDeviceProperties for the requested texture format
             VkFormatProperties formatProperties;
-            vkGetPhysicalDeviceFormatProperties(m_physicalDeviceOriginal, format, &formatProperties);
+            vkGetPhysicalDeviceFormatProperties(m_physicalDevice, format, &formatProperties);
             useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
         }
 
 //		useStaging = false;
         if (useStaging) {
 
-            vkcpp::Buffer_DeviceMemory stagingBufferAndMemory
-                = vkcpp::Buffer_DeviceMemory::withCopy(
-                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                    ktxTextureSize,
-                    0, //	Queue family index.  Does this matter?
-                    vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-                    ktxTextureData,
-                    m_deviceOriginal);
+			vkcpp::Buffer_DeviceMemory stagingBufferAndMemory
+				= vkcpp::Buffer_DeviceMemory::withCopy(
+					VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+					ktxTextureSize,
+					0, //	Queue family index.  Does this matter?
+					vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+					ktxTextureData);
             stagingBufferAndMemory.unmapMemory();
 
             //	Setup buffer copy regions for each mip level.
@@ -187,13 +189,13 @@ public:
             imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             imageCreateInfo.extent = { m_texture.m_width, m_texture.m_height, 1 };
             imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-            m_texture.m_image = vkcpp::Image(imageCreateInfo, m_deviceOriginal);
+            m_texture.m_image = vkcpp::Image(imageCreateInfo);
 
             VkMemoryRequirements vkMemoryRequirementsImage = m_texture.m_image.getMemoryRequirements();
             m_texture.m_deviceMemory = vkcpp::DeviceMemory(
-                vkMemoryRequirementsImage, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL, m_deviceOriginal);
+                vkMemoryRequirementsImage, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
-            VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_texture.m_image, m_texture.m_deviceMemory, 0));
+            VK_CHECK_RESULT(vkBindImageMemory(m_device, m_texture.m_image, m_texture.m_deviceMemory, 0));
 
             VkCommandBuffer vkcb = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
             vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(vkcb);
@@ -264,16 +266,16 @@ public:
             imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
             imageCreateInfo.extent = { m_texture.m_width, m_texture.m_height, 1 };
-            vkcpp::Image mappableImage = vkcpp::Image(imageCreateInfo, m_deviceOriginal);
+            vkcpp::Image mappableImage = vkcpp::Image(imageCreateInfo);
 
             VkMemoryRequirements vkMemoryRequirementsImage = mappableImage.getMemoryRequirements();
             vkcpp::DeviceMemory stagingMemory = vkcpp::DeviceMemory(
-                vkMemoryRequirementsImage, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT, m_deviceOriginal);
+                vkMemoryRequirementsImage, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
             vkcpp::DeviceMemory mappableMemory = vkcpp::DeviceMemory(
-                vkMemoryRequirementsImage, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT, m_deviceOriginal);
+                vkMemoryRequirementsImage, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
-            mappableImage.bindImageMemory(mappableMemory, m_deviceOriginal);
+            mappableImage.bindImageMemory(mappableMemory);
 			mappableMemory.mapCopyUnmap(ktxTextureData, vkMemoryRequirementsImage.size);
 
             // Linear tiled images don't need to be staged and can be directly used as textures
@@ -345,7 +347,7 @@ public:
             vkSamplerCreateInfo.anisotropyEnable = VK_FALSE;
         }
         vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-        m_texture.m_sampler = vkcpp::Sampler(vkSamplerCreateInfo, m_deviceOriginal);
+        m_texture.m_sampler = vkcpp::Sampler(vkSamplerCreateInfo);
         // VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &sampler, nullptr, &m_texture.m_vkSampler));
 
         // Create m_vkImage m_vkImageView
@@ -366,7 +368,7 @@ public:
         vkImageViewCreateInfo.subresourceRange.levelCount = (useStaging) ? m_texture.m_mipLevels : 1;
         // The m_vkImageView will be based on the texture's m_vkImage
         vkImageViewCreateInfo.image = m_texture.m_image;
-        m_texture.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo, m_deviceOriginal);
+        m_texture.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo);
         // VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &m_texture.m_vkImageView));
     }
 
@@ -455,7 +457,7 @@ public:
         descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
         descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);
         descriptorPoolCreateInfo.setMaxSets(2);
-        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo, m_deviceOriginal);
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
 
         // Layout
         constexpr int uniformBufferIndex = 0;
@@ -465,7 +467,7 @@ public:
             uniformBufferIndex, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, vkcpp::SHADER_STAGE_VERTEX);
         descriptorSetLayoutCreateInfo.addDescriptorSetLayoutBinding(
             combinedImageSamplerIndex, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, vkcpp::SHADER_STAGE_FRAGMENT);
-        m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo, m_deviceOriginal);
+        m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
 
         // Set
         m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
@@ -492,7 +494,7 @@ public:
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             textureDescriptor);
 
-        descriptorSetUpdater.updateDescriptorSets(m_deviceOriginal);
+        descriptorSetUpdater.updateDescriptorSets();
     }
 
     void preparePipelines()
@@ -501,7 +503,7 @@ public:
         vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
         pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
 
-        m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo, m_deviceOriginal);
+        m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
 
         // Pipeline
         VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -545,7 +547,7 @@ public:
         pipelineCreateInfo.pDynamicState = &dynamicState;
         pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
         pipelineCreateInfo.pStages = shaderStages.data();
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
     }
 
     // Prepare and initialize uniform buffer containing shader uniforms
