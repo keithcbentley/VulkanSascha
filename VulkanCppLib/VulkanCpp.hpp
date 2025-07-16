@@ -2614,7 +2614,7 @@ public:
         uint32_t regionCount,
         const VkBufferImageCopy* pRegions) const
     {
-        vkCmdCopyBufferToImage(*this, buffer, image, vkImageLayout, 1, pRegions);
+        vkCmdCopyBufferToImage(*this, buffer, image, vkImageLayout, regionCount, pRegions);
         return *this;
     }
 

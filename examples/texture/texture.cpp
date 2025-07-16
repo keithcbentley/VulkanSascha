@@ -134,7 +134,7 @@ public:
             useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
         }
 
-		useStaging = false;
+//		useStaging = false;
         if (useStaging) {
 
 			vkcpp::Buffer_DeviceMemory stagingBufferAndMemory
@@ -340,7 +340,8 @@ public:
 		vkSamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
 		vkSamplerCreateInfo.minLod = 0.0f;
         // Set max level-of-detail to mip level count of the texture
-		vkSamplerCreateInfo.maxLod = (useStaging) ? (float)m_texture.m_mipLevels : 0.0f;
+//		vkSamplerCreateInfo.maxLod = (useStaging) ? (float)m_texture.m_mipLevels : 0.0f;
+		vkSamplerCreateInfo.maxLod = (float)m_texture.m_mipLevels;
         // Enable anisotropic filtering
         // This feature is optional, so we must check if it's supported on the m_vkDevice
         if (m_physicalDeviceFeatures.m_features2.features.samplerAnisotropy) {
