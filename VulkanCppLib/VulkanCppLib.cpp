@@ -133,6 +133,7 @@ void AppContext::init(const AppContextCreateInfo& appContextCreateInfo) {
 
 	//	Create (logical) device.  After this, use device().
 	s_appContext.m_deviceOriginal = Device(deviceCreateInfo, s_appContext.m_physicalDeviceOriginal);
+	s_appContext.m_vkDeviceOriginal = device();
 
 	std::cout << "AppContext::init()\n";
 
@@ -148,6 +149,10 @@ const PhysicalDevice& physicalDevice() {
 }
 
 const Device& device() {
+	return s_appContext.deviceAppContext();
+}
+
+VkDevice vkDevice() {
 	return s_appContext.deviceAppContext();
 }
 

@@ -2346,7 +2346,7 @@ void VulkanExampleBase::setupDepthStencil()
     vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo, m_device);
+    m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo);
     // VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &vkImageCreateInfo, nullptr, &m_defaultDepthStencil.m_vkImage));
 
     VkMemoryRequirements memReqs {};
@@ -2356,7 +2356,7 @@ void VulkanExampleBase::setupDepthStencil()
     memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAlloc.allocationSize = memReqs.size;
     memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(memAlloc, m_device);
+    m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(memAlloc);
 
     // VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllloc, nullptr, &m_defaultDepthStencil.m_deviceMemory));
 
@@ -2376,7 +2376,7 @@ void VulkanExampleBase::setupDepthStencil()
     if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
         vkImageViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     }
-    m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo, m_device);
+    m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo);
     // VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &imageViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
 }
 
@@ -2471,7 +2471,7 @@ void VulkanExampleBase::setupRenderPass()
     vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
     vkRenderPassCreateInfo.pDependencies = dependencies.data();
 
-    m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo, m_device);
+    m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo);
 
 }
 

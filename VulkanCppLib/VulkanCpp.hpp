@@ -944,8 +944,6 @@ public:
     }
 };
 
-
-
 class Win32SurfaceCreateInfo : public VkWin32SurfaceCreateInfoKHR {
 
 public:
@@ -1201,42 +1199,51 @@ public:
     }
 };
 
-class AppContextCreateInfo
-{
+class AppContextCreateInfo {
 
 public:
-	AppContextCreateInfo() = default;
+    AppContextCreateInfo() = default;
 };
 
-class AppContext
-{
+class AppContext {
 
-	VulkanInstance m_vulkanInstanceOriginal;
-	PhysicalDevice m_physicalDeviceOriginal;
-	Device m_deviceOriginal;
+    VulkanInstance m_vulkanInstanceOriginal;
+    PhysicalDevice m_physicalDeviceOriginal;
+    Device m_deviceOriginal;
+    VkDevice m_vkDeviceOriginal;
 
 public:
-	AppContext() {
-		std::cout << "AppContext()\n";
-	}
+    AppContext()
+    {
+        std::cout << "AppContext()\n";
+    }
 
-	~AppContext() {
-		std::cout << "~AppContext()\n";
-	}
+    ~AppContext()
+    {
+        std::cout << "~AppContext()\n";
+    }
 
-	const VulkanInstance& vulkanInstanceAppContext() {
-		return m_vulkanInstanceOriginal;
-	}
+    const VulkanInstance& vulkanInstanceAppContext()
+    {
+        return m_vulkanInstanceOriginal;
+    }
 
-	const PhysicalDevice& physicalDeviceAppContext() {
-		return m_physicalDeviceOriginal;
-	}
+    const PhysicalDevice& physicalDeviceAppContext()
+    {
+        return m_physicalDeviceOriginal;
+    }
 
-	const Device& deviceAppContext() {
-		return m_deviceOriginal;
-	}
+    const Device& deviceAppContext()
+    {
+        return m_deviceOriginal;
+    }
 
-	static void init(const AppContextCreateInfo& appContextCreateInfo);
+    const VkDevice vkDeviceAppContext()
+    {
+        return m_vkDeviceOriginal;
+    }
+
+    static void init(const AppContextCreateInfo& appContextCreateInfo);
 };
 
 extern AppContext s_appContext;
@@ -1249,8 +1256,7 @@ extern AppContext s_appContext;
 const VulkanInstance& vulkanInstance();
 const PhysicalDevice& physicalDevice();
 const Device& device();
-
-
+VkDevice vkDevice();
 
 class Semaphore : public HandleWithOwner<VkSemaphore> {
 
@@ -1267,21 +1273,21 @@ class Semaphore : public HandleWithOwner<VkSemaphore> {
 public:
     Semaphore() = default;
 
-    Semaphore(const VkSemaphoreCreateInfo& vkSemaphoreCreateInfo, VkDevice vkDevice)
+    Semaphore(const VkSemaphoreCreateInfo& vkSemaphoreCreateInfo)
     {
         VkSemaphore vkSemaphore;
-        VkResult vkResult = vkCreateSemaphore(vkDevice, &vkSemaphoreCreateInfo, nullptr, &vkSemaphore);
+        VkResult vkResult = vkCreateSemaphore(vkDevice(), &vkSemaphoreCreateInfo, nullptr, &vkSemaphore);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Semaphore(vkSemaphore, vkDevice, &destroy);
+        new (this) Semaphore(vkSemaphore, vkDevice(), &destroy);
     }
 
     Semaphore(VkDevice vkDevice)
     {
         VkSemaphoreCreateInfo vkSemaphoreCreateInfo {};
         vkSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        new (this) Semaphore(vkSemaphoreCreateInfo, vkDevice);
+        new (this) Semaphore(vkSemaphoreCreateInfo);
     }
 };
 
@@ -1301,22 +1307,20 @@ class Fence : public HandleWithOwner<VkFence> {
     }
 
 public:
-    Fence() = default;
-
     //	Kind of an exception to the argument ordering usually used.
     //	Flags are almost always 0, so make them optional.  Only
     //	the m_vkDevice is required.
-    Fence(VkDevice vkDevice, VkFenceCreateFlags vkFenceCreateFlags = 0)
+    Fence(VkFenceCreateFlags vkFenceCreateFlags = 0)
     {
         VkFenceCreateInfo vkFenceCreateInfo {};
         vkFenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         vkFenceCreateInfo.flags = vkFenceCreateFlags;
         VkFence vkFence;
-        VkResult vkResult = vkCreateFence(vkDevice, &vkFenceCreateInfo, nullptr, &vkFence);
+        VkResult vkResult = vkCreateFence(vkDevice(), &vkFenceCreateInfo, nullptr, &vkFence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Fence(vkFence, vkDevice, &destroy);
+        new (this) Fence(vkFence, vkDevice(), &destroy);
     }
 
     void close() const
@@ -1360,32 +1364,31 @@ class DeviceMemory : public HandleWithOwner<VkDeviceMemory> {
 public:
     DeviceMemory() = default;
 
-    DeviceMemory(const VkMemoryAllocateInfo& vkMemoryAllocateInfo, VkDevice vkDevice)
+    DeviceMemory(const VkMemoryAllocateInfo& vkMemoryAllocateInfo)
     {
         VkDeviceMemory vkDeviceMemory;
-        VkResult vkResult = vkAllocateMemory(vkDevice, &vkMemoryAllocateInfo, nullptr, &vkDeviceMemory);
+        VkResult vkResult = vkAllocateMemory(vkDevice(), &vkMemoryAllocateInfo, nullptr, &vkDeviceMemory);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) DeviceMemory(vkDeviceMemory, vkDevice, vkMemoryAllocateInfo.allocationSize, &destroy);
+        new (this) DeviceMemory(vkDeviceMemory, vkDevice(), vkMemoryAllocateInfo.allocationSize, &destroy);
     }
 
     DeviceMemory(
         const VkMemoryRequirements& vkMemoryRequirements,
-        MemoryPropertyFlags requiredMemoryPropertyFlags,
-        const Device& device)
+        MemoryPropertyFlags requiredMemoryPropertyFlags)
     {
         VkMemoryAllocateInfo vkMemoryAllocateInfo {};
         vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
-        vkMemoryAllocateInfo.memoryTypeIndex = device.findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, requiredMemoryPropertyFlags);
-        new (this) DeviceMemory(vkMemoryAllocateInfo, device);
+        vkMemoryAllocateInfo.memoryTypeIndex = device().findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, requiredMemoryPropertyFlags);
+        new (this) DeviceMemory(vkMemoryAllocateInfo);
     }
 
     void* mapMemory(VkDeviceSize vkDeviceSize)
     {
         void* pData;
-        VkResult vkResult = vkMapMemory(this->getVkDevice(), *this, 0, vkDeviceSize, 0, &pData);
+        VkResult vkResult = vkMapMemory(vkDevice(), *this, 0, vkDeviceSize, 0, &pData);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -1394,7 +1397,7 @@ public:
 
     void unmapMemory()
     {
-        vkUnmapMemory(this->getVkDevice(), *this);
+        vkUnmapMemory(vkDevice(), *this);
         return;
     }
 
@@ -1436,36 +1439,34 @@ public:
 
     Buffer(
         VkBufferUsageFlags vkBufferUsageFlags,
-        VkDeviceSize size,
-        uint32_t queueFamilyIndex,
-        const Device& device)
+        VkDeviceSize sizeArg,
+        uint32_t queueFamilyIndex)
     {
         VkBufferCreateInfo vkBufferCreateInfo {};
         vkBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         vkBufferCreateInfo.usage = vkBufferUsageFlags;
-        vkBufferCreateInfo.size = size;
+        vkBufferCreateInfo.size = sizeArg;
         vkBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         uint32_t queueFamilyIndexLocal = queueFamilyIndex;
         vkBufferCreateInfo.pQueueFamilyIndices = &queueFamilyIndexLocal;
-        new (this) Buffer(vkBufferCreateInfo, device);
+        new (this) Buffer(vkBufferCreateInfo);
     }
 
     Buffer(
         VkBufferUsageFlags vkBufferUsageFlags,
-        VkDeviceSize size,
-        const Device& device)
-        : Buffer(vkBufferUsageFlags, size, 0, device)
+        VkDeviceSize size)
+        : Buffer(vkBufferUsageFlags, size, 0)
     {
     }
 
-    Buffer(const VkBufferCreateInfo& vkBufferCreateInfo, const Device& device)
+    Buffer(const VkBufferCreateInfo& vkBufferCreateInfo)
     {
         VkBuffer vkBuffer;
-        VkResult vkResult = vkCreateBuffer(device, &vkBufferCreateInfo, nullptr, &vkBuffer);
+        VkResult vkResult = vkCreateBuffer(vkDevice(), &vkBufferCreateInfo, nullptr, &vkBuffer);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Buffer(vkBuffer, device, vkBufferCreateInfo.size, &destroy);
+        new (this) Buffer(vkBuffer, device(), vkBufferCreateInfo.size, &destroy);
     }
 
     VkDeviceSize size() const
@@ -1476,19 +1477,19 @@ public:
     VkMemoryRequirements getMemoryRequirements() const
     {
         VkMemoryRequirements vkMemoryRequirements;
-        vkGetBufferMemoryRequirements(getVkDevice(), *this, &vkMemoryRequirements);
+        vkGetBufferMemoryRequirements(vkDevice(), *this, &vkMemoryRequirements);
         return vkMemoryRequirements;
     }
 
     DeviceMemory allocateDeviceMemory(MemoryPropertyFlags requiredMemoryPropertyFlags) const
     {
         VkMemoryRequirements vkMemoryRequirements = getMemoryRequirements();
-        return DeviceMemory(vkMemoryRequirements, requiredMemoryPropertyFlags, getOwner());
+        return DeviceMemory(vkMemoryRequirements, requiredMemoryPropertyFlags);
     }
 
-    void bindDeviceMemory(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice)
+    void bindDeviceMemory(VkDeviceMemory vkDeviceMemory)
     {
-        VkResult vkResult = vkBindBufferMemory(vkDevice, *this, vkDeviceMemory, 0);
+        VkResult vkResult = vkBindBufferMemory(vkDevice(), *this, vkDeviceMemory, 0);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -1552,13 +1553,12 @@ public:
         VkBufferUsageFlags vkBufferUsageFlags,
         VkDeviceSize size,
         uint32_t queueFamilyIndex,
-        MemoryPropertyFlags requiredMemoryPropertyFlags,
-        const Device& device)
+        MemoryPropertyFlags requiredMemoryPropertyFlags)
     {
-        Buffer buffer(vkBufferUsageFlags, size, queueFamilyIndex, device);
+        Buffer buffer(vkBufferUsageFlags, size, queueFamilyIndex);
         DeviceMemory deviceMemory = buffer.allocateDeviceMemory(requiredMemoryPropertyFlags);
 
-        VkResult vkResult = vkBindBufferMemory(device, buffer, deviceMemory, 0);
+        VkResult vkResult = vkBindBufferMemory(vkDevice(), buffer, deviceMemory, 0);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -1570,12 +1570,11 @@ public:
         VkBufferUsageFlags vkBufferUsageFlags,
         int64_t size,
         uint32_t queueFamilyIndex,
-        MemoryPropertyFlags requiredMemoryPropertyFlags,
-        const Device& device)
+        MemoryPropertyFlags requiredMemoryPropertyFlags)
     {
-        Buffer_DeviceMemory newbdm(vkBufferUsageFlags, size, queueFamilyIndex, requiredMemoryPropertyFlags, device);
+        Buffer_DeviceMemory newbdm(vkBufferUsageFlags, size, queueFamilyIndex, requiredMemoryPropertyFlags);
         void* mappedMemory;
-        VkResult vkResult = vkMapMemory(device, newbdm.m_deviceMemory, 0, size, 0, &mappedMemory);
+        VkResult vkResult = vkMapMemory(vkDevice(), newbdm.m_deviceMemory, 0, size, 0, &mappedMemory);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -1588,15 +1587,13 @@ public:
         int64_t size,
         uint32_t queueFamilyIndex,
         MemoryPropertyFlags requiredMemoryPropertyFlags,
-        const void* pSrcMem,
-        const Device& device)
+        const void* pSrcMem)
     {
         Buffer_DeviceMemory newbdm = withMap(
             vkBufferUsageFlags,
             size,
             queueFamilyIndex,
-            requiredMemoryPropertyFlags,
-            device);
+            requiredMemoryPropertyFlags);
 
         memcpy(newbdm.m_mappedMemory, pSrcMem, size);
         return newbdm;
@@ -1604,7 +1601,7 @@ public:
 
     void unmapMemory()
     {
-        vkUnmapMemory(m_deviceMemory.getVkDevice(), m_deviceMemory);
+        vkUnmapMemory(vkDevice(), m_deviceMemory);
         m_mappedMemory = nullptr;
     }
 };
@@ -1640,7 +1637,7 @@ class ShaderModule : public HandleWithOwner<VkShaderModule> {
 public:
     ShaderModule() = default;
 
-    static ShaderModule createShaderModuleFromFile(const std::string& fileName, VkDevice vkDevice)
+    static ShaderModule createShaderModuleFromFile(const std::string& fileName)
     {
         auto fragShaderCode = readFile(fileName);
         VkShaderModuleCreateInfo createInfo {};
@@ -1648,11 +1645,11 @@ public:
         createInfo.codeSize = fragShaderCode.size();
         createInfo.pCode = reinterpret_cast<const uint32_t*>(fragShaderCode.data());
         VkShaderModule vkShaderModule;
-        VkResult vkResult = vkCreateShaderModule(vkDevice, &createInfo, nullptr, &vkShaderModule);
+        VkResult vkResult = vkCreateShaderModule(vkDevice(), &createInfo, nullptr, &vkShaderModule);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        return ShaderModule(vkShaderModule, vkDevice, &destroy);
+        return ShaderModule(vkShaderModule, vkDevice(), &destroy);
     }
 };
 
@@ -2084,24 +2081,24 @@ class RenderPass : public HandleWithOwner<VkRenderPass> {
 public:
     RenderPass() = default;
 
-    RenderPass(RenderPassCreateInfo& renderPassCreateInfo, VkDevice vkDevice)
+    RenderPass(RenderPassCreateInfo& renderPassCreateInfo)
     {
         VkRenderPass vkRenderPass;
-        VkResult vkResult = vkCreateRenderPass(vkDevice, renderPassCreateInfo.assemble(), nullptr, &vkRenderPass);
+        VkResult vkResult = vkCreateRenderPass(vkDevice(), renderPassCreateInfo.assemble(), nullptr, &vkRenderPass);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) RenderPass(vkRenderPass, vkDevice, &destroy);
+        new (this) RenderPass(vkRenderPass, vkDevice(), &destroy);
     }
 
-    RenderPass(const VkRenderPassCreateInfo& vkRenderPassCreateInfo, VkDevice vkDevice)
+    RenderPass(const VkRenderPassCreateInfo& vkRenderPassCreateInfo)
     {
         VkRenderPass vkRenderPass;
-        VkResult vkResult = vkCreateRenderPass(vkDevice, &vkRenderPassCreateInfo, nullptr, &vkRenderPass);
+        VkResult vkResult = vkCreateRenderPass(vkDevice(), &vkRenderPassCreateInfo, nullptr, &vkRenderPass);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) RenderPass(vkRenderPass, vkDevice, &destroy);
+        new (this) RenderPass(vkRenderPass, vkDevice(), &destroy);
     }
 };
 
@@ -2181,24 +2178,24 @@ public:
         return *this;
     }
 
-    Image(const ImageCreateInfo& imageCreateInfo, Device device)
+    Image(const ImageCreateInfo& imageCreateInfo)
     {
         VkImage vkImage;
-        VkResult vkResult = vkCreateImage(device, &imageCreateInfo, nullptr, &vkImage);
+        VkResult vkResult = vkCreateImage(device(), &imageCreateInfo, nullptr, &vkImage);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Image(vkImage, device, &destroy);
+        new (this) Image(vkImage, device(), &destroy);
     }
 
-    Image(const VkImageCreateInfo& vkImageCreateInfo, Device device)
+    Image(const VkImageCreateInfo& vkImageCreateInfo)
     {
         VkImage vkImage;
-        VkResult vkResult = vkCreateImage(device, &vkImageCreateInfo, nullptr, &vkImage);
+        VkResult vkResult = vkCreateImage(device(), &vkImageCreateInfo, nullptr, &vkImage);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Image(vkImage, device, &destroy);
+        new (this) Image(vkImage, device(), &destroy);
     }
 
     VkMemoryRequirements getMemoryRequirements() const
@@ -2215,12 +2212,12 @@ public:
         vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
         vkMemoryAllocateInfo.memoryTypeIndex = getOwner().findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, requiredProperties);
-        return vkcpp::DeviceMemory(vkMemoryAllocateInfo, getOwner());
+        return vkcpp::DeviceMemory(vkMemoryAllocateInfo);
     }
 
-    void bindImageMemory(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice) const
+    void bindImageMemory(VkDeviceMemory vkDeviceMemory) const
     {
-        VkResult vkResult = vkBindImageMemory(vkDevice, *this, vkDeviceMemory, 0);
+        VkResult vkResult = vkBindImageMemory(vkDevice(), *this, vkDeviceMemory, 0);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -2270,14 +2267,14 @@ public:
     //	imageview was created to make things easier to use later.
     ImageView() = default;
 
-    ImageView(const VkImageViewCreateInfo& vkImageViewCreateInfo, VkDevice vkDevice)
+    ImageView(const VkImageViewCreateInfo& vkImageViewCreateInfo)
     {
         VkImageView vkImageView;
-        VkResult vkResult = vkCreateImageView(vkDevice, &vkImageViewCreateInfo, nullptr, &vkImageView);
+        VkResult vkResult = vkCreateImageView(vkDevice(), &vkImageViewCreateInfo, nullptr, &vkImageView);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) ImageView(vkImageView, vkDevice, &destroy);
+        new (this) ImageView(vkImageView, vkDevice(), &destroy);
     }
 };
 
@@ -2362,24 +2359,24 @@ public:
         return *this;
     }
 
-    Sampler(const SamplerCreateInfo& samplerCreateInfo, Device device)
+    Sampler(const SamplerCreateInfo& samplerCreateInfo)
     {
         VkSampler vkSampler;
-        VkResult vkResult = vkCreateSampler(device, &samplerCreateInfo, nullptr, &vkSampler);
+        VkResult vkResult = vkCreateSampler(device(), &samplerCreateInfo, nullptr, &vkSampler);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Sampler(vkSampler, device, &destroy);
+        new (this) Sampler(vkSampler, device(), &destroy);
     }
 
-    Sampler(const VkSamplerCreateInfo& vkSamplerCreateInfo, Device device)
+    Sampler(const VkSamplerCreateInfo& vkSamplerCreateInfo)
     {
         VkSampler vkSampler;
-        VkResult vkResult = vkCreateSampler(device, &vkSamplerCreateInfo, nullptr, &vkSampler);
+        VkResult vkResult = vkCreateSampler(device(), &vkSamplerCreateInfo, nullptr, &vkSampler);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Sampler(vkSampler, device, &destroy);
+        new (this) Sampler(vkSampler, device(), &destroy);
     }
 };
 
@@ -2460,30 +2457,29 @@ class CommandPool : public HandleWithOwner<VkCommandPool> {
 public:
     CommandPool() = default;
 
-    CommandPool(const VkCommandPoolCreateInfo& commandPoolCreateInfo, VkDevice vkDevice)
+    CommandPool(const VkCommandPoolCreateInfo& commandPoolCreateInfo)
     {
         VkCommandPool vkCommandPool;
         VkResult vkResult = vkCreateCommandPool(
-            vkDevice,
+            vkDevice(),
             &commandPoolCreateInfo,
             nullptr,
             &vkCommandPool);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) CommandPool(vkCommandPool, vkDevice, &destroy);
+        new (this) CommandPool(vkCommandPool, vkDevice(), &destroy);
     }
 
     CommandPool(
         uint32_t queueFamilyIndex,
-        VkCommandPoolCreateFlags vkCommandPoolCreateFlags,
-        VkDevice vkDevice)
+        VkCommandPoolCreateFlags vkCommandPoolCreateFlags)
     {
         VkCommandPoolCreateInfo commandPoolCreateInfo {};
         commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         commandPoolCreateInfo.flags = vkCommandPoolCreateFlags;
         commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
-        new (this) CommandPool(commandPoolCreateInfo, vkDevice);
+        new (this) CommandPool(commandPoolCreateInfo);
     }
 };
 
@@ -3079,7 +3075,7 @@ public:
     {
         SubmitInfo2 submitInfo2;
         submitInfo2.addCommandBuffer(commandBuffer);
-        vkcpp::Fence completedFence(getVkDevice());
+        vkcpp::Fence completedFence;
         VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, completedFence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
@@ -3149,24 +3145,24 @@ class DescriptorPool : public HandleWithOwner<VkDescriptorPool> {
 public:
     DescriptorPool() = default;
 
-    DescriptorPool(const DescriptorPoolCreateInfo& descriptorPoolCreateInfo, VkDevice vkDevice)
+    DescriptorPool(const DescriptorPoolCreateInfo& descriptorPoolCreateInfo)
     {
         VkDescriptorPool vkDescriptorPool;
-        VkResult vkResult = vkCreateDescriptorPool(vkDevice, &descriptorPoolCreateInfo, nullptr, &vkDescriptorPool);
+        VkResult vkResult = vkCreateDescriptorPool(vkDevice(), &descriptorPoolCreateInfo, nullptr, &vkDescriptorPool);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) DescriptorPool(vkDescriptorPool, vkDevice, &destroy);
+        new (this) DescriptorPool(vkDescriptorPool, vkDevice(), &destroy);
     }
 
-    DescriptorPool(const VkDescriptorPoolCreateInfo& vkDescriptorPoolCreateInfo, VkDevice vkDevice)
+    DescriptorPool(const VkDescriptorPoolCreateInfo& vkDescriptorPoolCreateInfo)
     {
         VkDescriptorPool vkDescriptorPool;
-        VkResult vkResult = vkCreateDescriptorPool(vkDevice, &vkDescriptorPoolCreateInfo, nullptr, &vkDescriptorPool);
+        VkResult vkResult = vkCreateDescriptorPool(vkDevice(), &vkDescriptorPoolCreateInfo, nullptr, &vkDescriptorPool);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) DescriptorPool(vkDescriptorPool, vkDevice, &destroy);
+        new (this) DescriptorPool(vkDescriptorPool, vkDevice(), &destroy);
     }
 };
 
@@ -3280,35 +3276,33 @@ public:
     }
 
     DescriptorSetLayout(
-        DescriptorSetLayoutCreateInfo& descriptorSetLayoutCreateInfo,
-        VkDevice vkDevice)
+        DescriptorSetLayoutCreateInfo& descriptorSetLayoutCreateInfo)
     {
         VkDescriptorSetLayout vkDescriptorSetLayout;
         VkResult vkResult = vkCreateDescriptorSetLayout(
-            vkDevice,
+            vkDevice(),
             descriptorSetLayoutCreateInfo.assemble(),
             nullptr,
             &vkDescriptorSetLayout);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) DescriptorSetLayout(vkDescriptorSetLayout, vkDevice, &destroy);
+        new (this) DescriptorSetLayout(vkDescriptorSetLayout, vkDevice(), &destroy);
     }
 
     DescriptorSetLayout(
-        const VkDescriptorSetLayoutCreateInfo& vkDescriptorSetLayoutCreateInfo,
-        VkDevice vkDevice)
+        const VkDescriptorSetLayoutCreateInfo& vkDescriptorSetLayoutCreateInfo)
     {
         VkDescriptorSetLayout vkDescriptorSetLayout;
         VkResult vkResult = vkCreateDescriptorSetLayout(
-            vkDevice,
+            vkDevice(),
             &vkDescriptorSetLayoutCreateInfo,
             nullptr,
             &vkDescriptorSetLayout);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) DescriptorSetLayout(vkDescriptorSetLayout, vkDevice, &destroy);
+        new (this) DescriptorSetLayout(vkDescriptorSetLayout, vkDevice(), &destroy);
     }
 };
 
@@ -4260,14 +4254,14 @@ class Swapchain : public HandleWithOwner<VkSwapchainKHR, Device> {
 public:
     Swapchain() = default;
 
-    Swapchain(const VkSwapchainCreateInfoKHR& vkSwapchainCreateInfo, Device device)
+    Swapchain(const VkSwapchainCreateInfoKHR& vkSwapchainCreateInfo)
     {
         VkSwapchainKHR vkSwapchain;
-        VkResult vkResult = vkCreateSwapchainKHR(device, &vkSwapchainCreateInfo, nullptr, &vkSwapchain);
+        VkResult vkResult = vkCreateSwapchainKHR(device(), &vkSwapchainCreateInfo, nullptr, &vkSwapchain);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Swapchain(vkSwapchain, device, &destroy, vkSwapchainCreateInfo.imageExtent);
+        new (this) Swapchain(vkSwapchain, device(), &destroy, vkSwapchainCreateInfo.imageExtent);
     }
 
     VkExtent2D imageExtent() const { return m_vkSwapchainImageExtent; }
@@ -4357,13 +4351,12 @@ public:
 
     Image_Memory(
         const ImageCreateInfo& imageCreateInfo,
-        MemoryPropertyFlags properties,
-        Device device)
+        MemoryPropertyFlags properties)
     {
-        Image image(imageCreateInfo, device);
+        Image image(imageCreateInfo);
         DeviceMemory deviceMemory = image.allocateDeviceMemory(properties);
 
-        VkResult vkResult = vkBindImageMemory(device, image, deviceMemory, 0);
+        VkResult vkResult = vkBindImageMemory(vkDevice(), image, deviceMemory, 0);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -4375,12 +4368,11 @@ public:
         VkExtent2D vkExtent2D,
         VkFormat format,
         VkImageUsageFlags usage,
-        MemoryPropertyFlags properties,
-        Device device)
+        MemoryPropertyFlags properties)
     {
         ImageCreateInfo imageCreateInfo(format, usage);
         imageCreateInfo.setExtent(vkExtent2D);
-        new (this) Image_Memory(imageCreateInfo, properties, device);
+        new (this) Image_Memory(imageCreateInfo, properties);
     }
 };
 
@@ -4446,14 +4438,14 @@ class Framebuffer : public HandleWithOwner<VkFramebuffer, Device> {
 public:
     Framebuffer() = default;
 
-    Framebuffer(FramebufferCreateInfo& framebufferCreateInfo, Device device)
+    Framebuffer(FramebufferCreateInfo& framebufferCreateInfo)
     {
         VkFramebuffer vkFramebuffer;
-        VkResult vkResult = vkCreateFramebuffer(device, framebufferCreateInfo.assemble(), nullptr, &vkFramebuffer);
+        VkResult vkResult = vkCreateFramebuffer(device(), framebufferCreateInfo.assemble(), nullptr, &vkFramebuffer);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Framebuffer(vkFramebuffer, device, &destroy);
+        new (this) Framebuffer(vkFramebuffer, device(), &destroy);
     }
 
     void take(Image_Memory_View&& image_memory_view)
@@ -4470,16 +4462,12 @@ public:
 class Swapchain_FrameBuffers {
 
 public:
-    static inline Device s_device;
-
     //	Just save the create info since we need parts of it later.
     SwapchainCreateInfo m_swapchainCreateInfo;
 
     //	Save the "smart" m_vkSurface since the create info only has the base m_vkBuffer.
     Surface m_surface;
-
     RenderPass m_renderPass;
-
     Swapchain m_swapchain;
     std::vector<Framebuffer> m_swapchainFrameBuffers;
 
@@ -4499,11 +4487,8 @@ private:
 
     void destroy()
     {
-        if (!s_device) {
-            return;
-        }
         if (m_swapchain) {
-            vkDeviceWaitIdle(s_device);
+            vkDeviceWaitIdle(vkDevice());
             destroyFrameBuffers();
         }
     }
@@ -4520,14 +4505,14 @@ private:
             //	All we need to do is create them and make sure they don't disappear.
             //	We just have the framebuffer take ownership of the m_vkImage m_vkImageView and
             //	depth buffer.
-            Image_Memory_View depthBuffer(createDepthBuffer(m_swapchain.imageExtent(), s_device));
+            Image_Memory_View depthBuffer(createDepthBuffer(m_swapchain.imageExtent()));
 
             ImageViewCreateInfo imageViewCreateInfo(
                 vkImage,
                 VK_IMAGE_VIEW_TYPE_2D,
                 m_swapchainCreateInfo.imageFormat,
                 VK_IMAGE_ASPECT_COLOR_BIT);
-            ImageView imageView(imageViewCreateInfo, m_swapchain.getOwner());
+            ImageView imageView(imageViewCreateInfo);
 
             //	Note that attachments here are m_vkImage views.  When a
             //	Renderpass adds attachments, the attachments are descriptions
@@ -4537,7 +4522,7 @@ private:
                 .addAttachment(imageView)
                 .addAttachment(depthBuffer.m_imageView);
 
-            Framebuffer framebuffer(framebufferCreateInfo, s_device);
+            Framebuffer framebuffer(framebufferCreateInfo);
             framebuffer.take(std::move(depthBuffer));
             framebuffer.take(std::move(imageView));
             m_swapchainFrameBuffers.push_back(std::move(framebuffer));
@@ -4561,11 +4546,13 @@ private:
         swapChainCreateInfo.imageExtent = surfaceExtent;
         swapChainCreateInfo.preTransform = vkSurfaceCapabilities.currentTransform;
 
-        return Swapchain(swapChainCreateInfo, s_device);
+        return Swapchain(swapChainCreateInfo);
     }
 
 public:
-    Swapchain_FrameBuffers() { }
+    Swapchain_FrameBuffers()
+    {
+    }
     ~Swapchain_FrameBuffers()
     {
         destroy();
@@ -4602,11 +4589,6 @@ public:
         return *this;
     }
 
-    static void setDevice(Device device)
-    {
-        s_device = device;
-    }
-
     VkSwapchainKHR vkSwapchain()
     {
         VkSwapchainKHR vkSwapchain = m_swapchain; // Need to force a type conversion for return value.
@@ -4640,11 +4622,8 @@ public:
     void recreateFullSwapchain()
     {
         m_swapchainUpToDate = false;
-        if (!s_device) {
-            return;
-        }
 
-        vkDeviceWaitIdle(s_device);
+        vkDeviceWaitIdle(vkDevice());
         destroyFrameBuffers();
         //	TODO: can we set the old swapchain to avoid this?
         //	Explicitly destroy the old swapchain for now.
@@ -4664,8 +4643,7 @@ public:
     }
 
     Image_Memory_View createDepthBuffer(
-        VkExtent2D vkExtent2D,
-        vkcpp::Device device)
+        VkExtent2D vkExtent2D)
     {
         constexpr VkFormat depthBufferFormat = VK_FORMAT_D32_SFLOAT;
 
@@ -4673,14 +4651,14 @@ public:
             depthBufferFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
         imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
         imageCreateInfo.setExtent(vkExtent2D);
-        Image_Memory image_memory(imageCreateInfo, MEMORY_PROPERTY_DEVICE_LOCAL, device);
+        Image_Memory image_memory(imageCreateInfo, MEMORY_PROPERTY_DEVICE_LOCAL);
 
         ImageViewCreateInfo imageViewCreateInfo(
             image_memory.m_image,
             VK_IMAGE_VIEW_TYPE_2D,
             depthBufferFormat,
             VK_IMAGE_ASPECT_DEPTH_BIT);
-        ImageView imageView(imageViewCreateInfo, device);
+        ImageView imageView(imageViewCreateInfo);
 
         return Image_Memory_View(
             std::move(image_memory.m_image),

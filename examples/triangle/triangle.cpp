@@ -248,37 +248,33 @@ public:
         // We will do the same thing for the index info.
 
         // Create a host-visible buffer to copy the vertex data to (staging buffer)
-        vkcpp::Buffer_DeviceMemory verticesStagingBuffer
-            = vkcpp::Buffer_DeviceMemory::withCopy(
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                vertexBufferSize,
-                0,
-                vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-                vertexBuffer.data(),
-                m_device);
+		vkcpp::Buffer_DeviceMemory verticesStagingBuffer
+			= vkcpp::Buffer_DeviceMemory::withCopy(
+				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+				vertexBufferSize,
+				0,
+				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+				vertexBuffer.data());
         verticesStagingBuffer.unmapMemory();
-        m_vertices = vkcpp::Buffer_DeviceMemory(
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            vertexBufferSize,
-            0,
-            vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
-            m_device);
+		m_vertices = vkcpp::Buffer_DeviceMemory(
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			vertexBufferSize,
+			0,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
-        vkcpp::Buffer_DeviceMemory indicesStagingBuffer
-            = vkcpp::Buffer_DeviceMemory::withCopy(
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                indexBufferSize,
-                0,
-                vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-                indexBuffer.data(),
-                m_device);
+		vkcpp::Buffer_DeviceMemory indicesStagingBuffer
+			= vkcpp::Buffer_DeviceMemory::withCopy(
+				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+				indexBufferSize,
+				0,
+				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+				indexBuffer.data());
         indicesStagingBuffer.unmapMemory();
-        m_indices = vkcpp::Buffer_DeviceMemory(
-            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            indexBufferSize,
-            0,
-            vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
-            m_device);
+		m_indices = vkcpp::Buffer_DeviceMemory(
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			indexBufferSize,
+			0,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
         // Buffer copies have to be submitted to a m_vkQueue, so we need a command buffer for them
         // Note: Some devices offer a dedicated transfer m_vkQueue (with only the transfer bit set) that may be faster when doing lots of copies
@@ -333,7 +329,7 @@ public:
         // Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
         // Our sample will create one set per uniform buffer per frame
         descriptorPoolCreateInfo.maxSets = MAX_CONCURRENT_FRAMES;
-        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo, m_device);
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
     }
 
     // Descriptor set layouts define the interface between our application and the shader
@@ -344,7 +340,7 @@ public:
         // Binding 0: Uniform buffer (Vertex shader)
         vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
         descriptorSetLayoutCreateInfo.addDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, vkcpp::SHADER_STAGE_VERTEX);
-        m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo, m_device);
+        m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
     }
 
     // Shaders access data using descriptor sets that "point" at our uniform buffers
@@ -382,7 +378,7 @@ public:
         vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
         vkImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo, m_device);
+        m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo);
 
         // Allocate m_vkDeviceMemory for the m_vkImage (m_vkDevice local) and bind it to our m_vkImage
         VkMemoryAllocateInfo vkMemoryAllocateInfo {};
@@ -391,7 +387,7 @@ public:
         vkGetImageMemoryRequirements(m_device, m_defaultDepthStencil.m_image, &vkMemoryRequirements);
         vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
         vkMemoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(vkMemoryAllocateInfo, m_device);
+        m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(vkMemoryAllocateInfo);
 
         VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
 
@@ -413,7 +409,7 @@ public:
         vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
         vkImageViewCreateInfo.subresourceRange.layerCount = 1;
         vkImageViewCreateInfo.image = m_defaultDepthStencil.m_image;
-        m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo, m_device);
+        m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo);
     }
 
     // Create a frame buffer for each swap chain m_vkImage
@@ -510,7 +506,7 @@ public:
 				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
 
         // Create the actual renderpass
-        m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo, m_device);
+        m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo);
 
     }
 
@@ -735,7 +731,7 @@ public:
 
         // Create the buffers
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            m_uniformBuffers[i].m_bufferOriginal = vkcpp::Buffer(bufferInfo, m_device);
+            m_uniformBuffers[i].m_bufferOriginal = vkcpp::Buffer(bufferInfo);
 
             // Get m_vkDeviceMemory requirements including size, alignment and m_vkDeviceMemory type
             VkMemoryRequirements vkMemoryRequirements = m_uniformBuffers[i].m_bufferOriginal.getMemoryRequirements();
@@ -755,7 +751,7 @@ public:
                     vkMemoryRequirements.memoryTypeBits,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-            m_uniformBuffers[i].m_deviceMemoryOriginal = vkcpp::DeviceMemory(vkMemoryAllocateInfo, m_device);
+            m_uniformBuffers[i].m_deviceMemoryOriginal = vkcpp::DeviceMemory(vkMemoryAllocateInfo);
 
             // Bind m_vkDeviceMemory to buffer
             vkBindBufferMemory(m_device, m_uniformBuffers[i].m_bufferOriginal, m_uniformBuffers[i].m_deviceMemoryOriginal, 0);

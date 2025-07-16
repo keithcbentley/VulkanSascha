@@ -91,7 +91,7 @@ void VulkanRaytracingSample::setupRenderPass()
 	vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 	vkRenderPassCreateInfo.pDependencies = dependencies.data();
 
-	m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo, m_device);
+	m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo);
 }
 
 void VulkanRaytracingSample::setupFrameBuffer()

@@ -35,8 +35,7 @@ VulkanDevice::VulkanDevice(
 
 	m_graphicsCommandPoolOriginal = vkcpp::CommandPool(
 		m_queueFamilyIndices.m_graphics,
-		VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-		m_device);
+		VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
 
     // Get list of supported extensions
