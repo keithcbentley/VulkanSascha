@@ -13,6 +13,8 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
+vkcpp::AppContext vkcpp::s_appContext;
+
 #define MAX_LAYERS 8
 
 // Vertex layout for this example
@@ -68,14 +70,14 @@ public:
 
 	~VulkanExample()
 	{
-		if (m_deviceOriginal) {
-			vkDestroyImageView(m_deviceOriginal, textureArray.m_vkImageView, nullptr);
-			vkDestroyImage(m_deviceOriginal, textureArray.m_vkImage, nullptr);
-			vkDestroySampler(m_deviceOriginal, textureArray.m_vkSampler, nullptr);
-			vkFreeMemory(m_deviceOriginal, textureArray.m_vkDeviceMemory, nullptr);
-			vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
-			vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
+		if (m_device) {
+			vkDestroyImageView(m_device, textureArray.m_vkImageView, nullptr);
+			vkDestroyImage(m_device, textureArray.m_vkImage, nullptr);
+			vkDestroySampler(m_device, textureArray.m_vkSampler, nullptr);
+			vkFreeMemory(m_device, textureArray.m_vkDeviceMemory, nullptr);
+			vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
+			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
 			vertexBuffer.destroy();
 			indexBuffer.destroy();
 			uniformBuffer.destroy();
@@ -132,23 +134,23 @@ public:
 		bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		VK_CHECK_RESULT(vkCreateBuffer(m_deviceOriginal, &bufferCreateInfo, nullptr, &stagingBuffer));
+		VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &stagingBuffer));
 
 		// Get m_vkDeviceMemory requirements for the staging buffer (alignment, m_vkDeviceMemory type bits)
-		vkGetBufferMemoryRequirements(m_deviceOriginal, stagingBuffer, &memReqs);
+		vkGetBufferMemoryRequirements(m_device, stagingBuffer, &memReqs);
 
 		memAllocInfo.allocationSize = memReqs.size;
 		// Get m_vkDeviceMemory type index for a host visible buffer
 		memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-		VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &stagingMemory));
-		VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, stagingBuffer, stagingMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &stagingMemory));
+		VK_CHECK_RESULT(vkBindBufferMemory(m_device, stagingBuffer, stagingMemory, 0));
 
 		// Copy texture data into staging buffer
 		uint8_t *data;
-		VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, stagingMemory, 0, memReqs.size, 0, (void **)&data));
+		VK_CHECK_RESULT(vkMapMemory(m_device, stagingMemory, 0, memReqs.size, 0, (void **)&data));
 		memcpy(data, ktxTextureData, ktxTextureSize);
-		vkUnmapMemory(m_deviceOriginal, stagingMemory);
+		vkUnmapMemory(m_device, stagingMemory);
 
 		// Setup buffer copy regions for array layers
 		std::vector<VkBufferImageCopy> bufferCopyRegions;
@@ -188,15 +190,15 @@ public:
 		imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		imageCreateInfo.arrayLayers = layerCount;
 
-		VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCreateInfo, nullptr, &textureArray.m_vkImage));
+		VK_CHECK_RESULT(vkCreateImage(m_device, &imageCreateInfo, nullptr, &textureArray.m_vkImage));
 
-		vkGetImageMemoryRequirements(m_deviceOriginal, textureArray.m_vkImage, &memReqs);
+		vkGetImageMemoryRequirements(m_device, textureArray.m_vkImage, &memReqs);
 
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &textureArray.m_vkDeviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, textureArray.m_vkImage, textureArray.m_vkDeviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &textureArray.m_vkDeviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(m_device, textureArray.m_vkImage, textureArray.m_vkDeviceMemory, 0));
 
 		VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
@@ -249,7 +251,7 @@ public:
 		vkSamplerCreateInfo.minLod = 0.0f;
 		vkSamplerCreateInfo.maxLod = 0.0f;
 		vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &vkSamplerCreateInfo, nullptr, &textureArray.m_vkSampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_device, &vkSamplerCreateInfo, nullptr, &textureArray.m_vkSampler));
 
 		// Create m_vkImage m_vkImageView
 		VkImageViewCreateInfo VkImageViewCreateInfo = vks::initializers::imageViewCreateInfo();
@@ -259,11 +261,11 @@ public:
 		VkImageViewCreateInfo.subresourceRange.layerCount = layerCount;
 		VkImageViewCreateInfo.subresourceRange.levelCount = 1;
 		VkImageViewCreateInfo.image = textureArray.m_vkImage;
-		VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &VkImageViewCreateInfo, nullptr, &textureArray.m_vkImageView));
+		VK_CHECK_RESULT(vkCreateImageView(m_device, &VkImageViewCreateInfo, nullptr, &textureArray.m_vkImageView));
 
 		// Clean up staging resources
-		vkFreeMemory(m_deviceOriginal, stagingMemory, nullptr);
-		vkDestroyBuffer(m_deviceOriginal, stagingBuffer, nullptr);
+		vkFreeMemory(m_device, stagingMemory, nullptr);
+		vkDestroyBuffer(m_device, stagingBuffer, nullptr);
 		ktxTexture_Destroy(ktxTexture);
 	}
 
@@ -393,8 +395,7 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo, m_deviceOriginal);
-		//VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -404,11 +405,11 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
 
 		// Image descriptor for the texture array
 		VkDescriptorImageInfo textureDescriptor =
@@ -423,14 +424,14 @@ public:
 			// Binding 1 : Fragment shader texture sampler
 			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
 		};
-		vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -472,7 +473,7 @@ public:
 		pipelineCI.pDynamicState = &dynamicStateCI;
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
 	}
 
 	void prepareUniformBuffers()
@@ -499,9 +500,9 @@ public:
 		uint8_t *pData;
 		uint32_t dataOffset = sizeof(uniformData.matrices);
 		uint32_t dataSize = layerCount * sizeof(PerInstanceData);
-		VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, uniformBuffer.m_vkMemory, dataOffset, dataSize, 0, (void **)&pData));
+		VK_CHECK_RESULT(vkMapMemory(m_device, uniformBuffer.m_vkMemory, dataOffset, dataSize, 0, (void **)&pData));
 		memcpy(pData, uniformData.instance, dataSize);
-		vkUnmapMemory(m_deviceOriginal, uniformBuffer.m_vkMemory);
+		vkUnmapMemory(m_device, uniformBuffer.m_vkMemory);
 
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffer.map());

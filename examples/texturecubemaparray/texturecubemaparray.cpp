@@ -14,6 +14,9 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 class VulkanExample : public VulkanExampleBase {
 public:
     bool displaySkybox = true;
@@ -60,15 +63,15 @@ public:
 
     ~VulkanExample()
     {
-        if (m_deviceOriginal) {
-            vkDestroyImageView(m_deviceOriginal, cubeMapArray.m_vkImageView, nullptr);
-            vkDestroyImage(m_deviceOriginal, cubeMapArray.m_vkImage, nullptr);
-            vkDestroySampler(m_deviceOriginal, cubeMapArray.m_vkSampler, nullptr);
-            vkFreeMemory(m_deviceOriginal, cubeMapArray.m_vkDeviceMemory, nullptr);
-            vkDestroyPipeline(m_deviceOriginal, pipelines.skybox, nullptr);
-            vkDestroyPipeline(m_deviceOriginal, pipelines.reflect, nullptr);
-            vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
-            vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
+        if (m_device) {
+            vkDestroyImageView(m_device, cubeMapArray.m_vkImageView, nullptr);
+            vkDestroyImage(m_device, cubeMapArray.m_vkImage, nullptr);
+            vkDestroySampler(m_device, cubeMapArray.m_vkSampler, nullptr);
+            vkFreeMemory(m_device, cubeMapArray.m_vkDeviceMemory, nullptr);
+            vkDestroyPipeline(m_device, pipelines.skybox, nullptr);
+            vkDestroyPipeline(m_device, pipelines.reflect, nullptr);
+            vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+            vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
             uniformBuffer.destroy();
         }
     }
@@ -131,23 +134,23 @@ public:
         bufferCreateInfo.size = ktxTextureSize;
         bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
         bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VK_CHECK_RESULT(vkCreateBuffer(m_deviceOriginal, &bufferCreateInfo, nullptr, &sourceData.m_vkBuffer));
+        VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &sourceData.m_vkBuffer));
 
         // Get m_vkDeviceMemory requirements for the source buffer (alignment, m_vkDeviceMemory type bits)
         VkMemoryRequirements memReqs;
-        vkGetBufferMemoryRequirements(m_deviceOriginal, sourceData.m_vkBuffer, &memReqs);
+        vkGetBufferMemoryRequirements(m_device, sourceData.m_vkBuffer, &memReqs);
         VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
         memAllocInfo.allocationSize = memReqs.size;
         // Get m_vkDeviceMemory type index for a host visible buffer
         memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &sourceData.m_vkMemory));
-        VK_CHECK_RESULT(vkBindBufferMemory(m_deviceOriginal, sourceData.m_vkBuffer, sourceData.m_vkMemory, 0));
+        VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &sourceData.m_vkMemory));
+        VK_CHECK_RESULT(vkBindBufferMemory(m_device, sourceData.m_vkBuffer, sourceData.m_vkMemory, 0));
 
         // Copy the ktx m_vkImage data into the source buffer
         uint8_t* data;
-        VK_CHECK_RESULT(vkMapMemory(m_deviceOriginal, sourceData.m_vkMemory, 0, memReqs.size, 0, (void**)&data));
+        VK_CHECK_RESULT(vkMapMemory(m_device, sourceData.m_vkMemory, 0, memReqs.size, 0, (void**)&data));
         memcpy(data, ktxTextureData, ktxTextureSize);
-        vkUnmapMemory(m_deviceOriginal, sourceData.m_vkMemory);
+        vkUnmapMemory(m_device, sourceData.m_vkMemory);
 
         // Create optimal tiled target m_vkImage
         // VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
@@ -167,14 +170,14 @@ public:
         imageCreateInfo.arrayLayers = 6 * cubeMapArray.layerCount;
         // This flag is required for cube map images
         imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-        VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCreateInfo, nullptr, &cubeMapArray.m_vkImage));
+        VK_CHECK_RESULT(vkCreateImage(m_device, &imageCreateInfo, nullptr, &cubeMapArray.m_vkImage));
 
         // Allocate m_vkDeviceMemory for the cube map array m_vkImage
-        vkGetImageMemoryRequirements(m_deviceOriginal, cubeMapArray.m_vkImage, &memReqs);
+        vkGetImageMemoryRequirements(m_device, cubeMapArray.m_vkImage, &memReqs);
         memAllocInfo.allocationSize = memReqs.size;
         memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllocInfo, nullptr, &cubeMapArray.m_vkDeviceMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, cubeMapArray.m_vkImage, cubeMapArray.m_vkDeviceMemory, 0));
+        VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &cubeMapArray.m_vkDeviceMemory));
+        VK_CHECK_RESULT(vkBindImageMemory(m_device, cubeMapArray.m_vkImage, cubeMapArray.m_vkDeviceMemory, 0));
 
         /*
                 We now copy the parts that make up the cube map array to our m_vkImage via a command buffer
@@ -267,7 +270,7 @@ public:
         //	sampler.maxAnisotropy = m_pVulkanDevice->m_vkPhysicalDeviceProperties.limits.maxSamplerAnisotropy;
         //	sampler.anisotropyEnable = VK_TRUE;
         // }
-        VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &sampler, nullptr, &cubeMapArray.m_vkSampler));
+        VK_CHECK_RESULT(vkCreateSampler(m_device, &sampler, nullptr, &cubeMapArray.m_vkSampler));
 
         // Create the m_vkImage m_vkImageView for a cube map array
         VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
@@ -277,11 +280,11 @@ public:
         view.subresourceRange.layerCount = 6 * cubeMapArray.layerCount;
         view.subresourceRange.levelCount = cubeMapArray.mipLevels;
         view.image = cubeMapArray.m_vkImage;
-        VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &cubeMapArray.m_vkImageView));
+        VK_CHECK_RESULT(vkCreateImageView(m_device, &view, nullptr, &cubeMapArray.m_vkImageView));
 
         // Clean up staging resources
-        vkFreeMemory(m_deviceOriginal, sourceData.m_vkMemory, nullptr);
-        vkDestroyBuffer(m_deviceOriginal, sourceData.m_vkBuffer, nullptr);
+        vkFreeMemory(m_device, sourceData.m_vkMemory, nullptr);
+        vkDestroyBuffer(m_device, sourceData.m_vkBuffer, nullptr);
         ktxTexture_Destroy(ktxTexture);
     }
 
@@ -360,7 +363,7 @@ public:
             vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
         };
         VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo, m_deviceOriginal);
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
         // VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
         // Layout
@@ -371,11 +374,11 @@ public:
             vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
         };
         VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
         // Set
         VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSet));
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
 
         // Image descriptor for the cube map array texture
         VkDescriptorImageInfo textureDescriptor
@@ -387,14 +390,14 @@ public:
             // Binding 1 : Fragment shader cubemap sampler
             vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
         };
-        vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
     }
 
     void preparePipelines()
     {
         // Layout
         const VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
+        VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
         // Pipelines
         VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -424,7 +427,7 @@ public:
         shaderStages[0] = loadShader(getShadersPath() + "texturecubemaparray/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
         shaderStages[1] = loadShader(getShadersPath() + "texturecubemaparray/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
         rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.skybox));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.skybox));
 
         // Cube map reflect pipeline
         shaderStages[0] = loadShader(getShadersPath() + "texturecubemaparray/reflect.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -434,7 +437,7 @@ public:
         depthStencilState.depthTestEnable = VK_TRUE;
         // Flip cull mode
         rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.reflect));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.reflect));
     }
 
     void prepareUniformBuffers()
