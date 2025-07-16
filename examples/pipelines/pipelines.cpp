@@ -12,6 +12,9 @@
 #include "vulkanexamplebase.h"
 #include <VulkanCpp.hpp>
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 class VulkanExample : public VulkanExampleBase {
 public:
     vkglTF::Model scene;
@@ -48,8 +51,8 @@ public:
 
     ~VulkanExample()
     {
-        if (m_deviceOriginal) {
-            vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
+        if (m_device) {
+            vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
 
             uniformBuffer.destroy();
         }
@@ -148,8 +151,7 @@ public:
             vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
         };
         VkDescriptorPoolCreateInfo vkDescriptorPoolCreateInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		m_descriptorPool = vkcpp::DescriptorPool(vkDescriptorPoolCreateInfo, m_deviceOriginal);
-//        VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		m_descriptorPool = vkcpp::DescriptorPool(vkDescriptorPoolCreateInfo);
 
         // Layout
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -157,17 +159,17 @@ public:
             vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
         };
         VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
         // Set
         VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &descriptorSet));
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             // Binding 0 : Vertex shader uniform buffer
             vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo)
         };
-        vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
     }
 
     void preparePipelines()
@@ -175,7 +177,7 @@ public:
 
         vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
         pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayout);
-        m_pipelineLayoutOriginal = vkcpp::PipelineLayout(pipelineLayoutCreateInfo, m_deviceOriginal);
+        m_pipelineLayoutOriginal = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
 
         vkcpp::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo;
         graphicsPipelineCreateInfo.setRenderPass(m_renderPassOriginal, 0);
@@ -203,14 +205,14 @@ public:
         //	Shader modules can be safely destroyed after pipeline creation, so RAII
         //	for the handles is ok for this situation.
         vkcpp::ShaderModule vertexShaderModulePhong = vkcpp::ShaderModule::createShaderModuleFromFile(
-            getShadersPath() + "pipelines/phong.vert.spv", m_deviceOriginal);
+            getShadersPath() + "pipelines/phong.vert.spv");
         graphicsPipelineCreateInfo.addShaderModule(vertexShaderModulePhong, VK_SHADER_STAGE_VERTEX_BIT, "main");
 
         vkcpp::ShaderModule fragmentShaderModulePhong = vkcpp::ShaderModule::createShaderModuleFromFile(
-            getShadersPath() + "pipelines/phong.frag.spv", m_deviceOriginal);
+            getShadersPath() + "pipelines/phong.frag.spv");
         graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModulePhong, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
 
-        m_pipelines.m_phongPipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo, m_deviceOriginal);
+        m_pipelines.m_phongPipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
 
         //	Not sure if this is necessary, but original code turned this off.
         graphicsPipelineCreateInfo.allowDerivatives(false);
@@ -219,28 +221,28 @@ public:
         // Toon shading pipeline
 		graphicsPipelineCreateInfo.clearShaders();
 		vkcpp::ShaderModule vertexShaderModuleToon = vkcpp::ShaderModule::createShaderModuleFromFile(
-			getShadersPath() + "pipelines/toon.vert.spv", m_deviceOriginal);
+			getShadersPath() + "pipelines/toon.vert.spv");
 		graphicsPipelineCreateInfo.addShaderModule(vertexShaderModuleToon, VK_SHADER_STAGE_VERTEX_BIT, "main");
 
 		vkcpp::ShaderModule fragmentShaderModuleToon = vkcpp::ShaderModule::createShaderModuleFromFile(
-			getShadersPath() + "pipelines/toon.frag.spv", m_deviceOriginal);
+			getShadersPath() + "pipelines/toon.frag.spv");
 		graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModuleToon, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
 
-        m_pipelines.m_toonPipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo, m_deviceOriginal);
+        m_pipelines.m_toonPipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
 
 		//	Wireframe
 		graphicsPipelineCreateInfo.setRasterizationPolygonMode(VK_POLYGON_MODE_LINE);
 
 		graphicsPipelineCreateInfo.clearShaders();
 		vkcpp::ShaderModule vertexShaderModuleWireframe = vkcpp::ShaderModule::createShaderModuleFromFile(
-			getShadersPath() + "pipelines/wireframe.vert.spv", m_deviceOriginal);
+			getShadersPath() + "pipelines/wireframe.vert.spv");
 		graphicsPipelineCreateInfo.addShaderModule(vertexShaderModuleWireframe, VK_SHADER_STAGE_VERTEX_BIT, "main");
 
 		vkcpp::ShaderModule fragmentShaderModuleWireframe = vkcpp::ShaderModule::createShaderModuleFromFile(
-			getShadersPath() + "pipelines/wireframe.frag.spv", m_deviceOriginal);
+			getShadersPath() + "pipelines/wireframe.frag.spv");
 		graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModuleWireframe, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
 
-		m_pipelines.m_wireframePipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo, m_deviceOriginal);
+		m_pipelines.m_wireframePipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
 
     }
 

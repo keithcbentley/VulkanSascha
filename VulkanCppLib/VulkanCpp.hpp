@@ -4182,24 +4182,24 @@ class GraphicsPipeline : public HandleWithOwner<VkPipeline> {
 public:
     GraphicsPipeline() = default;
 
-    GraphicsPipeline(GraphicsPipelineCreateInfo& pipelineCreateInfo, VkDevice vkDevice)
+    GraphicsPipeline(GraphicsPipelineCreateInfo& pipelineCreateInfo)
     {
         VkPipeline vkPipeline;
-        VkResult vkResult = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &vkPipeline);
+        VkResult vkResult = vkCreateGraphicsPipelines(vkDevice(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &vkPipeline);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) GraphicsPipeline(vkPipeline, vkDevice, &destroy);
+        new (this) GraphicsPipeline(vkPipeline, vkDevice(), &destroy);
     }
 
-    GraphicsPipeline(VkGraphicsPipelineCreateInfo& vkGraphicsPipelineCreateInfo, VkDevice vkDevice)
+    GraphicsPipeline(VkGraphicsPipelineCreateInfo& vkGraphicsPipelineCreateInfo)
     {
         VkPipeline vkPipeline;
-        VkResult vkResult = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &vkGraphicsPipelineCreateInfo, nullptr, &vkPipeline);
+        VkResult vkResult = vkCreateGraphicsPipelines(vkDevice(), VK_NULL_HANDLE, 1, &vkGraphicsPipelineCreateInfo, nullptr, &vkPipeline);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) GraphicsPipeline(vkPipeline, vkDevice, &destroy);
+        new (this) GraphicsPipeline(vkPipeline, vkDevice(), &destroy);
     }
 };
 
