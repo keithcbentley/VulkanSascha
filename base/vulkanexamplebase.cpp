@@ -8,76 +8,7 @@
 
 #include "vulkanexamplebase.h"
 
-#if defined(VK_EXAMPLE_XCODE_GENERATED)
-#if (defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT))
-#include <Cocoa/Cocoa.h>
-#include <CoreVideo/CVDisplayLink.h>
-#include <QuartzCore/CAMetalLayer.h>
-#endif
-#else // !defined(VK_EXAMPLE_XCODE_GENERATED)
-#if defined(VK_USE_PLATFORM_METAL_EXT)
-// SRS - Metal layer is defined externally when using iOS/macOS displayLink-driven examples project
-extern CAMetalLayer* layer;
-#endif
-#endif
-
 std::vector<const char*> VulkanExampleBase::args;
-
-void VulkanExampleBase::createVulkanAssets()
-{
-    vkcpp::VulkanInstanceCreateInfo vulkanInstanceCreateInfo {};
-    vulkanInstanceCreateInfo.addLayer("VK_LAYER_KHRONOS_validation");
-
-    vulkanInstanceCreateInfo.addExtension("VK_EXT_debug_utils");
-    vulkanInstanceCreateInfo.addExtension("VK_KHR_surface");
-    vulkanInstanceCreateInfo.addExtension("VK_KHR_win32_surface");
-
-    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = vkcpp::DebugUtilsMessenger::getCreateInfo();
-    vulkanInstanceCreateInfo.pNext = &debugCreateInfo;
-
-    vkcpp::VulkanInstance vulkanInstance = vkcpp::VulkanInstance(vulkanInstanceCreateInfo);
-	//	Move the original to the member variable, and then get a copy back.
-
-    m_vulkanInstanceOriginal = std::move(vulkanInstance);
-    vulkanInstance = m_vulkanInstanceOriginal;
-
-
-    auto allPhysicalDevices = vulkanInstance.getAllPhysicalDevices();
-
-    for (auto p : allPhysicalDevices) {
-        vkcpp::PhysicalDevice physicalDevice = vkcpp::PhysicalDevice(p);
-        auto deviceProperties = physicalDevice.getPhysicalDeviceProperties2();
-
-        std::cout << std::format("deviceName: {}\n", deviceProperties.m_properties2.properties.deviceName);
-        std::cout << std::format("m_requestedApiVersion: {}  driverVersion: {}\n",
-            vkcpp::VersionNumber(deviceProperties.m_properties2.properties.apiVersion).asString(),
-            vkcpp::VersionNumber(deviceProperties.m_properties2.properties.driverVersion).asString());
-        auto extensions = physicalDevice.EnumerateDeviceExtensionProperties();
-        for (VkExtensionProperties extension : extensions) {
-            std::cout << std::format("extension: {}\n", extension.extensionName);
-        }
-
-        std::cout << '\n';
-    }
-
-    vkcpp::PhysicalDevice physicalDevice = vkcpp::PhysicalDevice(allPhysicalDevices[0]);
-    m_physicalDeviceOriginal = std::move(physicalDevice);
-    physicalDevice = m_physicalDeviceOriginal;
-
-    vkcpp::DeviceCreateInfo deviceCreateInfo;
-    deviceCreateInfo.addExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
-    deviceCreateInfo.addDeviceQueue(0, 1);
-    deviceCreateInfo.addDeviceQueue(0, 1);
-    deviceCreateInfo.addDeviceQueue(1, 1);
-    deviceCreateInfo.addDeviceQueue(1, 1);
-
-    vkcpp::DeviceFeatures deviceFeatures = physicalDevice.getPhysicalDeviceFeatures2();
-    deviceCreateInfo.setDeviceFeatures(deviceFeatures);
-    vkcpp::Device device = vkcpp::Device(deviceCreateInfo, physicalDevice);
-    m_deviceOriginal = std::move(device);
-}
-
 
 void VulkanExampleBase::renderFrame()
 {
@@ -102,16 +33,16 @@ void VulkanExampleBase::createCommandBuffers()
     // Create one command buffer for each swap chain m_vkImage
     drawCmdBuffers.resize(m_swapChain.images.size());
     VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
-    VK_CHECK_RESULT(vkAllocateCommandBuffers(m_deviceOriginal, &cmdBufAllocateInfo, drawCmdBuffers.data()));
+    VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &cmdBufAllocateInfo, drawCmdBuffers.data()));
 }
 
 void VulkanExampleBase::destroyCommandBuffers()
 {
     vkFreeCommandBuffers(
-		m_deviceOriginal,
-		m_vkCommandPool,
-		static_cast<uint32_t>(drawCmdBuffers.size()),
-		drawCmdBuffers.data());
+        m_device,
+        m_vkCommandPool,
+        static_cast<uint32_t>(drawCmdBuffers.size()),
+        drawCmdBuffers.data());
 }
 
 std::string VulkanExampleBase::getShadersPath() const
@@ -123,7 +54,7 @@ void VulkanExampleBase::createPipelineCache()
 {
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-    VK_CHECK_RESULT(vkCreatePipelineCache(m_deviceOriginal, &pipelineCacheCreateInfo, nullptr, &m_vkPipelineCache));
+    VK_CHECK_RESULT(vkCreatePipelineCache(m_device, &pipelineCacheCreateInfo, nullptr, &m_vkPipelineCache));
 }
 
 void VulkanExampleBase::prepare()
@@ -158,7 +89,7 @@ VkPipelineShaderStageCreateInfo VulkanExampleBase::loadShader(std::string fileNa
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
     shaderStage.module = vks::tools::loadShader(androidApp->activity->assetManager, fileName.c_str(), m_vkDevice);
 #else
-    shaderStage.module = vks::tools::loadShader(fileName.c_str(), m_deviceOriginal);
+    shaderStage.module = vks::tools::loadShader(fileName.c_str(), m_device);
 #endif
     shaderStage.pName = "main";
     assert(shaderStage.module != VK_NULL_HANDLE);
@@ -213,39 +144,12 @@ void VulkanExampleBase::nextFrame()
 
 void VulkanExampleBase::renderLoop()
 {
-//// SRS - for non-apple plaforms, handle benchmarking here within VulkanExampleBase::renderLoop()
-////     - for macOS, handle benchmarking within NSApp rendering loop via displayLinkOutputCb()
-//#if !(defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT))
-//    if (m_benchmark.active) {
-//#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
-//        while (!configured) {
-//            if (wl_display_dispatch(display) == -1)
-//                break;
-//        }
-//        while (wl_display_prepare_read(display) != 0) {
-//            if (wl_display_dispatch_pending(display) == -1)
-//                break;
-//        }
-//        wl_display_flush(display);
-//        wl_display_read_events(display);
-//        if (wl_display_dispatch_pending(display) == -1)
-//            return;
-//#endif
-//
-//        m_benchmark.run([=] { render(); }, m_pVulkanDevice->m_vkPhysicalDeviceProperties);
-//        vkDeviceWaitIdle(m_deviceOriginal);
-//        if (!m_benchmark.filename.empty()) {
-//            m_benchmark.saveResults();
-//        }
-//        return;
-//    }
-//#endif
 
     m_destWidth = m_drawAreaWidth;
     m_destHeight = m_drawAreaHeight;
     m_lastTimestamp = std::chrono::high_resolution_clock::now();
     m_tPrevEnd = m_lastTimestamp;
-#if defined(_WIN32)
+
     MSG msg;
     bool quitMessageReceived = false;
     while (!quitMessageReceived) {
@@ -261,281 +165,9 @@ void VulkanExampleBase::renderLoop()
             nextFrame();
         }
     }
-#elif defined(VK_USE_PLATFORM_ANDROID_KHR)
-    while (true) {
-        int ident;
-        int events;
-        struct android_poll_source* source;
-        bool destroy = false;
-
-        focused = true;
-
-        while ((ident = ALooper_pollOnce(focused ? 0 : -1, nullptr, &events, (void**)&source)) > ALOOPER_POLL_TIMEOUT) {
-            if (source != nullptr) {
-                source->process(androidApp, source);
-            }
-            if (androidApp->destroyRequested != 0) {
-                LOGD("Android app destroy requested");
-                destroy = true;
-                break;
-            }
-        }
-
-        // App destruction requested
-        // Exit loop, example will be destroyed in application main
-        if (destroy) {
-            ANativeActivity_finish(androidApp->activity);
-            break;
-        }
-
-        // Render frame
-        if (m_prepared) {
-            auto tStart = std::chrono::high_resolution_clock::now();
-            render();
-            m_frameCounter++;
-            auto tEnd = std::chrono::high_resolution_clock::now();
-            auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-            m_frameTimer = tDiff / 1000.0f;
-            camera.update(m_frameTimer);
-            // Convert to clamped timer value
-            if (!paused) {
-                timer += timerSpeed * m_frameTimer;
-                if (timer > 1.0) {
-                    timer -= 1.0f;
-                }
-            }
-            float fpsTimer = std::chrono::duration<double, std::milli>(tEnd - m_lastTimestamp).count();
-            if (fpsTimer > 1000.0f) {
-                m_lastFPS = (float)m_frameCounter * (1000.0f / fpsTimer);
-                m_frameCounter = 0;
-                m_lastTimestamp = tEnd;
-            }
-
-            updateOverlay();
-
-            // Check touch state (for movement)
-            if (touchDown) {
-                touchTimer += m_frameTimer;
-            }
-            if (touchTimer >= 1.0) {
-                camera.keys.up = true;
-            }
-
-            // Check gamepad state
-            const float deadZone = 0.0015f;
-            if (camera.type != Camera::CameraType::firstperson) {
-                // Rotate
-                if (std::abs(gamePadState.axisLeft.x) > deadZone) {
-                    camera.rotate(glm::vec3(0.0f, gamePadState.axisLeft.x * 0.5f, 0.0f));
-                }
-                if (std::abs(gamePadState.axisLeft.y) > deadZone) {
-                    camera.rotate(glm::vec3(gamePadState.axisLeft.y * 0.5f, 0.0f, 0.0f));
-                }
-                // Zoom
-                if (std::abs(gamePadState.axisRight.y) > deadZone) {
-                    camera.translate(glm::vec3(0.0f, 0.0f, gamePadState.axisRight.y * 0.01f));
-                }
-            } else {
-                camera.updatePad(gamePadState.axisLeft, gamePadState.axisRight, m_frameTimer);
-            }
-        }
-    }
-#elif defined(_DIRECT2DISPLAY)
-    while (!quit) {
-        auto tStart = std::chrono::high_resolution_clock::now();
-        if (m_viewUpdated) {
-            m_viewUpdated = false;
-        }
-        render();
-        m_frameCounter++;
-        auto tEnd = std::chrono::high_resolution_clock::now();
-        auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-        m_frameTimer = tDiff / 1000.0f;
-        camera.update(m_frameTimer);
-        if (camera.moving()) {
-            m_viewUpdated = true;
-        }
-        // Convert to clamped timer value
-        if (!paused) {
-            timer += timerSpeed * m_frameTimer;
-            if (timer > 1.0) {
-                timer -= 1.0f;
-            }
-        }
-        float fpsTimer = std::chrono::duration<double, std::milli>(tEnd - m_lastTimestamp).count();
-        if (fpsTimer > 1000.0f) {
-            m_lastFPS = (float)m_frameCounter * (1000.0f / fpsTimer);
-            m_frameCounter = 0;
-            m_lastTimestamp = tEnd;
-        }
-        updateOverlay();
-    }
-#elif defined(VK_USE_PLATFORM_DIRECTFB_EXT)
-    while (!quit) {
-        auto tStart = std::chrono::high_resolution_clock::now();
-        if (m_viewUpdated) {
-            m_viewUpdated = false;
-        }
-        DFBWindowEvent event;
-        while (!event_buffer->GetEvent(event_buffer, DFB_EVENT(&event))) {
-            handleEvent(&event);
-        }
-        render();
-        m_frameCounter++;
-        auto tEnd = std::chrono::high_resolution_clock::now();
-        auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-        m_frameTimer = tDiff / 1000.0f;
-        camera.update(m_frameTimer);
-        if (camera.moving()) {
-            m_viewUpdated = true;
-        }
-        // Convert to clamped timer value
-        if (!paused) {
-            timer += timerSpeed * m_frameTimer;
-            if (timer > 1.0) {
-                timer -= 1.0f;
-            }
-        }
-        float fpsTimer = std::chrono::duration<double, std::milli>(tEnd - m_lastTimestamp).count();
-        if (fpsTimer > 1000.0f) {
-            m_lastFPS = (float)m_frameCounter * (1000.0f / fpsTimer);
-            m_frameCounter = 0;
-            m_lastTimestamp = tEnd;
-        }
-        updateOverlay();
-    }
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-    while (!quit) {
-        auto tStart = std::chrono::high_resolution_clock::now();
-        if (m_viewUpdated) {
-            m_viewUpdated = false;
-        }
-
-        while (!configured) {
-            if (wl_display_dispatch(display) == -1)
-                break;
-        }
-        while (wl_display_prepare_read(display) != 0) {
-            if (wl_display_dispatch_pending(display) == -1)
-                break;
-        }
-        wl_display_flush(display);
-        wl_display_read_events(display);
-        if (wl_display_dispatch_pending(display) == -1)
-            break;
-
-        render();
-        m_frameCounter++;
-        auto tEnd = std::chrono::high_resolution_clock::now();
-        auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-        m_frameTimer = tDiff / 1000.0f;
-        camera.update(m_frameTimer);
-        if (camera.moving()) {
-            m_viewUpdated = true;
-        }
-        // Convert to clamped timer value
-        if (!paused) {
-            timer += timerSpeed * m_frameTimer;
-            if (timer > 1.0) {
-                timer -= 1.0f;
-            }
-        }
-        float fpsTimer = std::chrono::duration<double, std::milli>(tEnd - m_lastTimestamp).count();
-        if (fpsTimer > 1000.0f) {
-            if (!settings.overlay) {
-                std::string windowTitle = getWindowTitle();
-                xdg_toplevel_set_title(xdg_toplevel, windowTitle.c_str());
-            }
-            m_lastFPS = (float)m_frameCounter * (1000.0f / fpsTimer);
-            m_frameCounter = 0;
-            m_lastTimestamp = tEnd;
-        }
-        updateOverlay();
-    }
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-    xcb_flush(connection);
-    while (!quit) {
-        auto tStart = std::chrono::high_resolution_clock::now();
-        if (m_viewUpdated) {
-            m_viewUpdated = false;
-        }
-        xcb_generic_event_t* event;
-        while ((event = xcb_poll_for_event(connection))) {
-            handleEvent(event);
-            free(event);
-        }
-        render();
-        m_frameCounter++;
-        auto tEnd = std::chrono::high_resolution_clock::now();
-        auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-        m_frameTimer = tDiff / 1000.0f;
-        camera.update(m_frameTimer);
-        if (camera.moving()) {
-            m_viewUpdated = true;
-        }
-        // Convert to clamped timer value
-        if (!paused) {
-            timer += timerSpeed * m_frameTimer;
-            if (timer > 1.0) {
-                timer -= 1.0f;
-            }
-        }
-        float fpsTimer = std::chrono::duration<double, std::milli>(tEnd - m_lastTimestamp).count();
-        if (fpsTimer > 1000.0f) {
-            if (!settings.overlay) {
-                std::string windowTitle = getWindowTitle();
-                xcb_change_property(connection, XCB_PROP_MODE_REPLACE,
-                    m_hwnd, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
-                    windowTitle.size(), windowTitle.c_str());
-            }
-            m_lastFPS = (float)m_frameCounter * (1000.0f / fpsTimer);
-            m_frameCounter = 0;
-            m_lastTimestamp = tEnd;
-        }
-        updateOverlay();
-    }
-#elif defined(VK_USE_PLATFORM_HEADLESS_EXT)
-    while (!quit) {
-        auto tStart = std::chrono::high_resolution_clock::now();
-        if (m_viewUpdated) {
-            m_viewUpdated = false;
-        }
-        render();
-        m_frameCounter++;
-        auto tEnd = std::chrono::high_resolution_clock::now();
-        auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-        m_frameTimer = tDiff / 1000.0f;
-        camera.update(m_frameTimer);
-        if (camera.moving()) {
-            m_viewUpdated = true;
-        }
-        // Convert to clamped timer value
-        timer += timerSpeed * m_frameTimer;
-        if (timer > 1.0) {
-            timer -= 1.0f;
-        }
-        float fpsTimer = std::chrono::duration<double, std::milli>(tEnd - m_lastTimestamp).count();
-        if (fpsTimer > 1000.0f) {
-            m_lastFPS = (float)m_frameCounter * (1000.0f / fpsTimer);
-            m_frameCounter = 0;
-            m_lastTimestamp = tEnd;
-        }
-        updateOverlay();
-    }
-#elif (defined(VK_USE_PLATFORM_MACOS_MVK) || defined(VK_USE_PLATFORM_METAL_EXT)) && defined(VK_EXAMPLE_XCODE_GENERATED)
-    [NSApp run];
-#elif defined(VK_USE_PLATFORM_SCREEN_QNX)
-    while (!quit) {
-        handleEvent();
-
-        if (m_prepared) {
-            nextFrame();
-        }
-    }
-#endif
     // Flush m_vkDevice to make sure all resources can be freed
-    if (m_deviceOriginal != VK_NULL_HANDLE) {
-        vkDeviceWaitIdle(m_deviceOriginal);
+    if (m_device != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(m_device);
     }
 }
 
@@ -672,12 +304,12 @@ void VulkanExampleBase::setCommandLineOptions()
         std::cin.get();
         exit(0);
     }
-    //if (m_commandLineParser.isSet("validation")) {
-    //    m_exampleSettings.m_useValidationLayers = true;
-    //}
-    //if (m_commandLineParser.isSet("validationlogfile")) {
-    //    vks::debug::logToFile = true;
-    //}
+    // if (m_commandLineParser.isSet("validation")) {
+    //     m_exampleSettings.m_useValidationLayers = true;
+    // }
+    // if (m_commandLineParser.isSet("validationlogfile")) {
+    //     vks::debug::logToFile = true;
+    // }
     if (m_commandLineParser.isSet("vsync")) {
         m_exampleSettings.m_forceSwapChainVsync = true;
     }
@@ -777,7 +409,7 @@ VulkanExampleBase::VulkanExampleBase()
 
 #if defined(_WIN32)
     // Enable console if validation is active, debug message callback will output to it
-    //if (this->m_exampleSettings.m_useValidationLayers) {
+    // if (this->m_exampleSettings.m_useValidationLayers) {
     //    setupConsole("Vulkan example");
     //}
     setupConsole("Vulkan example");
@@ -792,25 +424,25 @@ VulkanExampleBase::~VulkanExampleBase()
     m_swapChain.cleanup();
     destroyCommandBuffers();
 
-	for (auto& frameBuffer : m_vkFrameBuffers) {
-        vkDestroyFramebuffer(m_deviceOriginal, frameBuffer, nullptr);
+    for (auto& frameBuffer : m_vkFrameBuffers) {
+        vkDestroyFramebuffer(m_device, frameBuffer, nullptr);
     }
 
     for (auto& shaderModule : m_vkShaderModules) {
-        vkDestroyShaderModule(m_deviceOriginal, shaderModule, nullptr);
+        vkDestroyShaderModule(m_device, shaderModule, nullptr);
     }
-//    vkDestroyImageView(m_deviceOriginal, m_defaultDepthStencil.m_vkImageView, nullptr);
-//    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
-//    vkFreeMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkDeviceMemory, nullptr);
+    //    vkDestroyImageView(m_deviceOriginal, m_defaultDepthStencil.m_vkImageView, nullptr);
+    //    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
+    //    vkFreeMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkDeviceMemory, nullptr);
 
-    vkDestroyPipelineCache(m_deviceOriginal, m_vkPipelineCache, nullptr);
+    vkDestroyPipelineCache(m_device, m_vkPipelineCache, nullptr);
 
-    vkDestroyCommandPool(m_deviceOriginal, m_vkCommandPool, nullptr);
+    vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
 
-    vkDestroySemaphore(m_deviceOriginal, semaphores.m_vkSemaphorePresentComplete, nullptr);
-    vkDestroySemaphore(m_deviceOriginal, semaphores.m_vkSemaphoreRenderComplete, nullptr);
+    vkDestroySemaphore(m_device, semaphores.m_vkSemaphorePresentComplete, nullptr);
+    vkDestroySemaphore(m_device, semaphores.m_vkSemaphoreRenderComplete, nullptr);
     for (auto& fence : m_vkFences) {
-        vkDestroyFence(m_deviceOriginal, fence, nullptr);
+        vkDestroyFence(m_device, fence, nullptr);
     }
 
     if (m_exampleSettings.m_showUIOverlay) {
@@ -819,65 +451,27 @@ VulkanExampleBase::~VulkanExampleBase()
 
     delete m_pVulkanDevice;
 
-    //if (m_exampleSettings.m_useValidationLayers) {
-    //    vks::debug::freeDebugCallback(m_vulkanInstance);
-    //}
+    // if (m_exampleSettings.m_useValidationLayers) {
+    //     vks::debug::freeDebugCallback(m_vulkanInstance);
+    // }
 
-    //vkDestroyInstance(m_vulkanInstance, nullptr);
+    // vkDestroyInstance(m_vulkanInstance, nullptr);
 
-#if defined(_DIRECT2DISPLAY)
-
-#elif defined(VK_USE_PLATFORM_DIRECTFB_EXT)
-    if (event_buffer)
-        event_buffer->Release(event_buffer);
-    if (m_vkSurface)
-        m_vkSurface->Release(m_vkSurface);
-    if (m_hwnd)
-        m_hwnd->Release(m_hwnd);
-    if (layer)
-        layer->Release(layer);
-    if (dfb)
-        dfb->Release(dfb);
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-    xdg_toplevel_destroy(xdg_toplevel);
-    xdg_surface_destroy(xdg_surface);
-    wl_surface_destroy(m_vkSurface);
-    if (keyboard)
-        wl_keyboard_destroy(keyboard);
-    if (pointer)
-        wl_pointer_destroy(pointer);
-    if (seat)
-        wl_seat_destroy(seat);
-    xdg_wm_base_destroy(shell);
-    wl_compositor_destroy(compositor);
-    wl_registry_destroy(registry);
-    wl_display_disconnect(display);
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-    xcb_destroy_window(connection, m_hwnd);
-    xcb_disconnect(connection);
-#elif defined(VK_USE_PLATFORM_SCREEN_QNX)
-    screen_destroy_event(screen_event);
-    screen_destroy_window(screen_window);
-    screen_destroy_context(screen_context);
-#endif
 }
 
 bool VulkanExampleBase::initVulkan()
 {
-    createVulkanAssets();
-
-
-#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-    vks::android::loadVulkanFunctions(m_vulkanInstance);
-#endif
+	m_vulkanInstance = vkcpp::vulkanInstance();
+	m_physicalDevice = vkcpp::physicalDevice();
+	m_device = vkcpp::device();
 
     // Store m_vkPhysicalDeviceProperties (including limits),
     // m_vkPhysicalDeviceFeatures and m_vkDeviceMemory m_vkPhysicalDeviceProperties
     // of the physical m_vkDevice (so that examples can check against them)
 
-	m_physicalDeviceFeatures = m_physicalDeviceOriginal.getPhysicalDeviceFeatures2();
-	m_physicalDeviceProperties = m_physicalDeviceOriginal.getPhysicalDeviceProperties2();
-	m_vkPhysicalDeviceMemoryProperties = m_physicalDeviceOriginal.getPhysicalDeviceMemoryProperties();
+    m_physicalDeviceFeatures = m_physicalDevice.getPhysicalDeviceFeatures2();
+    m_physicalDeviceProperties = m_physicalDevice.getPhysicalDeviceProperties2();
+    m_vkPhysicalDeviceMemoryProperties = m_physicalDevice.getPhysicalDeviceMemoryProperties();
 
     // Derived examples can override this to set actual m_vkPhysicalDeviceFeatures (based on above readings) to enable for logical m_vkDevice creation
     getEnabledFeatures();
@@ -885,34 +479,34 @@ bool VulkanExampleBase::initVulkan()
     // Vulkan m_vkDevice creation
     // This is handled by a separate class that gets a logical m_vkDevice representation
     // and encapsulates functions related to a m_vkDevice
-    m_pVulkanDevice = new vks::VulkanDevice(m_physicalDeviceOriginal, m_deviceOriginal);
+    m_pVulkanDevice = new vks::VulkanDevice(m_physicalDevice, m_device);
 
     // Derived examples can enable extensions based on the list of supported extensions read from the physical m_vkDevice
     getEnabledExtensions();
 
     // Get a graphics m_vkQueue from the m_vkDevice
-    vkGetDeviceQueue(m_deviceOriginal, m_pVulkanDevice->m_queueFamilyIndices.m_graphics, 0, &m_vkQueue);
+    vkGetDeviceQueue(m_device, m_pVulkanDevice->m_queueFamilyIndices.m_graphics, 0, &m_vkQueue);
 
     // Find a suitable depth and/or stencil format
     VkBool32 validFormat { false };
     // Samples that make use of stencil will require a depth + stencil format, so we select from a different list
     if (m_requiresStencil) {
-        validFormat = vks::tools::getSupportedDepthStencilFormat(m_physicalDeviceOriginal, &m_vkFormatDepth);
+        validFormat = vks::tools::getSupportedDepthStencilFormat(m_physicalDevice, &m_vkFormatDepth);
     } else {
-        validFormat = vks::tools::getSupportedDepthFormat(m_physicalDeviceOriginal, &m_vkFormatDepth);
+        validFormat = vks::tools::getSupportedDepthFormat(m_physicalDevice, &m_vkFormatDepth);
     }
     assert(validFormat);
 
-    m_swapChain.setContext(m_vulkanInstanceOriginal, m_physicalDeviceOriginal, m_deviceOriginal);
+    m_swapChain.setContext(m_vulkanInstance, m_physicalDevice, m_device);
 
     // Create synchronization objects
     VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
     // Create a semaphore used to synchronize m_vkImage presentation
     // Ensures that the m_vkImage is displayed before we start submitting new commands to the m_vkQueue
-    VK_CHECK_RESULT(vkCreateSemaphore(m_deviceOriginal, &semaphoreCreateInfo, nullptr, &semaphores.m_vkSemaphorePresentComplete));
+    VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &semaphores.m_vkSemaphorePresentComplete));
     // Create a semaphore used to synchronize command submission
     // Ensures that the m_vkImage is not presented until all commands have been submitted and executed
-    VK_CHECK_RESULT(vkCreateSemaphore(m_deviceOriginal, &semaphoreCreateInfo, nullptr, &semaphores.m_vkSemaphoreRenderComplete));
+    VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &semaphores.m_vkSemaphoreRenderComplete));
 
     // Set up submit info structure
     // Semaphores will stay the same during application lifetime
@@ -2727,7 +2321,7 @@ void VulkanExampleBase::createSynchronizationPrimitives()
     VkFenceCreateInfo fenceCreateInfo = vks::initializers::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
     m_vkFences.resize(drawCmdBuffers.size());
     for (auto& fence : m_vkFences) {
-        VK_CHECK_RESULT(vkCreateFence(m_deviceOriginal, &fenceCreateInfo, nullptr, &fence));
+        VK_CHECK_RESULT(vkCreateFence(m_device, &fenceCreateInfo, nullptr, &fence));
     }
 }
 
@@ -2737,53 +2331,53 @@ void VulkanExampleBase::createCommandPool()
     cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmdPoolInfo.queueFamilyIndex = m_swapChain.queueNodeIndex;
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    VK_CHECK_RESULT(vkCreateCommandPool(m_deviceOriginal, &cmdPoolInfo, nullptr, &m_vkCommandPool));
+    VK_CHECK_RESULT(vkCreateCommandPool(m_device, &cmdPoolInfo, nullptr, &m_vkCommandPool));
 }
 
 void VulkanExampleBase::setupDepthStencil()
 {
-    VkImageCreateInfo vkImageCreateInfo{};
-	vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-	vkImageCreateInfo.format = m_vkFormatDepth;
-	vkImageCreateInfo.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
-	vkImageCreateInfo.mipLevels = 1;
-	vkImageCreateInfo.arrayLayers = 1;
-	vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo, m_deviceOriginal);
-	//VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &vkImageCreateInfo, nullptr, &m_defaultDepthStencil.m_vkImage));
+    VkImageCreateInfo vkImageCreateInfo {};
+    vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    vkImageCreateInfo.format = m_vkFormatDepth;
+    vkImageCreateInfo.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
+    vkImageCreateInfo.mipLevels = 1;
+    vkImageCreateInfo.arrayLayers = 1;
+    vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo, m_device);
+    // VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &vkImageCreateInfo, nullptr, &m_defaultDepthStencil.m_vkImage));
 
-	VkMemoryRequirements memReqs {};
-    vkGetImageMemoryRequirements(m_deviceOriginal, m_defaultDepthStencil.m_image, &memReqs);
+    VkMemoryRequirements memReqs {};
+    vkGetImageMemoryRequirements(m_device, m_defaultDepthStencil.m_image, &memReqs);
 
     VkMemoryAllocateInfo memAlloc {};
     memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAlloc.allocationSize = memReqs.size;
     memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(memAlloc, m_deviceOriginal);
+    m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(memAlloc, m_device);
 
-    //VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllloc, nullptr, &m_defaultDepthStencil.m_deviceMemory));
+    // VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllloc, nullptr, &m_defaultDepthStencil.m_deviceMemory));
 
-    VK_CHECK_RESULT(vkBindImageMemory(m_deviceOriginal, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
+    VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
 
-    VkImageViewCreateInfo vkImageViewCreateInfo{};
-	vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	vkImageViewCreateInfo.image = m_defaultDepthStencil.m_image;
-	vkImageViewCreateInfo.format = m_vkFormatDepth;
-	vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-	vkImageViewCreateInfo.subresourceRange.levelCount = 1;
-	vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-	vkImageViewCreateInfo.subresourceRange.layerCount = 1;
-	vkImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    VkImageViewCreateInfo vkImageViewCreateInfo {};
+    vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    vkImageViewCreateInfo.image = m_defaultDepthStencil.m_image;
+    vkImageViewCreateInfo.format = m_vkFormatDepth;
+    vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+    vkImageViewCreateInfo.subresourceRange.levelCount = 1;
+    vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+    vkImageViewCreateInfo.subresourceRange.layerCount = 1;
+    vkImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     // Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT
     if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
-		vkImageViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        vkImageViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     }
-	m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo, m_deviceOriginal);
-    //VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &imageViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
+    m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo, m_device);
+    // VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &imageViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
 }
 
 void VulkanExampleBase::setupFrameBuffer()
@@ -2804,7 +2398,7 @@ void VulkanExampleBase::setupFrameBuffer()
         frameBufferCreateInfo.width = m_drawAreaWidth;
         frameBufferCreateInfo.height = m_drawAreaHeight;
         frameBufferCreateInfo.layers = 1;
-        VK_CHECK_RESULT(vkCreateFramebuffer(m_deviceOriginal, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
+        VK_CHECK_RESULT(vkCreateFramebuffer(m_device, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
     }
 }
 
@@ -2869,17 +2463,16 @@ void VulkanExampleBase::setupRenderPass()
     dependencies[1].dependencyFlags = 0;
 
     VkRenderPassCreateInfo vkRenderPassCreateInfo = {};
-	vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	vkRenderPassCreateInfo.pAttachments = attachments.data();
-	vkRenderPassCreateInfo.subpassCount = 1;
-	vkRenderPassCreateInfo.pSubpasses = &subpassDescription;
-	vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
-	vkRenderPassCreateInfo.pDependencies = dependencies.data();
+    vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    vkRenderPassCreateInfo.pAttachments = attachments.data();
+    vkRenderPassCreateInfo.subpassCount = 1;
+    vkRenderPassCreateInfo.pSubpasses = &subpassDescription;
+    vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    vkRenderPassCreateInfo.pDependencies = dependencies.data();
 
-	m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo, m_deviceOriginal);
+    m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo, m_device);
 
-//    VK_CHECK_RESULT(vkCreateRenderPass(m_deviceOriginal, &renderPassInfo, nullptr, &m_vkRenderPass));
 }
 
 void VulkanExampleBase::getEnabledFeatures() { }
@@ -2895,7 +2488,7 @@ void VulkanExampleBase::windowResize()
     m_resized = true;
 
     // Ensure all operations on the m_vkDevice have been finished before destroying resources
-    vkDeviceWaitIdle(m_deviceOriginal);
+    vkDeviceWaitIdle(m_device);
 
     // Recreate swap chain
     m_drawAreaWidth = m_destWidth;
@@ -2903,12 +2496,12 @@ void VulkanExampleBase::windowResize()
     createSwapChain();
 
     // Recreate the frame buffers
-//    vkDestroyImageView(m_deviceOriginal, m_defaultDepthStencil.m_vkImageView, nullptr);
-//    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
-//    vkFreeMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkDeviceMemory, nullptr);
+    //    vkDestroyImageView(m_deviceOriginal, m_defaultDepthStencil.m_vkImageView, nullptr);
+    //    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
+    //    vkFreeMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkDeviceMemory, nullptr);
     setupDepthStencil();
     for (auto& frameBuffer : m_vkFrameBuffers) {
-        vkDestroyFramebuffer(m_deviceOriginal, frameBuffer, nullptr);
+        vkDestroyFramebuffer(m_device, frameBuffer, nullptr);
     }
     setupFrameBuffer();
 
@@ -2926,11 +2519,11 @@ void VulkanExampleBase::windowResize()
 
     // SRS - Recreate fences in case number of swapchain images has changed on resize
     for (auto& fence : m_vkFences) {
-        vkDestroyFence(m_deviceOriginal, fence, nullptr);
+        vkDestroyFence(m_device, fence, nullptr);
     }
     createSynchronizationPrimitives();
 
-    vkDeviceWaitIdle(m_deviceOriginal);
+    vkDeviceWaitIdle(m_device);
 
     if ((m_drawAreaWidth > 0.0f) && (m_drawAreaHeight > 0.0f)) {
         camera.updateAspectRatio((float)m_drawAreaWidth / (float)m_drawAreaHeight);

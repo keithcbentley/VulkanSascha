@@ -91,7 +91,7 @@ void VulkanRaytracingSample::setupRenderPass()
 	vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 	vkRenderPassCreateInfo.pDependencies = dependencies.data();
 
-	m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo, m_deviceOriginal);
+	m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo, m_device);
 }
 
 void VulkanRaytracingSample::setupFrameBuffer()
@@ -115,7 +115,7 @@ void VulkanRaytracingSample::setupFrameBuffer()
 	m_vkFrameBuffers.resize(m_swapChain.images.size());
 	for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++) {
 		attachments[0] = m_swapChain.imageViews[i];
-		VK_CHECK_RESULT(vkCreateFramebuffer(m_deviceOriginal, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
+		VK_CHECK_RESULT(vkCreateFramebuffer(m_device, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
 	}
 }
 
@@ -217,9 +217,9 @@ void VulkanRaytracingSample::createAccelerationStructure(AccelerationStructure& 
 
 void VulkanRaytracingSample::deleteAccelerationStructure(AccelerationStructure& accelerationStructure)
 {
-	vkFreeMemory(m_deviceOriginal, accelerationStructure.memory, nullptr);
-	vkDestroyBuffer(m_deviceOriginal, accelerationStructure.buffer, nullptr);
-	vkDestroyAccelerationStructureKHR(m_deviceOriginal, accelerationStructure.handle, nullptr);
+	vkFreeMemory(m_device, accelerationStructure.memory, nullptr);
+	vkDestroyBuffer(m_device, accelerationStructure.buffer, nullptr);
+	vkDestroyAccelerationStructureKHR(m_device, accelerationStructure.handle, nullptr);
 }
 
 uint64_t VulkanRaytracingSample::getBufferDeviceAddress(VkBuffer buffer)
@@ -234,9 +234,9 @@ void VulkanRaytracingSample::createStorageImage(VkFormat format, VkExtent3D exte
 {
 	// Release resources if m_vkImage is to be recreated
 	if (storageImage.image != VK_NULL_HANDLE) {
-            vkDestroyImageView(m_deviceOriginal, storageImage.view, nullptr);
-            vkDestroyImage(m_deviceOriginal, storageImage.image, nullptr);
-            vkFreeMemory(m_deviceOriginal, storageImage.memory, nullptr);
+            vkDestroyImageView(m_device, storageImage.view, nullptr);
+            vkDestroyImage(m_device, storageImage.image, nullptr);
+            vkFreeMemory(m_device, storageImage.memory, nullptr);
 		storageImage = {};
 	}
 
@@ -297,33 +297,33 @@ void VulkanRaytracingSample::prepare()
 	VkPhysicalDeviceProperties2 deviceProperties2{};
 	deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 	deviceProperties2.pNext = &rayTracingPipelineProperties;
-	vkGetPhysicalDeviceProperties2(m_physicalDeviceOriginal, &deviceProperties2);
+	vkGetPhysicalDeviceProperties2(m_physicalDevice, &deviceProperties2);
 	accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
 	VkPhysicalDeviceFeatures2 deviceFeatures2{};
 	deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 	deviceFeatures2.pNext = &accelerationStructureFeatures;
-	vkGetPhysicalDeviceFeatures2(m_physicalDeviceOriginal, &deviceFeatures2);
+	vkGetPhysicalDeviceFeatures2(m_physicalDevice, &deviceFeatures2);
 	// Get the function pointers required for ray tracing
 	vkGetBufferDeviceAddressKHR
-            = reinterpret_cast<PFN_vkGetBufferDeviceAddressKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkGetBufferDeviceAddressKHR"));
+            = reinterpret_cast<PFN_vkGetBufferDeviceAddressKHR>(vkGetDeviceProcAddr(m_device, "vkGetBufferDeviceAddressKHR"));
 	vkCmdBuildAccelerationStructuresKHR
-            = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkCmdBuildAccelerationStructuresKHR"));
+            = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(vkGetDeviceProcAddr(m_device, "vkCmdBuildAccelerationStructuresKHR"));
 	vkBuildAccelerationStructuresKHR
-            = reinterpret_cast<PFN_vkBuildAccelerationStructuresKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkBuildAccelerationStructuresKHR"));
+            = reinterpret_cast<PFN_vkBuildAccelerationStructuresKHR>(vkGetDeviceProcAddr(m_device, "vkBuildAccelerationStructuresKHR"));
 	vkCreateAccelerationStructureKHR
-            = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkCreateAccelerationStructureKHR"));
+            = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(vkGetDeviceProcAddr(m_device, "vkCreateAccelerationStructureKHR"));
 	vkDestroyAccelerationStructureKHR
-            = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkDestroyAccelerationStructureKHR"));
+            = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(vkGetDeviceProcAddr(m_device, "vkDestroyAccelerationStructureKHR"));
 	vkGetAccelerationStructureBuildSizesKHR
-            = reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkGetAccelerationStructureBuildSizesKHR"));
+            = reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(vkGetDeviceProcAddr(m_device, "vkGetAccelerationStructureBuildSizesKHR"));
 	vkGetAccelerationStructureDeviceAddressKHR
-            = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkGetAccelerationStructureDeviceAddressKHR"));
+            = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(vkGetDeviceProcAddr(m_device, "vkGetAccelerationStructureDeviceAddressKHR"));
 	vkCmdTraceRaysKHR
-            = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkCmdTraceRaysKHR"));
+            = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(m_device, "vkCmdTraceRaysKHR"));
 	vkGetRayTracingShaderGroupHandlesKHR
-            = reinterpret_cast<PFN_vkGetRayTracingShaderGroupHandlesKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkGetRayTracingShaderGroupHandlesKHR"));
+            = reinterpret_cast<PFN_vkGetRayTracingShaderGroupHandlesKHR>(vkGetDeviceProcAddr(m_device, "vkGetRayTracingShaderGroupHandlesKHR"));
 	vkCreateRayTracingPipelinesKHR
-            = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(vkGetDeviceProcAddr(m_deviceOriginal, "vkCreateRayTracingPipelinesKHR"));
+            = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(vkGetDeviceProcAddr(m_device, "vkCreateRayTracingPipelinesKHR"));
 }
 
 VkStridedDeviceAddressRegionKHR VulkanRaytracingSample::getSbtEntryStridedDeviceAddressRegion(VkBuffer buffer, uint32_t handleCount)

@@ -79,18 +79,17 @@ class VulkanExampleBase
 {
 
 protected:
-    vkcpp::VulkanInstance m_vulkanInstanceOriginal;
-    vkcpp::PhysicalDevice m_physicalDeviceOriginal;
-    vkcpp::Device m_deviceOriginal;
+
+	vkcpp::VulkanInstance	m_vulkanInstance;
+	vkcpp::PhysicalDevice	m_physicalDevice;
+	vkcpp::Device			m_device;
 
 private:
+
 	uint32_t m_destWidth {};
     uint32_t m_destHeight {};
 	bool m_resizing = false;
     std::string m_shaderDir = "glsl";
-
-	void createVulkanAssets();
-
 
     std::string getWindowTitle() const;
 	void handleMouseMove(int32_t x, int32_t y);
@@ -121,10 +120,6 @@ protected:
 	vkcpp::DeviceFeatures m_physicalDeviceFeatures;
     vkcpp::DeviceProperties m_physicalDeviceProperties;
 
-	// Stores physical m_vkDevice m_vkPhysicalDeviceProperties (for e.g. checking m_vkDevice limits)
-    //VkPhysicalDeviceProperties m_vkPhysicalDeviceProperties {};
-	// Stores the m_vkPhysicalDeviceFeatures available on the selected physical m_vkDevice (for e.g. checking if a feature is available)
-	//VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures{};
 
 	// Stores all available m_vkDeviceMemory (type) m_vkPhysicalDeviceProperties for the physical m_vkDevice
 	VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties{};

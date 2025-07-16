@@ -944,23 +944,7 @@ public:
     }
 };
 
-class AppContextCreateInfo {
 
-public:
-    AppContextCreateInfo() = default;
-};
-
-class AppContext {
-
-public:
-    AppContext() = default;
-
-    static void init(const AppContextCreateInfo& appContextCreateInfo)
-    {
-    }
-};
-
-static inline AppContext s_appContext;
 
 class Win32SurfaceCreateInfo : public VkWin32SurfaceCreateInfoKHR {
 
@@ -1216,6 +1200,57 @@ public:
         vkDeviceWaitIdle(*this);
     }
 };
+
+class AppContextCreateInfo
+{
+
+public:
+	AppContextCreateInfo() = default;
+};
+
+class AppContext
+{
+
+	VulkanInstance m_vulkanInstanceOriginal;
+	PhysicalDevice m_physicalDeviceOriginal;
+	Device m_deviceOriginal;
+
+public:
+	AppContext() {
+		std::cout << "AppContext()\n";
+	}
+
+	~AppContext() {
+		std::cout << "~AppContext()\n";
+	}
+
+	const VulkanInstance& vulkanInstanceAppContext() {
+		return m_vulkanInstanceOriginal;
+	}
+
+	const PhysicalDevice& physicalDeviceAppContext() {
+		return m_physicalDeviceOriginal;
+	}
+
+	const Device& deviceAppContext() {
+		return m_deviceOriginal;
+	}
+
+	static void init(const AppContextCreateInfo& appContextCreateInfo);
+};
+
+extern AppContext s_appContext;
+//	Free functions just to make things easier to use.  Clients can call
+//	vkcpp::vulkanInstance(),
+//	vkcpp::physicalDevice,
+//	vkcpp::device,
+//	etc
+
+const VulkanInstance& vulkanInstance();
+const PhysicalDevice& physicalDevice();
+const Device& device();
+
+
 
 class Semaphore : public HandleWithOwner<VkSemaphore> {
 
