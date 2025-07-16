@@ -3516,12 +3516,12 @@ public:
         }
     }
 
-    void updateDescriptorSets(VkDevice vkDevice)
+    void updateDescriptorSets()
     {
         assemble();
         //	TODO: check for no updates before calling.
         vkUpdateDescriptorSets(
-            vkDevice,
+            vkDevice(),
             static_cast<uint32_t>(m_vkWriteDescriptorSets.size()),
             m_vkWriteDescriptorSets.data(),
             0, nullptr);

@@ -11,6 +11,9 @@
 #include "VulkanglTFModel.h"
 #include "vulkanexamplebase.h"
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 class VulkanExample : public VulkanExampleBase {
 public:
     bool animate = true;
@@ -147,7 +150,7 @@ public:
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             vkcpp::SHADER_STAGE_FRAGMENT);
 
-        m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo, m_deviceOriginal);
+        m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
 
         /*
                 Descriptor pool
@@ -167,7 +170,7 @@ public:
         descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, cubes.size());
         descriptorPoolCreateInfo.setMaxSets(cubes.size());
 
-        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo, m_deviceOriginal);
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
 
         /*
 
@@ -228,7 +231,7 @@ public:
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 cube.texture.m_vkDescriptorImageInfo);
 
-            descriptorSetUpdater.updateDescriptorSets(m_deviceOriginal);
+            descriptorSetUpdater.updateDescriptorSets();
 
             //			vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
         }
@@ -241,7 +244,7 @@ public:
         */
         vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
         pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
-        m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo, m_deviceOriginal);
+        m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
 
         // VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
@@ -271,7 +274,7 @@ public:
 
         shaderStages[0] = loadShader(getShadersPath() + "descriptorsets/cube.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
         shaderStages[1] = loadShader(getShadersPath() + "descriptorsets/cube.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
     }
 
     void prepareUniformBuffers()
