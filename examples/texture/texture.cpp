@@ -275,9 +275,6 @@ public:
 
             mappableImage.bindImageMemory(mappableMemory, m_deviceOriginal);
 			mappableMemory.mapCopyUnmap(ktxTextureData, vkMemoryRequirementsImage.size);
-			void* pMem = mappableMemory.mapMemory(vkMemoryRequirementsImage.size);
-            memcpy(pMem, ktxTextureData, vkMemoryRequirementsImage.size);
-			mappableMemory.unmapMemory();
 
             // Linear tiled images don't need to be staged and can be directly used as textures
             m_texture.m_image = std::move(mappableImage);
