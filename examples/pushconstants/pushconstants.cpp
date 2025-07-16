@@ -16,6 +16,9 @@
 #include "VulkanglTFModel.h"
 #include "vulkanexamplebase.h"
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 class VulkanExample : public VulkanExampleBase {
 public:
     vkglTF::Model model;
@@ -55,10 +58,10 @@ public:
 
     ~VulkanExample()
     {
-        if (m_deviceOriginal) {
-            vkDestroyPipeline(m_deviceOriginal, m_vkPipeline, nullptr);
-            vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
-            vkDestroyDescriptorSetLayout(m_deviceOriginal, m_vkDescriptorSetLayout, nullptr);
+        if (m_device) {
+            vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
+            vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+            vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
             uniformBuffer.destroy();
         }
     }
@@ -139,21 +142,21 @@ public:
             vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
         };
         VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo, m_deviceOriginal);
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
 
         // Layout
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
             vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
         };
         VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
         // Set
         VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &m_vkDescriptorSet));
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &m_vkDescriptorSet));
 
         VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo);
-        vkUpdateDescriptorSets(m_deviceOriginal, 1, &writeDescriptorSet, 0, nullptr);
+        vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
     }
 
     void preparePipelines()
@@ -170,7 +173,7 @@ public:
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
         pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
         pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
+        VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
         // Pipeline
         VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -197,7 +200,7 @@ public:
         pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Color });
         shaderStages[0] = loadShader(getShadersPath() + "pushconstants/pushconstants.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
         shaderStages[1] = loadShader(getShadersPath() + "pushconstants/pushconstants.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipeline));
     }
 
     void prepareUniformBuffers()
