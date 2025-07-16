@@ -215,12 +215,20 @@ VkResult VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPrope
  *
  * @return VK_SUCCESS if buffer handle and memory have been created and (optionally passed) data has been copied
  */
-VkResult VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, vks::Buffer* buffer, VkDeviceSize size, void* data)
+VkResult VulkanDevice::createBuffer(
+	VkBufferUsageFlags usageFlags,
+	VkMemoryPropertyFlags memoryPropertyFlags,
+	vks::Buffer* buffer,
+	VkDeviceSize size,
+	void* data)
 {
-    buffer->device = m_device;
+    buffer->m_vkDevice = m_device;
 
     // Create the buffer handle
-    VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo(usageFlags, size);
+	vkcpp::BufferCreateInfo bufferCreateInfo;
+	bufferCreateInfo.usage = usageFlags;
+	bufferCreateInfo.size = size;
+
     VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer->m_vkBuffer));
 
     // Create the memory backing up the buffer handle

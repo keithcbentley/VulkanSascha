@@ -1346,6 +1346,29 @@ public:
         vkMemoryAllocateInfo.memoryTypeIndex = device.findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, requiredMemoryPropertyFlags);
         new (this) DeviceMemory(vkMemoryAllocateInfo, device);
     }
+
+    void* mapMemory(VkDeviceSize vkDeviceSize)
+    {
+        void* pData;
+        VkResult vkResult = vkMapMemory(this->getVkDevice(), *this, 0, vkDeviceSize, 0, &pData);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        return pData;
+    }
+
+    void unmapMemory()
+    {
+        vkUnmapMemory(this->getVkDevice(), *this);
+        return;
+    }
+
+    void mapCopyUnmap(void* pSource, VkDeviceSize vkDeviceSize)
+    {
+        void* pMemMapped = mapMemory(vkDeviceSize);
+        memcpy(pMemMapped, pSource, vkDeviceSize);
+        unmapMemory();
+    }
 };
 
 class BufferCreateInfo : public VkBufferCreateInfo {
@@ -2159,6 +2182,14 @@ public:
         vkMemoryAllocateInfo.memoryTypeIndex = getOwner().findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, requiredProperties);
         return vkcpp::DeviceMemory(vkMemoryAllocateInfo, getOwner());
     }
+
+    void bindImageMemory(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice) const
+    {
+        VkResult vkResult = vkBindImageMemory(vkDevice, *this, vkDeviceMemory, 0);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+    }
 };
 
 class ImageViewCreateInfo : public VkImageViewCreateInfo {
@@ -2306,17 +2337,15 @@ public:
         new (this) Sampler(vkSampler, device, &destroy);
     }
 
-	Sampler(const VkSamplerCreateInfo& vkSamplerCreateInfo, Device device) {
-		VkSampler vkSampler;
-		VkResult vkResult = vkCreateSampler(device, &vkSamplerCreateInfo, nullptr, &vkSampler);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-		new (this) Sampler(vkSampler, device, &destroy);
-	}
-
-
-
+    Sampler(const VkSamplerCreateInfo& vkSamplerCreateInfo, Device device)
+    {
+        VkSampler vkSampler;
+        VkResult vkResult = vkCreateSampler(device, &vkSamplerCreateInfo, nullptr, &vkSampler);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) Sampler(vkSampler, device, &destroy);
+    }
 };
 
 class ImageMemoryBarrier2 : public VkImageMemoryBarrier2 {

@@ -23,7 +23,7 @@ namespace vks
 	*/
 	struct Buffer
 	{
-		VkDevice device;
+		VkDevice m_vkDevice;
 		VkBuffer m_vkBuffer = VK_NULL_HANDLE;
 		VkDeviceMemory m_vkMemory = VK_NULL_HANDLE;
 		VkDescriptorBufferInfo m_vkDescriptorBufferInfo;
