@@ -3638,14 +3638,14 @@ class PipelineLayout : public HandleWithOwner<VkPipelineLayout> {
 public:
     PipelineLayout() = default;
 
-    PipelineLayout(const PipelineLayoutCreateInfo& pipelineLayoutCreateInfo, VkDevice vkDevice)
+    PipelineLayout(const PipelineLayoutCreateInfo& pipelineLayoutCreateInfo)
     {
         VkPipelineLayout vkPipelineLayout;
-        VkResult vkResult = vkCreatePipelineLayout(vkDevice, &pipelineLayoutCreateInfo, nullptr, &vkPipelineLayout);
+        VkResult vkResult = vkCreatePipelineLayout(vkDevice(), &pipelineLayoutCreateInfo, nullptr, &vkPipelineLayout);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) PipelineLayout(vkPipelineLayout, vkDevice, &destroy);
+        new (this) PipelineLayout(vkPipelineLayout, vkDevice(), &destroy);
     }
 };
 
