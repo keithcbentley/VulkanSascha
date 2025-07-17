@@ -17,6 +17,9 @@
 
 #include "gltfskinning.h"
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 /*
 
 	 glTF model class
@@ -40,16 +43,16 @@ glm::mat4 VulkanglTFModel::Node::getLocalMatrix()
 */
 VulkanglTFModel::~VulkanglTFModel()
 {
-	vkDestroyBuffer(vulkanDevice->m_vkDevice, vertices.buffer, nullptr);
-	vkFreeMemory(vulkanDevice->m_vkDevice, vertices.memory, nullptr);
-	vkDestroyBuffer(vulkanDevice->m_vkDevice, indices.buffer, nullptr);
-	vkFreeMemory(vulkanDevice->m_vkDevice, indices.memory, nullptr);
+	vkDestroyBuffer(vulkanDevice->m_device, vertices.buffer, nullptr);
+	vkFreeMemory(vulkanDevice->m_device, vertices.memory, nullptr);
+	vkDestroyBuffer(vulkanDevice->m_device, indices.buffer, nullptr);
+	vkFreeMemory(vulkanDevice->m_device, indices.memory, nullptr);
 	for (Image image : images)
 	{
-		vkDestroyImageView(vulkanDevice->m_vkDevice, image.texture.view, nullptr);
-		vkDestroyImage(vulkanDevice->m_vkDevice, image.texture.image, nullptr);
-		vkDestroySampler(vulkanDevice->m_vkDevice, image.texture.sampler, nullptr);
-		vkFreeMemory(vulkanDevice->m_vkDevice, image.texture.deviceMemory, nullptr);
+		vkDestroyImageView(vulkanDevice->m_device, image.texture.m_vkImageView, nullptr);
+		vkDestroyImage(vulkanDevice->m_device, image.texture.m_vkImage, nullptr);
+		vkDestroySampler(vulkanDevice->m_device, image.texture.m_vkSampler, nullptr);
+		vkFreeMemory(vulkanDevice->m_device, image.texture.m_vkDeviceMemory, nullptr);
 	}
 	for (Skin skin : skins)
 	{
@@ -649,16 +652,16 @@ VulkanExample::VulkanExample() : VulkanExampleBase()
 
 VulkanExample::~VulkanExample()
 {
-	vkDestroyPipeline(m_vkDevice, pipelines.solid, nullptr);
+	vkDestroyPipeline(m_device, pipelines.solid, nullptr);
 	if (pipelines.wireframe != VK_NULL_HANDLE)
 	{
-		vkDestroyPipeline(m_vkDevice, pipelines.wireframe, nullptr);
+		vkDestroyPipeline(m_device, pipelines.wireframe, nullptr);
 	}
 
-	vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-	vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.matrices, nullptr);
-	vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.textures, nullptr);
-	vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.jointMatrices, nullptr);
+	vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+	vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.matrices, nullptr);
+	vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.textures, nullptr);
+	vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.jointMatrices, nullptr);
 
 	shaderData.buffer.destroy();
 }
@@ -666,7 +669,7 @@ VulkanExample::~VulkanExample()
 void VulkanExample::getEnabledFeatures()
 {
 	// Fill mode non solid is required for wireframe display
-	if (m_vkPhysicalDeviceFeatures.fillModeNonSolid)
+//	if (m_vkPhysicalDeviceFeatures.fillModeNonSolid)
 	{
 		m_vkPhysicalDeviceFeatures10.fillModeNonSolid = VK_TRUE;
 	};
@@ -682,7 +685,7 @@ void VulkanExample::buildCommandBuffers()
 	clearValues[1].depthStencil = {1.0f, 0};
 
 	VkRenderPassBeginInfo renderPassBeginInfo    = vks::initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass               = m_vkRenderPass;
+	renderPassBeginInfo.renderPass               = m_renderPassOriginal;
 	renderPassBeginInfo.renderArea.offset.x      = 0;
 	renderPassBeginInfo.renderArea.offset.y      = 0;
 	renderPassBeginInfo.renderArea.extent.width  = m_drawAreaWidth;
@@ -716,7 +719,6 @@ void VulkanExample::loadglTFFile(std::string filename)
 	tinygltf::TinyGLTF gltfContext;
 	std::string        error, warning;
 
-	this->m_vkDevice = m_vkDevice;
 
 #if defined(__ANDROID__)
 	// On Android all assets are packed with the apk in a compressed form, so we need to open them using the asset manager
@@ -809,10 +811,10 @@ void VulkanExample::loadglTFFile(std::string filename)
 	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
 	// Free staging resources
-	vkDestroyBuffer(m_vkDevice, vertexStaging.buffer, nullptr);
-	vkFreeMemory(m_vkDevice, vertexStaging.memory, nullptr);
-	vkDestroyBuffer(m_vkDevice, indexStaging.buffer, nullptr);
-	vkFreeMemory(m_vkDevice, indexStaging.memory, nullptr);
+	vkDestroyBuffer(m_device, vertexStaging.buffer, nullptr);
+	vkFreeMemory(m_device, vertexStaging.memory, nullptr);
+	vkDestroyBuffer(m_device, indexStaging.buffer, nullptr);
+	vkFreeMemory(m_device, indexStaging.memory, nullptr);
 }
 
 void VulkanExample::setupDescriptors()
@@ -831,7 +833,8 @@ void VulkanExample::setupDescriptors()
 	// Number of descriptor sets = One for the scene ubo + one per m_vkImage + one per skin
 	const uint32_t             maxSetCount        = static_cast<uint32_t>(glTFModel.images.size()) + static_cast<uint32_t>(glTFModel.skins.size()) + 1;
 	VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, maxSetCount);
-	VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+	m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+	//VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 	// Descriptor set layouts
 	VkDescriptorSetLayoutBinding    setLayoutBinding{};
@@ -839,38 +842,44 @@ void VulkanExample::setupDescriptors()
 
 	// Descriptor set layout for passing matrices
 	setLayoutBinding = vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.matrices));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.matrices));
 
 	// Descriptor set layout for passing material textures
 	setLayoutBinding = vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.textures));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.textures));
 
 	// Descriptor set layout for passing skin joint matrices
 	setLayoutBinding = vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.jointMatrices));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.jointMatrices));
 
 	// Descriptor set for scene matrices
-	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.matrices, 1);
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
-	VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &shaderData.buffer.descriptor);
-	vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
+	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.matrices, 1);
+	VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
+	VkWriteDescriptorSet writeDescriptorSet
+		= vks::initializers::writeDescriptorSet(
+			descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &shaderData.buffer.m_vkDescriptorBufferInfo);
+	vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
 
 	// Descriptor set for glTF model skin joint matrices
 	for (auto &skin : glTFModel.skins)
 	{
-		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.jointMatrices, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &skin.descriptorSet));
-		VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(skin.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0, &skin.ssbo.descriptor);
-		vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
+		const VkDescriptorSetAllocateInfo allocInfo	= vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.jointMatrices, 1);
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &skin.descriptorSet));
+		VkWriteDescriptorSet writeDescriptorSet
+			= vks::initializers::writeDescriptorSet(
+				skin.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0, &skin.ssbo.m_vkDescriptorBufferInfo);
+		vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
 	}
 
 	// Descriptor sets for glTF model materials
 	for (auto &image : glTFModel.images)
 	{
-		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.textures, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &image.descriptorSet));
-		VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(image.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &image.texture.descriptor);
-		vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
+		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.textures, 1);
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &image.descriptorSet));
+		VkWriteDescriptorSet writeDescriptorSet
+			= vks::initializers::writeDescriptorSet(
+				image.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &image.texture.m_vkDescriptorImageInfo);
+		vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
 	}
 }
 
@@ -892,7 +901,7 @@ void VulkanExample::preparePipelines()
 	// Push constant ranges are part of the pipeline layout
 	pipelineLayoutCI.pushConstantRangeCount = 1;
 	pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 	// Pipeline
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI   = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -928,7 +937,7 @@ void VulkanExample::preparePipelines()
 	    loadShader(getShadersPath() + "gltfskinning/skinnedmodel.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
 	    loadShader(getShadersPath() + "gltfskinning/skinnedmodel.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT)};
 
-	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
+	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
 	pipelineCI.pVertexInputState            = &vertexInputStateCI;
 	pipelineCI.pInputAssemblyState          = &inputAssemblyStateCI;
 	pipelineCI.pRasterizationState          = &rasterizationStateCI;
@@ -941,14 +950,14 @@ void VulkanExample::preparePipelines()
 	pipelineCI.pStages                      = shaderStages.data();
 
 	// Solid rendering pipeline
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.solid));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.solid));
 
 	// Wire frame rendering pipeline
-	if (m_vkPhysicalDeviceFeatures.fillModeNonSolid)
+//	if (m_vkPhysicalDeviceFeatures.fillModeNonSolid)
 	{
 		rasterizationStateCI.polygonMode = VK_POLYGON_MODE_LINE;
 		rasterizationStateCI.lineWidth   = 1.0f;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.wireframe));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.wireframe));
 	}
 }
 
@@ -963,7 +972,7 @@ void VulkanExample::updateUniformBuffers()
 {
 	shaderData.values.projection = camera.matrices.perspective;
 	shaderData.values.model      = camera.matrices.view;
-	memcpy(shaderData.buffer.mapped, &shaderData.values, sizeof(shaderData.values));
+	memcpy(shaderData.buffer.m_pMapped, &shaderData.values, sizeof(shaderData.values));
 }
 
 void VulkanExample::loadAssets()
