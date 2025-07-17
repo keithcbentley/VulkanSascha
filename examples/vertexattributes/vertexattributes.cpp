@@ -8,6 +8,9 @@
 
 #include "vertexattributes.h"
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 void VulkanExample::loadSceneNode(const tinygltf::Node& inputNode, const tinygltf::Model& input, Node* parent)
 {
 	Node node{};
@@ -153,12 +156,12 @@ VulkanExample::VulkanExample() : VulkanExampleBase()
 
 VulkanExample::~VulkanExample()
 {
-	if (m_vkDevice) {
-		vkDestroyPipeline(m_vkDevice, pipelines.vertexAttributesInterleaved, nullptr);
-		vkDestroyPipeline(m_vkDevice, pipelines.vertexAttributesSeparate, nullptr);
-		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.matrices, nullptr);
-		vkDestroyDescriptorSetLayout(m_vkDevice, descriptorSetLayouts.textures, nullptr);
+	if (m_device) {
+		vkDestroyPipeline(m_device, pipelines.vertexAttributesInterleaved, nullptr);
+		vkDestroyPipeline(m_device, pipelines.vertexAttributesSeparate, nullptr);
+		vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.matrices, nullptr);
+		vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.textures, nullptr);
 		indices.destroy();
 		shaderData.buffer.destroy();
 		separateVertexBuffers.normal.destroy();
@@ -167,17 +170,17 @@ VulkanExample::~VulkanExample()
 		separateVertexBuffers.uv.destroy();
 		interleavedVertexBuffer.destroy();
 		for (Image image : scene.images) {
-			vkDestroyImageView(m_pVulkanDevice->m_vkDevice, image.texture.view, nullptr);
-			vkDestroyImage(m_pVulkanDevice->m_vkDevice, image.texture.image, nullptr);
-			vkDestroySampler(m_pVulkanDevice->m_vkDevice, image.texture.sampler, nullptr);
-			vkFreeMemory(m_pVulkanDevice->m_vkDevice, image.texture.deviceMemory, nullptr);
+			vkDestroyImageView(m_pVulkanDevice->m_device, image.texture.m_vkImageView, nullptr);
+			vkDestroyImage(m_pVulkanDevice->m_device, image.texture.m_vkImage, nullptr);
+			vkDestroySampler(m_pVulkanDevice->m_device, image.texture.m_vkSampler, nullptr);
+			vkFreeMemory(m_pVulkanDevice->m_device, image.texture.m_vkDeviceMemory, nullptr);
 		}
 	}
 }
 
 void VulkanExample::getEnabledFeatures()
 {
-	m_vkPhysicalDeviceFeatures10.samplerAnisotropy = m_vkPhysicalDeviceFeatures.samplerAnisotropy;
+//	m_vkPhysicalDeviceFeatures10.samplerAnisotropy = m_vkPhysicalDeviceFeatures.samplerAnisotropy;
 }
 
 void VulkanExample::drawSceneNode(VkCommandBuffer commandBuffer, Node node)
@@ -217,7 +220,7 @@ void VulkanExample::buildCommandBuffers()
 	clearValues[1].depthStencil = { 1.0f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = m_vkRenderPass;
+	renderPassBeginInfo.renderPass = m_renderPassOriginal;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
 	renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -243,18 +246,22 @@ void VulkanExample::buildCommandBuffers()
 		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 		// Use the same index buffer, no matter how vertex attributes are passed
-		vkCmdBindIndexBuffer(drawCmdBuffers[i], indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(drawCmdBuffers[i], indices.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 		if (vertexAttributeSettings == VertexAttributeSettings::separate) {
 			// Using separate vertex attribute bindings requires binding multiple attribute buffers
 			VkDeviceSize offsets[4] = { 0, 0, 0, 0 };
-			std::array<VkBuffer, 4> buffers = { separateVertexBuffers.pos.buffer, separateVertexBuffers.normal.buffer, separateVertexBuffers.uv.buffer, separateVertexBuffers.tangent.buffer };
+			std::array<VkBuffer, 4> buffers = {
+				separateVertexBuffers.pos.m_vkBuffer,
+				separateVertexBuffers.normal.m_vkBuffer,
+				separateVertexBuffers.uv.m_vkBuffer,
+				separateVertexBuffers.tangent.m_vkBuffer };
 			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, static_cast<uint32_t>(buffers.size()), buffers.data(), offsets);
 		}
 		else {
 			// Using interleaved attribute bindings only requires one buffer to be bound
 			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &interleavedVertexBuffer.buffer, offsets);
+			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &interleavedVertexBuffer.m_vkBuffer, offsets);
 		}
 		// Render all nodes starting at top-level
 		for (auto& node : nodes) {
@@ -273,7 +280,6 @@ void VulkanExample::loadglTFFile(std::string filename)
 	tinygltf::TinyGLTF gltfContext;
 	std::string error, warning;
 
-	this->m_vkDevice = m_vkDevice;
 
 #if defined(__ANDROID__)
 	// On Android all assets are packed with the apk in a compressed form, so we need to open them using the asset manager
@@ -356,12 +362,12 @@ void VulkanExample::uploadVertexData()
 	size_t vertexBufferSize = vertexBuffer.size() * sizeof(Vertex);
 	vks::Buffer vertexStaging;
 	createStagingBuffer(vertexStaging, vertexBuffer.data(), vertexBufferSize);
-	createDeviceBuffer(interleavedVertexBuffer, vertexStaging.size);
+	createDeviceBuffer(interleavedVertexBuffer, vertexStaging.m_size);
 
 	// Copy data from staging buffer (host) do m_vkDevice local buffer (gpu)
 	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	copyRegion.size = vertexBufferSize;
-	vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, interleavedVertexBuffer.buffer, 1, &copyRegion);
+	vkCmdCopyBuffer(copyCmd, vertexStaging.m_vkBuffer, interleavedVertexBuffer.m_vkBuffer, 1, &copyRegion);
 	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 	vertexStaging.destroy();
 
@@ -375,10 +381,10 @@ void VulkanExample::uploadVertexData()
 	createStagingBuffer(stagingBuffers[2], vertexAttributeBuffers.uv.data(), vertexAttributeBuffers.uv.size() * sizeof(vertexAttributeBuffers.uv[0]));
 	createStagingBuffer(stagingBuffers[3], vertexAttributeBuffers.tangent.data(), vertexAttributeBuffers.tangent.size() * sizeof(vertexAttributeBuffers.tangent[0]));
 
-	createDeviceBuffer(separateVertexBuffers.pos, stagingBuffers[0].size);
-	createDeviceBuffer(separateVertexBuffers.normal, stagingBuffers[1].size);
-	createDeviceBuffer(separateVertexBuffers.uv, stagingBuffers[2].size);
-	createDeviceBuffer(separateVertexBuffers.tangent, stagingBuffers[3].size);
+	createDeviceBuffer(separateVertexBuffers.pos, stagingBuffers[0].m_size);
+	createDeviceBuffer(separateVertexBuffers.normal, stagingBuffers[1].m_size);
+	createDeviceBuffer(separateVertexBuffers.uv, stagingBuffers[2].m_size);
+	createDeviceBuffer(separateVertexBuffers.tangent, stagingBuffers[3].m_size);
 
 	// Stage
 	std::vector<vks::Buffer> attributeBuffers = {
@@ -391,8 +397,8 @@ void VulkanExample::uploadVertexData()
 	// Copy data from staging buffer (host) do m_vkDevice local buffer (gpu)
 	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	for (size_t i = 0; i < attributeBuffers.size(); i++) {
-		copyRegion.size = attributeBuffers[i].size;
-		vkCmdCopyBuffer(copyCmd, stagingBuffers[i].buffer, attributeBuffers[i].buffer, 1, &copyRegion);
+		copyRegion.size = attributeBuffers[i].m_size;
+		vkCmdCopyBuffer(copyCmd, stagingBuffers[i].m_vkBuffer, attributeBuffers[i].m_vkBuffer, 1, &copyRegion);
 	}
 	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 
@@ -407,11 +413,11 @@ void VulkanExample::uploadVertexData()
 	size_t indexBufferSize = indexBuffer.size() * sizeof(uint32_t);
 	vks::Buffer indexStaging;
 	createStagingBuffer(indexStaging, indexBuffer.data(), indexBufferSize);
-	createDeviceBuffer(indices, indexStaging.size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+	createDeviceBuffer(indices, indexStaging.m_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 	// Copy data from staging buffer (host) do m_vkDevice local buffer (gpu)
 	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	copyRegion.size = indexBufferSize;
-	vkCmdCopyBuffer(copyCmd, indexStaging.buffer, indices.buffer, 1, &copyRegion);
+	vkCmdCopyBuffer(copyCmd, indexStaging.m_vkBuffer, indices.m_vkBuffer, 1, &copyRegion);
 	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
 	// Free staging resources
 	indexStaging.destroy();
@@ -433,13 +439,14 @@ void VulkanExample::setupDescriptors()
 	// One set for matrices and one per model m_vkImage/texture
 	const uint32_t maxSetCount = static_cast<uint32_t>(scene.images.size()) + 1;
 	VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, maxSetCount);
-	VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+	m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+	//VK_CHECK_RESULT(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 	// Descriptor set layout for passing matrices
 	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 		vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
 	};
 	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings.data(), static_cast<uint32_t>(setLayoutBindings.size()));
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.matrices));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.matrices));
 	// Descriptor set layout for passing material textures
 	setLayoutBindings = {
 		// Color map
@@ -449,7 +456,7 @@ void VulkanExample::setupDescriptors()
 	};
 	descriptorSetLayoutCI.pBindings = setLayoutBindings.data();
 	descriptorSetLayoutCI.bindingCount = 2;
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.textures));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts.textures));
 
 	// Pipeline layout using both descriptor sets (set 0 = matrices, set 1 = material)
 	std::array<VkDescriptorSetLayout, 2> setLayouts = { descriptorSetLayouts.matrices, descriptorSetLayouts.textures };
@@ -459,25 +466,27 @@ void VulkanExample::setupDescriptors()
 	// Push constant ranges are part of the pipeline layout
 	pipelineLayoutCI.pushConstantRangeCount = 1;
 	pipelineLayoutCI.pPushConstantRanges = &pushConstantRange;
-	VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
+	VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 	// Descriptor set for scene matrices
-	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.matrices, 1);
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
-	VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &shaderData.buffer.descriptor);
-	vkUpdateDescriptorSets(m_vkDevice, 1, &writeDescriptorSet, 0, nullptr);
+	VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.matrices, 1);
+	VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
+	VkWriteDescriptorSet writeDescriptorSet
+		= vks::initializers::writeDescriptorSet(
+			descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &shaderData.buffer.m_vkDescriptorBufferInfo);
+	vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
 
 	// Descriptor sets for the materials
 	for (auto& material : scene.materials) {
-		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &descriptorSetLayouts.textures, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &material.descriptorSet));
-		VkDescriptorImageInfo colorMap = scene.images[material.baseColorTextureIndex].texture.descriptor;
-		VkDescriptorImageInfo normalMap = scene.images[material.normalTextureIndex].texture.descriptor;
+		const VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.textures, 1);
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &material.descriptorSet));
+		VkDescriptorImageInfo colorMap = scene.images[material.baseColorTextureIndex].texture.m_vkDescriptorImageInfo;
+		VkDescriptorImageInfo normalMap = scene.images[material.normalTextureIndex].texture.m_vkDescriptorImageInfo;
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(material.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &colorMap),
 			vks::initializers::writeDescriptorSet(material.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &normalMap),
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 }
 
@@ -495,7 +504,7 @@ void VulkanExample::preparePipelines()
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCI = vks::initializers::pipelineVertexInputStateCreateInfo();
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
+	VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
 	pipelineCI.pVertexInputState = &vertexInputStateCI;
 	pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
 	pipelineCI.pRasterizationState = &rasterizationStateCI;
@@ -523,7 +532,7 @@ void VulkanExample::preparePipelines()
 	};
 
 	vertexInputStateCI = vks::initializers::pipelineVertexInputStateCreateInfo(vertexInputBindingsInterleaved, vertexInputAttributesInterleaved);
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.vertexAttributesInterleaved));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.vertexAttributesInterleaved));
 
 	// Separate vertex attribute
 	// Multiple bindings (for each attribute buffer) and multiple attribues
@@ -541,7 +550,7 @@ void VulkanExample::preparePipelines()
 	};
 
 	vertexInputStateCI = vks::initializers::pipelineVertexInputStateCreateInfo(vertexInputBindingsSeparate, vertexInputAttributesSeparate);
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.vertexAttributesSeparate));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.vertexAttributesSeparate));
 }
 
 void VulkanExample::prepareUniformBuffers()
@@ -560,7 +569,7 @@ void VulkanExample::updateUniformBuffers()
 	shaderData.values.projection = camera.matrices.perspective;
 	shaderData.values.view = camera.matrices.view;
 	shaderData.values.viewPos = camera.viewPos;
-	memcpy(shaderData.buffer.mapped, &shaderData.values, sizeof(shaderData.values));
+	memcpy(shaderData.buffer.m_pMapped, &shaderData.values, sizeof(shaderData.values));
 }
 
 void VulkanExample::prepare()
