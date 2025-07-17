@@ -19,13 +19,6 @@
 #include <vulkan/vulkan.h>
 #include "VulkanTools.h"
 
-#ifdef __ANDROID__
-#include "VulkanAndroid.h"
-#endif
-
-#ifdef __APPLE__
-#include <sys/utsname.h>
-#endif
 
 class VulkanSwapChain
 {

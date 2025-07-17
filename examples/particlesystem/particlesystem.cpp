@@ -11,6 +11,9 @@
 #include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 #define PARTICLE_COUNT 512
 
 #define FLAME_RADIUS 8.0f
@@ -115,35 +118,35 @@ public:
 
 	~VulkanExample()
 	{
-		if (m_vkDevice) {
+		if (m_device) {
 			textures.particles.smoke.destroy();
 			textures.particles.fire.destroy();
 			textures.floor.colorMap.destroy();
 			textures.floor.normalMap.destroy();
 
-			vkDestroyPipeline(m_vkDevice, pipelines.particles, nullptr);
-			vkDestroyPipeline(m_vkDevice, pipelines.environment, nullptr);
+			vkDestroyPipeline(m_device, pipelines.particles, nullptr);
+			vkDestroyPipeline(m_device, pipelines.environment, nullptr);
 
-			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
 
-			vkUnmapMemory(m_vkDevice, particles.memory);
-			vkDestroyBuffer(m_vkDevice, particles.buffer, nullptr);
-			vkFreeMemory(m_vkDevice, particles.memory, nullptr);
+			vkUnmapMemory(m_device, particles.memory);
+			vkDestroyBuffer(m_device, particles.buffer, nullptr);
+			vkFreeMemory(m_device, particles.memory, nullptr);
 
 			uniformBuffers.environment.destroy();
 			uniformBuffers.particles.destroy();
 
-			vkDestroySampler(m_vkDevice, textures.particles.sampler, nullptr);
+			vkDestroySampler(m_device, textures.particles.sampler, nullptr);
 		}
 	}
 
 	virtual void getEnabledFeatures()
 	{
-		// Enable anisotropic filtering if supported
-		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
-			m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
-		};
+		//// Enable anisotropic filtering if supported
+		//if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
+		//	m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
+		//};
 	}
 
 	void buildCommandBuffers()
@@ -155,7 +158,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = m_vkRenderPass;
+		renderPassBeginInfo.renderPass = m_renderPassOriginal;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -278,7 +281,7 @@ public:
 			particleBuffer.data()));
 
 		// Map the m_vkDeviceMemory and store the pointer for reuse
-		VK_CHECK_RESULT(vkMapMemory(m_vkDevice, particles.memory, 0, particles.size, 0, &particles.mappedMemory));
+		VK_CHECK_RESULT(vkMapMemory(m_device, particles.memory, 0, particles.size, 0, &particles.mappedMemory));
 	}
 
 	// Update the state of all particles
@@ -340,16 +343,16 @@ public:
 		// Both particle textures have the same number of mip maps
 		samplerCreateInfo.maxLod = float(textures.particles.fire.mipLevels);
 
-		if (m_pVulkanDevice->m_vkPhysicalDeviceFeatures.samplerAnisotropy)
-		{
-			// Enable anisotropic filtering
-			samplerCreateInfo.maxAnisotropy = 8.0f;
-			samplerCreateInfo.anisotropyEnable = VK_TRUE;
-		}
+		//if (m_pVulkanDevice->m_vkPhysicalDeviceFeatures.samplerAnisotropy)
+		//{
+		//	// Enable anisotropic filtering
+		//	samplerCreateInfo.maxAnisotropy = 8.0f;
+		//	samplerCreateInfo.anisotropyEnable = VK_TRUE;
+		//}
 
 		// Use a different border color (than the normal texture loader) for additive blending
 		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &samplerCreateInfo, nullptr, &textures.particles.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_device, &samplerCreateInfo, nullptr, &textures.particles.sampler));
 
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
 		environment.loadFromFile(getAssetPath() + "models/fireplace.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
@@ -363,7 +366,8 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+		//VK_CHECK_RESULT(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -375,47 +379,58 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT,2)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 		
 		// Sets
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets;
 
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
+		VkDescriptorSetAllocateInfo allocInfo
+			= vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
 
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.particles));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSets.particles));
 
 		// Image descriptor for the color map texture
-		VkDescriptorImageInfo texDescriptorSmoke = vks::initializers::descriptorImageInfo(textures.particles.sampler, textures.particles.smoke.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		VkDescriptorImageInfo texDescriptorFire = vks::initializers::descriptorImageInfo(textures.particles.sampler, textures.particles.fire.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VkDescriptorImageInfo texDescriptorSmoke
+			= vks::initializers::descriptorImageInfo(
+				textures.particles.sampler, textures.particles.smoke.m_vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VkDescriptorImageInfo texDescriptorFire
+			= vks::initializers::descriptorImageInfo(
+				textures.particles.sampler, textures.particles.fire.m_vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
-			vks::initializers::writeDescriptorSet(descriptorSets.particles, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.particles.descriptor),
+			vks::initializers::writeDescriptorSet(
+				descriptorSets.particles, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.particles.m_vkDescriptorBufferInfo),
 			// Binding 1: Smoke texture
-			vks::initializers::writeDescriptorSet(descriptorSets.particles, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texDescriptorSmoke),
+			vks::initializers::writeDescriptorSet(
+				descriptorSets.particles, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texDescriptorSmoke),
 			// Binding 1: Fire texture array
-			vks::initializers::writeDescriptorSet(descriptorSets.particles, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texDescriptorFire)
+			vks::initializers::writeDescriptorSet(
+				descriptorSets.particles, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texDescriptorFire)
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 
 		// Environment
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSets.environment));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSets.environment));
 		writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
-			vks::initializers::writeDescriptorSet(descriptorSets.environment, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.environment.descriptor),
+			vks::initializers::writeDescriptorSet(
+				descriptorSets.environment, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.environment.m_vkDescriptorBufferInfo),
 			// Binding 1: Color map
-			vks::initializers::writeDescriptorSet(descriptorSets.environment, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textures.floor.colorMap.descriptor),
+			vks::initializers::writeDescriptorSet(
+				descriptorSets.environment, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textures.floor.colorMap.m_vkDescriptorImageInfo),
 			// Binding 2: Normal map
-			vks::initializers::writeDescriptorSet(descriptorSets.environment, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &textures.floor.normalMap.descriptor),
+			vks::initializers::writeDescriptorSet(
+				descriptorSets.environment, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &textures.floor.normalMap.m_vkDescriptorImageInfo),
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 
 	void preparePipelines()
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
 		// Pipelines
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_POINT_LIST, 0, VK_FALSE);
@@ -429,7 +444,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -478,7 +493,7 @@ public:
 
 			shaderStages[0] = loadShader(getShadersPath() + "particlesystem/particle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 			shaderStages[1] = loadShader(getShadersPath() + "particlesystem/particle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.particles));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.particles));
 		}
 
 		// Environment rendering pipeline (normal mapped)
@@ -492,7 +507,7 @@ public:
 
 			shaderStages[0] = loadShader(getShadersPath() + "particlesystem/normalmap.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 			shaderStages[1] = loadShader(getShadersPath() + "particlesystem/normalmap.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.environment));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.environment));
 		}
 	}
 
@@ -514,7 +529,7 @@ public:
 		uniformDataParticles.projection = camera.matrices.perspective;
 		uniformDataParticles.modelView = camera.matrices.view;
 		uniformDataParticles.viewportDim = glm::vec2((float)m_drawAreaWidth, (float)m_drawAreaHeight);
-		memcpy(uniformBuffers.particles.mapped, &uniformDataParticles, sizeof(UniformDataParticles));
+		memcpy(uniformBuffers.particles.m_pMapped, &uniformDataParticles, sizeof(UniformDataParticles));
 
 		// Environment
 		uniformDataEnvironment.projection = camera.matrices.perspective;
@@ -526,7 +541,7 @@ public:
 			uniformDataEnvironment.lightPos.y = 0.0f;
 			uniformDataEnvironment.lightPos.z = cos(timer * 2.0f * float(M_PI)) * 1.5f;
 		}
-		memcpy(uniformBuffers.environment.mapped, &uniformDataEnvironment, sizeof(UniformDataEnvironment));
+		memcpy(uniformBuffers.environment.m_pMapped, &uniformDataEnvironment, sizeof(UniformDataEnvironment));
 	}
 
 	void prepare()

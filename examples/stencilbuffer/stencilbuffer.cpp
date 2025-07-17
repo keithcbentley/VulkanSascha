@@ -9,6 +9,9 @@
 #include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
 
+vkcpp::AppContext vkcpp::s_appContext;
+
+
 class VulkanExample : public VulkanExampleBase
 {
 public:
@@ -21,6 +24,7 @@ public:
 		// Vertex shader extrudes model by this value along normals for outlining
 		float outlineWidth = 0.025f;
 	} uniformData;
+
 	vks::Buffer uniformBuffer;
 
 	struct {
@@ -46,11 +50,11 @@ public:
 
 	~VulkanExample()
 	{
-		if (m_vkDevice) {
-			vkDestroyPipeline(m_vkDevice, pipelines.stencil, nullptr);
-			vkDestroyPipeline(m_vkDevice, pipelines.outline, nullptr);
-			vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+		if (m_device) {
+			vkDestroyPipeline(m_device, pipelines.stencil, nullptr);
+			vkDestroyPipeline(m_device, pipelines.outline, nullptr);
+			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
 			uniformBuffer.destroy();
 		}
 	}
@@ -64,7 +68,7 @@ public:
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = m_vkRenderPass;
+		renderPassBeginInfo.renderPass = m_renderPassOriginal;
 		renderPassBeginInfo.renderArea.offset.x = 0;
 		renderPassBeginInfo.renderArea.offset.y = 0;
 		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -121,7 +125,8 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), 1);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+		//VK_CHECK_RESULT(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 		
 		// Layout
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -129,22 +134,23 @@ public:
 		};
 
 		VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings.data(), 1);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayoutInfo, nullptr, &m_vkDescriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayoutInfo, nullptr, &m_vkDescriptorSetLayout));
 
 		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
+		VkDescriptorSetAllocateInfo allocInfo
+			= vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
 		std::vector<VkWriteDescriptorSet> modelWriteDescriptorSets = {
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.descriptor)
+			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo)
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, NULL);
+		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, NULL);
 	}
 
 	void preparePipelines()
 	{
 		// Layout
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutInfo, nullptr, &m_vkPipelineLayout));
+		VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -158,7 +164,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -183,7 +189,7 @@ public:
 		depthStencilState.back.writeMask = 0xff;
 		depthStencilState.back.reference = 1;
 		depthStencilState.front = depthStencilState.back;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.stencil));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.stencil));
 		// Outline pass
 		depthStencilState.back.compareOp = VK_COMPARE_OP_NOT_EQUAL;
 		depthStencilState.back.failOp = VK_STENCIL_OP_KEEP;
@@ -193,7 +199,7 @@ public:
 		depthStencilState.depthTestEnable = VK_FALSE;
 		shaderStages[0] = loadShader(getShadersPath() + "stencilbuffer/outline.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "stencilbuffer/outline.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.outline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.outline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -208,7 +214,7 @@ public:
 	{
 		uniformData.projection = camera.matrices.perspective;
 		uniformData.model = camera.matrices.view;
-		memcpy(uniformBuffer.mapped, &uniformData, sizeof(UniformData));
+		memcpy(uniformBuffer.m_pMapped, &uniformData, sizeof(UniformData));
 	}
 
 	void draw()

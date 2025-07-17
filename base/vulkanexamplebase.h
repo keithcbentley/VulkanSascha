@@ -121,45 +121,46 @@ protected:
     vkcpp::DeviceProperties m_physicalDeviceProperties;
 
 
-	// Stores all available m_vkDeviceMemory (type) m_vkPhysicalDeviceProperties for the physical m_vkDevice
 	VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties{};
-	/** @brief Set of physical device features to be enabled for this example (must be set in the derived constructor) */
+
 	VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures10{};
-	/** @brief Set of device extensions to be enabled for this example (must be set in the derived constructor) */
+
 	std::vector<const char*> m_requestedDeviceExtensions;
-	/** @brief Set of instance extensions to be enabled for this example (must be set in the derived constructor) */
+
 	std::vector<const char*> m_requestedInstanceExtensions;
-	/** @brief Set of layer settings to be enabled for this example (must be set in the derived constructor) */
+
 	std::vector<VkLayerSettingEXT> m_requestedLayerSettings;
-	/** @brief Optional pNext structure for passing extension structures to device creation */
+
 	void* m_deviceCreatepNextChain = nullptr;
-	// Handle to the m_vkDevice graphics m_vkQueue that command buffers are submitted to
+
 	VkQueue m_vkQueue{ VK_NULL_HANDLE };
-	// Depth buffer format (selected during Vulkan initialization)
+
 	VkFormat m_vkFormatDepth{VK_FORMAT_UNDEFINED};
-	// Command buffer pool
+
 	VkCommandPool m_vkCommandPool{ VK_NULL_HANDLE };
-	/** @brief Pipeline stages used to wait at for graphics queue submissions */
+
 	VkPipelineStageFlags submitPipelineStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	// Contains command buffers and semaphores to be presented to the m_vkQueue
+
 	VkSubmitInfo m_vkSubmitInfo{};
-	// Command buffers used for rendering
+
 	std::vector<VkCommandBuffer> drawCmdBuffers;
+
 	// Global render pass for frame buffer writes
 	//VkRenderPass m_vkRenderPass{ VK_NULL_HANDLE };
 	vkcpp::RenderPass m_renderPassOriginal;
-	// List of available frame buffers (same as number of swap chain images)
+
 	std::vector<VkFramebuffer>m_vkFrameBuffers;
-	// Active frame buffer index
+
 	uint32_t m_currentBufferIndex = 0;
-	// Descriptor set pool
+
 	vkcpp::DescriptorPool m_descriptorPool;
-	// List of shader modules created (stored for cleanup)
+
 	std::vector<VkShaderModule> m_vkShaderModules;
-	// Pipeline cache object
+
 	VkPipelineCache m_vkPipelineCache{ VK_NULL_HANDLE };
-	// Wraps the swap chain to present images (framebuffers) to the windowing system
+
 	VulkanSwapChain m_swapChain;
+
 	// Synchronization semaphores
 	struct {
 		// Swap chain m_vkImage presentation
@@ -167,7 +168,9 @@ protected:
 		// Command buffer submission and execution
 		VkSemaphore m_vkSemaphoreRenderComplete;
 	} semaphores{};
+
 	std::vector<VkFence> m_vkFences;
+
 	bool m_requiresStencil{ false };
 
 public:
