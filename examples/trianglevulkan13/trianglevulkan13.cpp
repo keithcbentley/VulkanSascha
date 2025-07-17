@@ -93,8 +93,6 @@ public:
     // Fences are used to make sure command buffers aren't rerecorded until they've finished executing
     std::array<VkFence, MAX_CONCURRENT_FRAMES> m_waitFences {};
 
-    //    VkCommandPool m_vkCommandPool { VK_NULL_HANDLE };
-    std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> m_commandBuffers {};
 
     // To select the correct sync and command objects, we need to keep track of the current frame
     uint32_t m_currentFrameIndex { 0 };
@@ -130,7 +128,6 @@ public:
             vkFreeMemory(m_device, m_vertexBuffer.m_vkDeviceMemory, nullptr);
             vkDestroyBuffer(m_device, m_indexBuffer.m_vkBuffer, nullptr);
             vkFreeMemory(m_device, m_indexBuffer.m_vkDeviceMemory, nullptr);
-            vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
             for (size_t i = 0; i < m_presentCompleteSemaphores.size(); i++) {
                 vkDestroySemaphore(m_device, m_presentCompleteSemaphores[i], nullptr);
             }
@@ -198,18 +195,6 @@ public:
         }
     }
 
-    // Command buffers are used to record commands to and are submitted to a m_vkQueue for execution ("rendering")
-    void createCommandBuffers()
-    {
-        // All command buffers are allocated from the same command pool
-        VkCommandPoolCreateInfo commandPoolCI { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-        commandPoolCI.queueFamilyIndex = m_swapChain.queueNodeIndex;
-        commandPoolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        VK_CHECK_RESULT(vkCreateCommandPool(m_device, &commandPoolCI, nullptr, &m_vkCommandPool));
-        // Allocate one command buffer per max. concurrent frame from above pool
-        VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, MAX_CONCURRENT_FRAMES);
-        VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &cmdBufAllocateInfo, m_commandBuffers.data()));
-    }
 
     // Prepare vertex and index buffers for an indexed triangle
     // Also uploads them to m_vkDevice local m_vkDeviceMemory using staging and initializes vertex input and attribute binding to match the vertex shader
@@ -296,7 +281,7 @@ public:
         VkCommandBuffer copyCmd;
 
         VkCommandBufferAllocateInfo cmdBufAllocateInfo { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        cmdBufAllocateInfo.commandPool = m_vkCommandPool;
+        cmdBufAllocateInfo.commandPool = m_commandPool;
         cmdBufAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         cmdBufAllocateInfo.commandBufferCount = 1;
         VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &cmdBufAllocateInfo, &copyCmd));
@@ -327,7 +312,7 @@ public:
         // Wait for the fence to signal that command buffer has finished executing
         VK_CHECK_RESULT(vkWaitForFences(m_device, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
         vkDestroyFence(m_device, fence, nullptr);
-        vkFreeCommandBuffers(m_device, m_vkCommandPool, 1, &copyCmd);
+        vkFreeCommandBuffers(m_device, m_commandPool, 1, &copyCmd);
 
         // The fence made sure copies are finished, so we can safely delete the staging buffer
         vkDestroyBuffer(m_device, stagingBuffer.m_vkBuffer, nullptr);
@@ -596,7 +581,6 @@ public:
     {
         VulkanExampleBase::prepare();
         createSynchronizationPrimitives();
-        createCommandBuffers();
         createVertexBuffer();
         createUniformBuffers();
         createDescriptors();
@@ -632,7 +616,7 @@ public:
 
         // Build the command buffer for the next frame to render
 
-        const VkCommandBuffer vkCommandBuffer = m_commandBuffers[m_currentFrameIndex];
+        const VkCommandBuffer vkCommandBuffer = drawCmdBuffers[m_currentFrameIndex];
         vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(vkCommandBuffer);
         commandBuffer.reset();
         commandBuffer.begin();
