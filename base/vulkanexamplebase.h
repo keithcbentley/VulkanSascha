@@ -133,12 +133,12 @@ protected:
 
 	void* m_deviceCreatepNextChain = nullptr;
 
-	VkQueue m_vkQueue{ VK_NULL_HANDLE };
+	vkcpp::Queue m_queue;
 
 	VkFormat m_vkFormatDepth{VK_FORMAT_UNDEFINED};
 
 	vkcpp::CommandPool m_commandPool;
-	std::vector<VkCommandBuffer> drawCmdBuffers;
+	std::vector<vkcpp::CommandBuffer> m_drawCommandBuffers;
 
 	VkPipelineStageFlags submitPipelineStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 

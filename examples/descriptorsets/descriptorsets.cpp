@@ -81,8 +81,8 @@ public:
         vkRenderPassBeginInfo.clearValueCount = 2;
         vkRenderPassBeginInfo.pClearValues = clearValues;
 
-        for (int32_t i = 0; i < drawCmdBuffers.size(); ++i) {
-            vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(drawCmdBuffers[i]);
+        for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
+            vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[i];
 
             vkRenderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
@@ -92,7 +92,7 @@ public:
             commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
             commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
 
-            model.bindBuffers(drawCmdBuffers[i]);
+            model.bindBuffers(m_drawCommandBuffers[i]);
 
             /*
                     [POI] Render cubes with separate descriptor sets
@@ -100,10 +100,10 @@ public:
             for (auto cube : cubes) {
                 // Bind the cube's descriptor set. This tells the command buffer to use the uniform buffer and m_vkImage set for this cube
                 commandBuffer.cmdBindDescriptorSet(cube.m_descriptorSet, m_pipelineLayout);
-                model.draw(drawCmdBuffers[i]);
+                model.draw(m_drawCommandBuffers[i]);
             }
 
-            drawUI(drawCmdBuffers[i]);
+            drawUI(m_drawCommandBuffers[i]);
 
             commandBuffer.cmdEndRenderPass();
             commandBuffer.end();
@@ -113,9 +113,11 @@ public:
     void loadAssets()
     {
         const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-        model.loadFromFile(getAssetPath() + "models/cube.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
-        cubes[0].texture.loadFromFile(getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
-        cubes[1].texture.loadFromFile(getAssetPath() + "textures/crate02_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
+        model.loadFromFile(getAssetPath() + "models/cube.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
+        cubes[0].texture.loadFromFile(
+			getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
+        cubes[1].texture.loadFromFile(
+			getAssetPath() + "textures/crate02_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
     }
 
     /*
@@ -312,8 +314,9 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-        m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
-        VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
     }
 

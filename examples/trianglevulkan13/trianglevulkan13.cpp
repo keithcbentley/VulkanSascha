@@ -308,7 +308,7 @@ public:
         VkFence fence;
         VK_CHECK_RESULT(vkCreateFence(m_device, &fenceCI, nullptr, &fence));
         // Submit copies to the m_vkQueue
-        VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, fence));
+        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &submitInfo, fence));
         // Wait for the fence to signal that command buffer has finished executing
         VK_CHECK_RESULT(vkWaitForFences(m_device, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
         vkDestroyFence(m_device, fence, nullptr);
@@ -616,7 +616,7 @@ public:
 
         // Build the command buffer for the next frame to render
 
-        const VkCommandBuffer vkCommandBuffer = drawCmdBuffers[m_currentFrameIndex];
+        const VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentFrameIndex];
         vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(vkCommandBuffer);
         commandBuffer.reset();
         commandBuffer.begin();
@@ -719,7 +719,7 @@ public:
         submitInfo.addSignalSemaphore(m_renderCompleteSemaphores[imageIndex]);
 
         // Submit to the graphics m_vkQueue passing a wait fence
-        vkcpp::Queue queue = vkcpp::Queue::makeCopy(m_vkQueue);
+        vkcpp::Queue queue = vkcpp::Queue::makeCopy(m_queue);
         queue.submit(submitInfo, m_waitFences[m_currentFrameIndex]);
 
         //	Present the current frame buffer to the swap chain.

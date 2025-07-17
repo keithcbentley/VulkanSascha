@@ -82,7 +82,7 @@ Queue Device::getDeviceQueue(int deviceQueueFamilyIndex, int deviceQueueIndex) c
     if (vkQueue == nullptr) {
         throw Exception(VK_ERROR_UNKNOWN);
     }
-    return Queue(vkQueue, deviceQueueFamilyIndex, *this);
+    return Queue(vkQueue, deviceQueueFamilyIndex);
 }
 
 void AppContext::init(const AppContextCreateInfo& appContextCreateInfo) {

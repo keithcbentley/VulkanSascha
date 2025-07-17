@@ -2451,36 +2451,38 @@ public:
         sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     }
 
-	CommandPoolCreateInfo& setFlags(VkCommandPoolCreateFlagBits flagsArg) {
-		flags = flagsArg;
-		return *this;
-	}
+    CommandPoolCreateInfo& setFlags(VkCommandPoolCreateFlagBits flagsArg)
+    {
+        flags = flagsArg;
+        return *this;
+    }
 
-	CommandPoolCreateInfo& setQueueFamilyIndex(uint32_t queueFamilyIndexArg) {
-		queueFamilyIndex = queueFamilyIndexArg;
-		return *this;
-	}
-
+    CommandPoolCreateInfo& setQueueFamilyIndex(uint32_t queueFamilyIndexArg)
+    {
+        queueFamilyIndex = queueFamilyIndexArg;
+        return *this;
+    }
 };
 
-class CommandBufferAllocateInfo : public VkCommandBufferAllocateInfo
-{
+class CommandBufferAllocateInfo : public VkCommandBufferAllocateInfo {
 public:
+    CommandBufferAllocateInfo()
+        : VkCommandBufferAllocateInfo {}
+    {
+        sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    }
 
-	CommandBufferAllocateInfo()
-		: VkCommandBufferAllocateInfo{} {
-			sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	}
+    CommandBufferAllocateInfo& setCount(uint32_t commandBufferCountArg)
+    {
+        commandBufferCount = commandBufferCountArg;
+        return *this;
+    }
 
-	CommandBufferAllocateInfo& setCount(uint32_t commandBufferCountArg) {
-		commandBufferCount = commandBufferCountArg;
-		return *this;
-	}
-
-	CommandBufferAllocateInfo& setCommandPool(VkCommandPool commandPoolArg) {
-		commandPool = commandPoolArg;
-		return *this;
-	}
+    CommandBufferAllocateInfo& setCommandPool(VkCommandPool commandPoolArg)
+    {
+        commandPool = commandPoolArg;
+        return *this;
+    }
 };
 
 //	TODO: should we make some object that has contains a m_vkQueue and command pool
@@ -3056,8 +3058,8 @@ public:
     Queue() = default;
 
     //	Queues always come from the m_vkDevice and are never (explicitly) destroyed
-    Queue(VkQueue vkQueue, uint32_t queueFamilyIndex, const Device& device)
-        : HandleWithOwner(vkQueue, device, nullptr)
+    Queue(VkQueue vkQueue, uint32_t queueFamilyIndex)
+        : HandleWithOwner(vkQueue, device(), nullptr)
         , m_queueFamilyIndex(queueFamilyIndex)
     {
     }
@@ -3070,7 +3072,7 @@ public:
 
     static Queue makeCopy(VkQueue vkQueue)
     {
-        return Queue(vkQueue, -1, Device());
+        return Queue(vkQueue, -1);
     }
 
     void waitIdle() const
@@ -3081,6 +3083,14 @@ public:
     void submit(const SubmitInfo& submitInfo, VkFence vkFence) const
     {
         VkResult vkResult = vkQueueSubmit(*this, 1, &submitInfo, vkFence);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+    }
+
+    void submit(VkSubmitInfo& vkSubmitInfo, VkFence vkFence) const
+    {
+        VkResult vkResult = vkQueueSubmit(*this, 1, &vkSubmitInfo, vkFence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }

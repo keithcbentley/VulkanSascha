@@ -13,9 +13,12 @@ std::vector<const char*> VulkanExampleBase::args;
 void VulkanExampleBase::renderFrame()
 {
     VulkanExampleBase::prepareFrame();
+	//	TODO: use smarter submit info.
     m_vkSubmitInfo.commandBufferCount = 1;
-    m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
-    VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+	VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+	m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+	m_queue.submit(m_vkSubmitInfo, VK_NULL_HANDLE);
+    VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
     VulkanExampleBase::submitFrame();
 }
 
@@ -34,22 +37,20 @@ void VulkanExampleBase::createCommandBuffers()
 	//	TODO: need a better way to communicate the number of swapchain images being used.
 	//	This is kind of dicey since it requires that the swapchain already be created.
 	//	This creates an arbitrary dependency on initialization order.
-    drawCmdBuffers.resize(m_swapChain.images.size());
-	vkcpp::CommandBufferAllocateInfo commandBufferAllocateInfo;
-	commandBufferAllocateInfo
-		.setCount(drawCmdBuffers.size())
-		.setCommandPool(m_commandPool);
+	m_drawCommandBuffers.clear();
+	for (uint32_t i = 0; i < m_swapChain.images.size(); i++) {
+		m_drawCommandBuffers.emplace_back(vkcpp::CommandBuffer(m_commandPool));
+	}
 
-    VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, drawCmdBuffers.data()));
 }
 
 void VulkanExampleBase::destroyCommandBuffers()
 {
-    vkFreeCommandBuffers(
-        m_device,
-        m_commandPool,
-        static_cast<uint32_t>(drawCmdBuffers.size()),
-        drawCmdBuffers.data());
+    //vkFreeCommandBuffers(
+    //    m_device,
+    //    m_commandPool,
+    //    static_cast<uint32_t>(drawCmdBuffers.size()),
+    //    drawCmdBuffers.data());
 }
 
 std::string VulkanExampleBase::getShadersPath() const
@@ -78,7 +79,7 @@ void VulkanExampleBase::prepare()
     m_exampleSettings.m_showUIOverlay = m_exampleSettings.m_showUIOverlay && (!m_benchmark.active);
     if (m_exampleSettings.m_showUIOverlay) {
         m_UIOverlay.device = m_pVulkanDevice;
-        m_UIOverlay.queue = m_vkQueue;
+        m_UIOverlay.queue = m_queue;
         m_UIOverlay.shaders = {
             loadShader(getShadersPath() + "base/uioverlay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
             loadShader(getShadersPath() + "base/uioverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
@@ -261,7 +262,7 @@ void VulkanExampleBase::prepareFrame()
 
 void VulkanExampleBase::submitFrame()
 {
-    VkResult result = m_swapChain.queuePresent(m_vkQueue, m_currentBufferIndex, semaphores.m_vkSemaphoreRenderComplete);
+    VkResult result = m_swapChain.queuePresent(m_queue, m_currentBufferIndex, semaphores.m_vkSemaphoreRenderComplete);
     // Recreate the swapchain if it's no longer compatible with the m_vkSurface (OUT_OF_DATE) or no longer optimal for presentation (SUBOPTIMAL)
     if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
         windowResize();
@@ -271,7 +272,7 @@ void VulkanExampleBase::submitFrame()
     } else {
         VK_CHECK_RESULT(result);
     }
-    VK_CHECK_RESULT(vkQueueWaitIdle(m_vkQueue));
+    VK_CHECK_RESULT(vkQueueWaitIdle(m_queue));
 }
 
 void VulkanExampleBase::setCommandLineOptions()
@@ -447,7 +448,8 @@ bool VulkanExampleBase::initVulkan()
     getEnabledExtensions();
 
     // Get a graphics m_vkQueue from the m_vkDevice
-    vkGetDeviceQueue(m_device, m_pVulkanDevice->m_queueFamilyIndices.m_graphics, 0, &m_vkQueue);
+	m_queue = m_device.getDeviceQueue(m_pVulkanDevice->m_queueFamilyIndices.m_graphics,0);
+    //vkGetDeviceQueue(m_device, m_pVulkanDevice->m_queueFamilyIndices.m_graphics, 0, &m_queue);
 
     // Find a suitable depth and/or stencil format
     VkBool32 validFormat { false };
@@ -756,7 +758,7 @@ void VulkanExampleBase::createSynchronizationPrimitives()
 {
     // Wait fences to sync command buffer access
     VkFenceCreateInfo fenceCreateInfo = vks::initializers::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
-    m_vkFences.resize(drawCmdBuffers.size());
+    m_vkFences.resize(m_drawCommandBuffers.size());
     for (auto& fence : m_vkFences) {
         VK_CHECK_RESULT(vkCreateFence(m_device, &fenceCreateInfo, nullptr, &fence));
     }

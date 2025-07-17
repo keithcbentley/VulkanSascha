@@ -294,7 +294,7 @@ public:
         VK_CHECK_RESULT(vkCreateFence(m_device, &fenceCI, nullptr, &fence));
 
         // Submit to the m_vkQueue
-        VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, fence));
+        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &submitInfo, fence));
         // Wait for the fence to signal that command buffer has finished executing
         VK_CHECK_RESULT(vkWaitForFences(m_device, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
 
@@ -816,8 +816,7 @@ public:
         renderPassBeginInfo.pClearValues = clearValues;
         renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
 
-//        vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_vkCommandBuffers[m_currentFrameIndex]);
-		vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(drawCmdBuffers[m_currentFrameIndex]);
+		vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[m_currentFrameIndex];
 
         commandBuffer
             .reset()
@@ -845,7 +844,7 @@ public:
         submitInfo.addSignalSemaphore(m_vkRenderCompleteSemaphores[imageIndex]);
 
         // Submit to the graphics m_vkQueue passing a wait fence
-        VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &submitInfo, m_vkWaitFences[m_currentFrameIndex]));
+        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &submitInfo, m_vkWaitFences[m_currentFrameIndex]));
 
         // Present the current frame buffer to the swap chain
         // Pass the semaphore signaled by the command buffer submission from the submit info as the wait semaphore for swap chain presentation
@@ -854,7 +853,7 @@ public:
         vkcpp::PresentInfo presentInfo;
         presentInfo.addWaitSemaphore(m_vkRenderCompleteSemaphores[imageIndex]);
         presentInfo.addSwapchain(m_swapChain.swapChain, imageIndex);
-        result = vkQueuePresentKHR(m_vkQueue, &presentInfo);
+        result = vkQueuePresentKHR(m_queue, &presentInfo);
 
         if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
             windowResize();
