@@ -45,12 +45,6 @@ public:
         float color[3];
     };
 
-    // Vertex buffer and attributes
-    // struct {
-    //    vkcpp::DeviceMemory m_deviceMemory; // Handle to the m_vkDevice m_vkDeviceMemory for this buffer
-    //    vkcpp::Buffer m_buffer; // Handle to the Vulkan buffer object that the m_vkDeviceMemory is bound to
-    //} m_vertices;
-
     vkcpp::Buffer_DeviceMemory m_vertices;
     vkcpp::Buffer_DeviceMemory m_indices;
     uint32_t m_indicesCount { 0 };
@@ -65,6 +59,7 @@ public:
         // We keep a pointer to the mapped buffer, so we can easily update it's contents via a memcpy
         uint8_t* m_pMappedMemory { nullptr };
     };
+
     // We use one UBO per frame, so we can have a frame overlap and make sure that uniforms aren't updated while still in use
     std::array<UniformBuffer, MAX_CONCURRENT_FRAMES> m_uniformBuffers;
 
@@ -107,8 +102,7 @@ public:
     std::vector<VkSemaphore> m_vkPresentCompleteSemaphores {};
     std::vector<VkSemaphore> m_vkRenderCompleteSemaphores {};
 
-    VkCommandPool m_vkCommandPool { VK_NULL_HANDLE };
-    std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> m_vkCommandBuffers {};
+    //std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> m_vkCommandBuffers {};
     std::array<VkFence, MAX_CONCURRENT_FRAMES> m_vkWaitFences {};
 
     // To select the correct sync and command objects, we need to keep track of the current frame
@@ -133,7 +127,7 @@ public:
         // Clean up used Vulkan resources
         // Note: Inherited destructor cleans up resources stored in base class
         if (m_device) {
-            vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
+
             for (size_t i = 0; i < m_vkPresentCompleteSemaphores.size(); i++) {
                 vkDestroySemaphore(m_device, m_vkPresentCompleteSemaphores[i], nullptr);
             }
@@ -194,19 +188,6 @@ public:
         }
     }
 
-    void createCommandBuffers()
-    {
-        // All command buffers are allocated from a command pool
-        VkCommandPoolCreateInfo commandPoolCI {};
-        commandPoolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        commandPoolCI.queueFamilyIndex = m_swapChain.queueNodeIndex;
-        commandPoolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        VK_CHECK_RESULT(vkCreateCommandPool(m_device, &commandPoolCI, nullptr, &m_vkCommandPool));
-
-        // Allocate one command buffer per max. concurrent frame from above pool
-        VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, MAX_CONCURRENT_FRAMES);
-        VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &cmdBufAllocateInfo, m_vkCommandBuffers.data()));
-    }
 
     // Prepare vertex and index buffers for an indexed triangle
     // Also uploads them to m_vkDevice local m_vkDeviceMemory using staging and initializes vertex input and attribute binding to match the vertex shader
@@ -282,7 +263,7 @@ public:
 
         VkCommandBufferAllocateInfo cmdBufAllocateInfo {};
         cmdBufAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        cmdBufAllocateInfo.commandPool = m_vkCommandPool;
+        cmdBufAllocateInfo.commandPool = m_commandPool;
         cmdBufAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         cmdBufAllocateInfo.commandBufferCount = 1;
         VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &cmdBufAllocateInfo, &vkCommandBuffer));
@@ -318,7 +299,8 @@ public:
         VK_CHECK_RESULT(vkWaitForFences(m_device, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
 
         vkDestroyFence(m_device, fence, nullptr);
-        vkFreeCommandBuffers(m_device, m_vkCommandPool, 1, &vkCommandBuffer);
+
+        vkFreeCommandBuffers(m_device, m_commandPool, 1, &vkCommandBuffer);
     }
 
     // Descriptors are allocated from a pool, that tells the implementation how many and what types of descriptors we are going to use (at maximum)
@@ -555,7 +537,7 @@ public:
         // In a more complex scenario you would have different m_vkPipeline layouts for different descriptor set layouts that could be reused
         vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
         pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
-        m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo, m_device);
+        m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
 
         // Create the graphics m_vkPipeline used in this example
         // Vulkan uses the concept of rendering pipelines to encapsulate fixed states, replacing OpenGL's complex state machine
@@ -712,7 +694,7 @@ public:
         pipelineCI.pDynamicState = &dynamicStateCI;
 
         // Create rendering m_vkPipeline using the specified states
-        m_graphicsPipeline = vkcpp::GraphicsPipeline(pipelineCI, m_device);
+        m_graphicsPipeline = vkcpp::GraphicsPipeline(pipelineCI);
 
         // Shader modules are no longer needed once the graphics m_vkPipeline has been created
         vkDestroyShaderModule(m_device, shaderStages[0].module, nullptr);
@@ -764,7 +746,6 @@ public:
     {
         VulkanExampleBase::prepare();
         createSynchronizationPrimitives();
-        createCommandBuffers();
         createVertexBuffer();
         createUniformBuffers();
         createDescriptorSetLayout();
@@ -835,7 +816,8 @@ public:
         renderPassBeginInfo.pClearValues = clearValues;
         renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
 
-        vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_vkCommandBuffers[m_currentFrameIndex]);
+//        vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_vkCommandBuffers[m_currentFrameIndex]);
+		vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(drawCmdBuffers[m_currentFrameIndex]);
 
         commandBuffer
             .reset()

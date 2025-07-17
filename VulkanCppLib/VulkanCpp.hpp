@@ -275,6 +275,7 @@ protected:
         if (m_pfnDestroy && m_handle) {
             (*m_pfnDestroy)(m_handle, m_owner);
         }
+        m_handle = Handle_t {};
     }
 
     HandleWithOwner(Handle_t handle, Owner_t owner, DestroyFunc_t pfnDestroy)
@@ -2438,6 +2439,48 @@ public:
         memoryBarrierCount = static_cast<uint32_t>(m_memoryBarriers.size());
         pMemoryBarriers = m_memoryBarriers.data();
     }
+};
+
+class CommandPoolCreateInfo : public VkCommandPoolCreateInfo {
+
+public:
+    CommandPoolCreateInfo()
+        : VkCommandPoolCreateInfo {}
+    {
+        VkCommandPoolCreateInfo cmdPoolInfo = {};
+        sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    }
+
+	CommandPoolCreateInfo& setFlags(VkCommandPoolCreateFlagBits flagsArg) {
+		flags = flagsArg;
+		return *this;
+	}
+
+	CommandPoolCreateInfo& setQueueFamilyIndex(uint32_t queueFamilyIndexArg) {
+		queueFamilyIndex = queueFamilyIndexArg;
+		return *this;
+	}
+
+};
+
+class CommandBufferAllocateInfo : public VkCommandBufferAllocateInfo
+{
+public:
+
+	CommandBufferAllocateInfo()
+		: VkCommandBufferAllocateInfo{} {
+			sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	}
+
+	CommandBufferAllocateInfo& setCount(uint32_t commandBufferCountArg) {
+		commandBufferCount = commandBufferCountArg;
+		return *this;
+	}
+
+	CommandBufferAllocateInfo& setCommandPool(VkCommandPool commandPoolArg) {
+		commandPool = commandPoolArg;
+		return *this;
+	}
 };
 
 //	TODO: should we make some object that has contains a m_vkQueue and command pool

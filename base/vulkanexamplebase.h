@@ -137,13 +137,13 @@ protected:
 
 	VkFormat m_vkFormatDepth{VK_FORMAT_UNDEFINED};
 
-	VkCommandPool m_vkCommandPool{ VK_NULL_HANDLE };
+	vkcpp::CommandPool m_commandPool;
+	std::vector<VkCommandBuffer> drawCmdBuffers;
 
 	VkPipelineStageFlags submitPipelineStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
 	VkSubmitInfo m_vkSubmitInfo{};
 
-	std::vector<VkCommandBuffer> drawCmdBuffers;
 
 	// Global render pass for frame buffer writes
 	//VkRenderPass m_vkRenderPass{ VK_NULL_HANDLE };

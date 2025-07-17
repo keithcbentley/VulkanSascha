@@ -31,16 +31,23 @@ std::string VulkanExampleBase::getWindowTitle() const
 void VulkanExampleBase::createCommandBuffers()
 {
     // Create one command buffer for each swap chain m_vkImage
+	//	TODO: need a better way to communicate the number of swapchain images being used.
+	//	This is kind of dicey since it requires that the swapchain already be created.
+	//	This creates an arbitrary dependency on initialization order.
     drawCmdBuffers.resize(m_swapChain.images.size());
-    VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(m_vkCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, static_cast<uint32_t>(drawCmdBuffers.size()));
-    VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &cmdBufAllocateInfo, drawCmdBuffers.data()));
+	vkcpp::CommandBufferAllocateInfo commandBufferAllocateInfo;
+	commandBufferAllocateInfo
+		.setCount(drawCmdBuffers.size())
+		.setCommandPool(m_commandPool);
+
+    VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, drawCmdBuffers.data()));
 }
 
 void VulkanExampleBase::destroyCommandBuffers()
 {
     vkFreeCommandBuffers(
         m_device,
-        m_vkCommandPool,
+        m_commandPool,
         static_cast<uint32_t>(drawCmdBuffers.size()),
         drawCmdBuffers.data());
 }
@@ -380,6 +387,7 @@ VulkanExampleBase::~VulkanExampleBase()
 {
     // Clean up Vulkan resources
     m_swapChain.cleanup();
+
     destroyCommandBuffers();
 
     for (auto& frameBuffer : m_vkFrameBuffers) {
@@ -389,13 +397,10 @@ VulkanExampleBase::~VulkanExampleBase()
     for (auto& shaderModule : m_vkShaderModules) {
         vkDestroyShaderModule(m_device, shaderModule, nullptr);
     }
-    //    vkDestroyImageView(m_deviceOriginal, m_defaultDepthStencil.m_vkImageView, nullptr);
-    //    vkDestroyImage(m_deviceOriginal, m_defaultDepthStencil.m_vkImage, nullptr);
-    //    vkFreeMemory(m_deviceOriginal, m_defaultDepthStencil.m_vkDeviceMemory, nullptr);
 
     vkDestroyPipelineCache(m_device, m_vkPipelineCache, nullptr);
 
-    vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
+//    vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
 
     vkDestroySemaphore(m_device, semaphores.m_vkSemaphorePresentComplete, nullptr);
     vkDestroySemaphore(m_device, semaphores.m_vkSemaphoreRenderComplete, nullptr);
@@ -759,11 +764,13 @@ void VulkanExampleBase::createSynchronizationPrimitives()
 
 void VulkanExampleBase::createCommandPool()
 {
-    VkCommandPoolCreateInfo cmdPoolInfo = {};
-    cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cmdPoolInfo.queueFamilyIndex = m_swapChain.queueNodeIndex;
-    cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    VK_CHECK_RESULT(vkCreateCommandPool(m_device, &cmdPoolInfo, nullptr, &m_vkCommandPool));
+	//	TODO: another arbitrary initialization dependency.
+	vkcpp::CommandPoolCreateInfo commandPoolCreateInfo;
+	commandPoolCreateInfo
+		.setFlags(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
+		.setQueueFamilyIndex(m_swapChain.queueNodeIndex);
+
+	m_commandPool = vkcpp::CommandPool(commandPoolCreateInfo);
 }
 
 void VulkanExampleBase::setupDepthStencil()
