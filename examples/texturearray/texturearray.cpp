@@ -235,7 +235,7 @@ public:
 			textureArray.m_vkImageLayout,
 			subresourceRange);
 
-		m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+		m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
 
 		// Create sampler
 		VkSamplerCreateInfo vkSamplerCreateInfo = vks::initializers::samplerCreateInfo();
@@ -291,35 +291,35 @@ public:
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
-		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
+		for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i)
 		{
 			// Set target frame buffer
 			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
+			VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
 
-			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-			vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+			vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
 
 			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
-			vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+			vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
 
-			vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-			vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
+			vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+			vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
 
 			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertexBuffer.m_vkBuffer, offsets);
-			vkCmdBindIndexBuffer(drawCmdBuffers[i], indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindVertexBuffers(m_drawCommandBuffers[i], 0, 1, &vertexBuffer.m_vkBuffer, offsets);
+			vkCmdBindIndexBuffer(m_drawCommandBuffers[i], indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-			vkCmdDrawIndexed(drawCmdBuffers[i], m_indexCount, layerCount, 0, 0, 0);
+			vkCmdDrawIndexed(m_drawCommandBuffers[i], m_indexCount, layerCount, 0, 0, 0);
 
-			drawUI(drawCmdBuffers[i]);
+			drawUI(m_drawCommandBuffers[i]);
 
-			vkCmdEndRenderPass(drawCmdBuffers[i]);
+			vkCmdEndRenderPass(m_drawCommandBuffers[i]);
 
-			VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
+			VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
 		}
 	}
 
@@ -379,8 +379,8 @@ public:
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &indexBuffer, indices.size() * sizeof(uint32_t)));
 
 		// Copy from host do m_vkDevice
-		m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_vkQueue);
-		m_pVulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, m_vkQueue);
+		m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_queue);
+		m_pVulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, m_queue);
 
 		// Clean up
 		stagingBuffers.vertices.destroy();
@@ -531,8 +531,9 @@ public:
 	{
 		VulkanExampleBase::prepareFrame();
 		m_vkSubmitInfo.commandBufferCount = 1;
-		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
-		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+		VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 

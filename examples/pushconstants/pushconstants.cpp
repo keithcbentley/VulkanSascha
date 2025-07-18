@@ -97,8 +97,8 @@ public:
         renderPassBeginInfo.clearValueCount = 2;
         renderPassBeginInfo.pClearValues = clearValues;
 
-        for (int32_t i = 0; i < drawCmdBuffers.size(); ++i) {
-            vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(drawCmdBuffers[i]);
+        for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
+            vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[i];
 
             renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
@@ -132,7 +132,7 @@ public:
     void loadAssets()
     {
         const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-        model.loadFromFile(getAssetPath() + "models/sphere.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+        model.loadFromFile(getAssetPath() + "models/sphere.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
     }
 
     void setupDescriptors()
@@ -234,8 +234,9 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-        m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
-        VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
     }
 

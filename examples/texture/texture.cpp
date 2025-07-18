@@ -248,7 +248,7 @@ public:
             // Store current layout for later reuse
             m_texture.m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-            m_pVulkanDevice->flushCommandBuffer(commandBuffer, m_vkQueue, true);
+            m_pVulkanDevice->flushCommandBuffer(commandBuffer, m_queue, true);
 
         } else {
             // Copy data to a linear tiled m_vkImage
@@ -314,7 +314,7 @@ public:
                 0, nullptr,
                 1, &imageMemoryBarrier);
 
-            m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+            m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
         }
 
         ktxTexture_Destroy(ktxTexture);
@@ -389,9 +389,9 @@ public:
         renderPassBeginInfo.clearValueCount = 2;
         renderPassBeginInfo.pClearValues = clearValues;
 
-        for (int32_t i = 0; i < drawCmdBuffers.size(); ++i) {
+        for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
 
-            vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(drawCmdBuffers[i]);
+            vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
 
             // Set target frame buffer
             renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
@@ -442,8 +442,8 @@ public:
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &indexBuffer, indices.size() * sizeof(uint32_t)));
 
         // Copy from host do m_vkDevice
-        m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_vkQueue);
-        m_pVulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, m_vkQueue);
+        m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_queue);
+        m_pVulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, m_queue);
 
         // Clean up
         stagingBuffers.vertices.destroy();
@@ -582,8 +582,9 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-        m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
-        VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
     }
 

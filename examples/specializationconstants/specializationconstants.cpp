@@ -82,12 +82,12 @@ public:
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
-		for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
+		for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i)
 		{
 			// Set target frame buffer
 			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(drawCmdBuffers[i]);
+			vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[i];
 			commandBuffer.begin();
 			commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
 			commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
@@ -120,8 +120,8 @@ public:
 
 	void loadAssets()
 	{
-		scene.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", m_pVulkanDevice, m_vkQueue , vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
-		colormap.loadFromFile(getAssetPath() + "textures/metalplate_nomips_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
+		scene.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", m_pVulkanDevice, m_queue , vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
+		colormap.loadFromFile(getAssetPath() + "textures/metalplate_nomips_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
 	}
 
 	void setupDescriptors()
@@ -268,8 +268,9 @@ public:
 	{
 		VulkanExampleBase::prepareFrame();
 		m_vkSubmitInfo.commandBufferCount = 1;
-		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
-		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+		VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 
