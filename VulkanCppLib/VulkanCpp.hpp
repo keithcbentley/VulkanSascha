@@ -2646,6 +2646,10 @@ static_assert(sizeof(BufferImageCopy) == sizeof(VkBufferImageCopy));
 
 class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
 
+	//	We need a smart command pool for the destroy work.
+	//	We need both the command pool and the device for the destroy call.
+	//	We grab the device from the command pool so that we don't have to store
+	//	the device in addition to the regular owner object.
     static void destroy(VkCommandBuffer vkCommandBuffer, CommandPool commandPool)
     {
         vkFreeCommandBuffers(commandPool.getVkDevice(), commandPool, 1, &vkCommandBuffer);
@@ -2674,9 +2678,11 @@ public:
         new (this) CommandBuffer(vkCommandBuffer, commandPool, &destroy);
     }
 
+	//	Handy way to make simple copy from an existing vkCommandBuffer.
+	//	Note that we don't have a real command pool.
     static CommandBuffer makeCopy(VkCommandBuffer vkCommandBuffer)
     {
-        return CommandBuffer(vkCommandBuffer, CommandPool(), nullptr);
+		return CommandBuffer(vkCommandBuffer, CommandPool(), nullptr);
     }
 
     const CommandBuffer& reset() const
@@ -2871,6 +2877,16 @@ public:
         return *this;
     }
 
+	const CommandBuffer& cmdBindDescriptorSetDynamicOffset(
+		VkDescriptorSet vkDescriptorSet,
+		VkPipelineLayout vkPipelineLayout,
+		uint32_t	dynamicOffset) const {
+		vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
+								vkPipelineLayout, 0, 1, &vkDescriptorSet, 1, &dynamicOffset);
+		return *this;
+	}
+
+
     const CommandBuffer& cmdBindVertexBuffer(VkBuffer vkBuffer) const
     {
         VkDeviceSize offsets[1] { 0 };
@@ -2957,6 +2973,7 @@ public:
 
 class SubmitInfo : public VkSubmitInfo {
 
+	//	Always up to date.
     std::vector<VkSemaphore> m_vkWaitSemaphores;
     std::vector<VkPipelineStageFlags> m_vkPipelineStateFlags;
     std::vector<VkCommandBuffer> m_vkCommandBuffers;
@@ -3002,6 +3019,7 @@ public:
 
 class SubmitInfo2 : public VkSubmitInfo2 {
 
+	//	Always up to date.
     std::vector<VkSemaphoreSubmitInfo> m_waitSemaphoreInfos;
     std::vector<VkCommandBufferSubmitInfo> m_commandBufferInfos;
     std::vector<VkSemaphoreSubmitInfo> m_signalSemaphoreInfos;
@@ -3120,54 +3138,62 @@ public:
         vkQueueWaitIdle(*this);
     }
 
-    void submit(const SubmitInfo& submitInfo, VkFence vkFence) const
-    {
-        VkResult vkResult = vkQueueSubmit(*this, 1, &submitInfo, vkFence);
-        if (vkResult != VK_SUCCESS) {
-            throw Exception(vkResult);
-        }
-    }
+    //void submit(const SubmitInfo& submitInfo, VkFence vkFence) const
+    //{
+    //    VkResult vkResult = vkQueueSubmit(*this, 1, &submitInfo, vkFence);
+    //    if (vkResult != VK_SUCCESS) {
+    //        throw Exception(vkResult);
+    //    }
+    //}
 
-    void submit(VkSubmitInfo& vkSubmitInfo, VkFence vkFence) const
-    {
-        VkResult vkResult = vkQueueSubmit(*this, 1, &vkSubmitInfo, vkFence);
-        if (vkResult != VK_SUCCESS) {
-            throw Exception(vkResult);
-        }
-    }
+	void submit(const VkSubmitInfo& vkSubmitInfo, VkFence vkFence) const {
+		VkResult vkResult = vkQueueSubmit(*this, 1, &vkSubmitInfo, vkFence);
+		if (vkResult != VK_SUCCESS) {
+			throw Exception(vkResult);
+		}
+	}
 
-    void submit2(const CommandBuffer& commandBuffer) const
+
+    //void submit(const VkSubmitInfo& vkSubmitInfo, VkFence vkFence) const
+    //{
+    //    VkResult vkResult = vkQueueSubmit(*this, 1, &vkSubmitInfo, vkFence);
+    //    if (vkResult != VK_SUCCESS) {
+    //        throw Exception(vkResult);
+    //    }
+    //}
+
+    void submit2(VkCommandBuffer vkCommandBuffer) const
     {
         SubmitInfo2 submitInfo2;
-        submitInfo2.addCommandBuffer(commandBuffer);
+        submitInfo2.addCommandBuffer(vkCommandBuffer);
         VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, VK_NULL_HANDLE);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
     }
 
-    void submit2(const CommandBuffer& commandBuffer, const Fence& fence) const
+    void submit2(VkCommandBuffer vkCommandBuffer, VkFence vkFence) const
     {
         SubmitInfo2 submitInfo2;
-        submitInfo2.addCommandBuffer(commandBuffer);
-        VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, fence);
+        submitInfo2.addCommandBuffer(vkCommandBuffer);
+        VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, vkFence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
     }
 
-    void submit2(const SubmitInfo2& submitInfo2, const Fence& fence) const
+    void submit2(const VkSubmitInfo2& vkSubmitInfo2, VkFence vkFence) const
     {
-        VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, fence);
+        VkResult vkResult = vkQueueSubmit2(*this, 1, &vkSubmitInfo2, vkFence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
     }
 
-    void submit2Fenced(const CommandBuffer& commandBuffer) const
+    void submit2Fenced(VkCommandBuffer vkCommandBuffer) const
     {
         SubmitInfo2 submitInfo2;
-        submitInfo2.addCommandBuffer(commandBuffer);
+        submitInfo2.addCommandBuffer(vkCommandBuffer);
         vkcpp::Fence completedFence;
         VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, completedFence);
         if (vkResult != VK_SUCCESS) {
@@ -3192,6 +3218,7 @@ public:
 
 class DescriptorPoolCreateInfo : public VkDescriptorPoolCreateInfo {
 
+	//	Always up to date.
     std::vector<VkDescriptorPoolSize> m_vkDescriptorPoolSizes;
 
 public:
@@ -3199,6 +3226,7 @@ public:
         : VkDescriptorPoolCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		maxSets = 1;
     }
 
     ~DescriptorPoolCreateInfo() = default;
@@ -3207,7 +3235,7 @@ public:
     DescriptorPoolCreateInfo(DescriptorPoolCreateInfo&&) noexcept = delete;
     DescriptorPoolCreateInfo& operator=(DescriptorPoolCreateInfo&&) noexcept = delete;
 
-    void addDescriptorCount(VkDescriptorType vkDescriptorType, uint32_t count)
+    DescriptorPoolCreateInfo& addDescriptorCount(VkDescriptorType vkDescriptorType, uint32_t count)
     {
         VkDescriptorPoolSize vkDescriptorPoolSize;
         vkDescriptorPoolSize.type = vkDescriptorType;
@@ -3215,11 +3243,13 @@ public:
         m_vkDescriptorPoolSizes.emplace_back(vkDescriptorPoolSize);
         poolSizeCount = static_cast<uint32_t>(m_vkDescriptorPoolSizes.size());
         pPoolSizes = m_vkDescriptorPoolSizes.data();
+		return *this;
     }
 
-    void setMaxSets(uint32_t maxSetsArg)
+	DescriptorPoolCreateInfo& setMaxSets(uint32_t maxSetsArg)
     {
         maxSets = maxSetsArg;
+		return *this;
     }
 };
 
@@ -3446,7 +3476,7 @@ class DescriptorSetUpdater {
 
     //	TODO: can this be made always up to date?
     //	Use vector for each type of info, and then set pointer
-    //	after saving info.
+    //	after saving info.  Does it matter?
 
     //	Union to hold each type of info that can be updated/written.
     union WriteDescriptorInfo {
@@ -3474,6 +3504,8 @@ class DescriptorSetUpdater {
     std::vector<VkWriteDescriptorSet> m_vkWriteDescriptorSets;
     std::vector<WriteDescriptorInfo> m_writeDescriptorInfos;
 
+	VkDescriptorSet	m_preboundDescriptorSet = VK_NULL_HANDLE;
+
 public:
     DescriptorSetUpdater() = default;
     ~DescriptorSetUpdater() = default;
@@ -3482,7 +3514,13 @@ public:
     DescriptorSetUpdater(DescriptorSetUpdater&&) noexcept = delete;
     DescriptorSetUpdater& operator=(DescriptorSetUpdater&&) noexcept = delete;
 
-    void addBufferWriteDescriptor(
+	DescriptorSetUpdater(VkDescriptorSet vkDescriptorSet)
+		: m_preboundDescriptorSet(vkDescriptorSet) {
+
+	}
+
+
+	DescriptorSetUpdater& addBufferWriteDescriptor(
         VkDescriptorSet vkDescriptorSet,
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
@@ -3511,22 +3549,24 @@ public:
 
         m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
         m_writeDescriptorInfos.emplace_back(vkDescriptorBufferInfo);
+		return *this;
     }
 
     //	Handy version for Sascha Willems demos.
-    void addBufferWriteDescriptor(
-        VkDescriptorSet vkDescriptorSet,
+	//	Descriptor buffer info is already created.
+	//	Uses prebound descriptor set.
+	DescriptorSetUpdater& addBufferWriteDescriptor(
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
         const VkDescriptorBufferInfo& vkDescriptorBufferInfo)
     {
-
         //	Just need a non-zero marker
         const VkDescriptorBufferInfo* bufferMarker = reinterpret_cast<VkDescriptorBufferInfo*>(-1);
 
+		//	TODO: maybe check prebound descriptor set for null handle.
         VkWriteDescriptorSet vkWriteDescriptorSet {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vkDescriptorSet,
+            .dstSet = m_preboundDescriptorSet,
             .dstBinding = bindingIndex,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -3536,9 +3576,10 @@ public:
 
         m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
         m_writeDescriptorInfos.emplace_back(vkDescriptorBufferInfo);
+		return *this;
     }
 
-    void addImageWriteDescriptor(
+	DescriptorSetUpdater& addImageWriteDescriptor(
         VkDescriptorSet vkDescriptorSet,
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
@@ -3567,21 +3608,20 @@ public:
 
         m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
         m_writeDescriptorInfos.emplace_back(vkDescriptorImageInfo);
+		return *this;
     }
 
-    void addImageWriteDescriptor(
-        VkDescriptorSet vkDescriptorSet,
+	DescriptorSetUpdater& addImageWriteDescriptor(
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
         const VkDescriptorImageInfo& vkDescriptorImageInfo)
     {
-
         //	Just need a non-zero marker
         const VkDescriptorImageInfo* imageMarker = reinterpret_cast<VkDescriptorImageInfo*>(-1);
 
         VkWriteDescriptorSet vkWriteDescriptorSet {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vkDescriptorSet,
+            .dstSet = m_preboundDescriptorSet,
             .dstBinding = bindingIndex,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -3591,6 +3631,7 @@ public:
 
         m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
         m_writeDescriptorInfos.emplace_back(vkDescriptorImageInfo);
+		return *this;
     }
 
     void assemble()

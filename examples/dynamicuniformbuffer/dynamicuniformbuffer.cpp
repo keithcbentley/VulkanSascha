@@ -79,11 +79,11 @@ public:
 		glm::mat4* model{ nullptr };
 	} uboDataDynamic;
 
+	vkcpp::PipelineLayout m_pipelineLayout;
 	VkPipeline m_vkPipeline{ VK_NULL_HANDLE };
-	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
-	VkDescriptorSet descriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
-
+	vkcpp::DescriptorSetLayout m_descriptorSetLayout;
+	vkcpp::DescriptorSet m_descriptorSet;
+	
 	float animationTimer{ 0.0f };
 
 	size_t dynamicAlignment{ 0 };
@@ -104,8 +104,8 @@ public:
 				alignedFree(uboDataDynamic.model);
 			}
 			vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
-			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
+//			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+//			vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
 			vertexBuffer.destroy();
 			indexBuffer.destroy();
 			uniformBuffers.view.destroy();
@@ -134,21 +134,16 @@ public:
 		{
 			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-			VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
-
-			vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-			vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
-
-			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
-			vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
-
-			vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
-
-			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindVertexBuffers(m_drawCommandBuffers[i], 0, 1, &vertexBuffer.m_vkBuffer, offsets);
-			vkCmdBindIndexBuffer(m_drawCommandBuffers[i], indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+			vkcpp::CommandBuffer commandBuffer
+				= vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
+			commandBuffer
+				.begin(cmdBufInfo)
+				.cmdBeginRenderPass(renderPassBeginInfo)
+				.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
+				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
+				.cmdBindPipeline(m_vkPipeline)
+				.cmdBindVertexBuffer(vertexBuffer.m_vkBuffer)
+				.cmdBindIndexBuffer(indexBuffer.m_vkBuffer, VK_INDEX_TYPE_UINT32);
 
 			// Render multiple objects using different model matrices by dynamically offsetting into one uniform buffer
 			for (uint32_t j = 0; j < OBJECT_INSTANCES; j++)
@@ -156,16 +151,16 @@ public:
 				// One dynamic offset per dynamic descriptor to offset into the ubo containing all model matrices
 				uint32_t dynamicOffset = j * static_cast<uint32_t>(dynamicAlignment);
 				// Bind the descriptor set for rendering a mesh using the dynamic offset
-				vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 1, &dynamicOffset);
-
-				vkCmdDrawIndexed(m_drawCommandBuffers[i], m_indexCount, 1, 0, 0, 0);
+				commandBuffer
+					.cmdBindDescriptorSetDynamicOffset(m_descriptorSet, m_pipelineLayout, dynamicOffset)
+					.cmdDrawIndexed(m_indexCount);
 			}
 
-			drawUI(m_drawCommandBuffers[i]);
+			drawUI(commandBuffer);
 
-			vkCmdEndRenderPass(m_drawCommandBuffers[i]);
+			commandBuffer.cmdEndRenderPass();
+			commandBuffer.end();
 
-			VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
 		}
 	}
 
@@ -206,48 +201,54 @@ public:
 			indices.size() * sizeof(uint32_t),
 			indices.data()));
 	}
+
 	void setupDescriptors()
 	{
-		// Pool
-		std::vector<VkDescriptorPoolSize> poolSizes = {
-			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-			// Dynamic uniform buffer
-			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1)
-		};
+		//	Descriptor Pool
+		vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+		descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+		descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1);
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
 
-		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
 
-		//VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		// Descriptor Set Layout
+		constexpr int uniformBufferBindingIndex = 0;
+		constexpr int dynamicUniformBufferBindingIndex = 1;
 
-		// Layout
-		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
-			// Dynamic uniform buffer
-			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT, 1)
-		};
+		vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+		descriptorSetLayoutCreateInfo
+			.addDescriptorSetLayoutBinding(
+				uniformBufferBindingIndex, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, vkcpp::SHADER_STAGE_VERTEX)
+			.addDescriptorSetLayoutBinding(
+				dynamicUniformBufferBindingIndex, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, vkcpp::SHADER_STAGE_VERTEX);
 
-		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
 
-		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
+		// Descriptor Set
+		m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
-		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-			// Binding 0 : Projection/View matrix as uniform buffer
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.view.m_vkDescriptorBufferInfo),
-			// Binding 1 : Instance matrix as dynamic uniform buffer
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, &uniformBuffers.dynamic.m_vkDescriptorBufferInfo),
-		};
-		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
+		descriptorSetUpdater
+			.addBufferWriteDescriptor(
+				uniformBufferBindingIndex,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				uniformBuffers.view.m_vkDescriptorBufferInfo)
+			.addBufferWriteDescriptor(
+				dynamicUniformBufferBindingIndex,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+				uniformBuffers.dynamic.m_vkDescriptorBufferInfo);
+
+		descriptorSetUpdater.updateDescriptorSets();
 	}
 
 	void preparePipelines()
 	{
 		// Layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
+		vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+		pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
+		m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
+
+		//VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0,  VK_FALSE);
@@ -278,7 +279,8 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "dynamicuniformbuffer/base.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "dynamicuniformbuffer/base.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo
+			= vks::initializers::pipelineCreateInfo(m_pipelineLayout, m_renderPassOriginal, 0);
 		pipelineCreateInfo.pVertexInputState = &vertexInputStateCI;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationState;

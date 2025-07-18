@@ -29,7 +29,7 @@ public:
         vks::Buffer uniformBuffer;
         glm::vec3 rotation { 0.0f };
     };
-    std::array<Cube, 2> cubes;
+    std::array<Cube, 2> m_cubes;
 
     vkglTF::Model model;
 
@@ -49,9 +49,7 @@ public:
 
     ~VulkanExample()
     {
-        //        vkDestroyPipelineLayout(m_deviceOriginal, m_vkPipelineLayout, nullptr);
-        //        vkDestroyDescriptorSetLayout(m_deviceOriginal, m_descriptorSetLayout, nullptr);
-        for (auto cube : cubes) {
+        for (auto cube : m_cubes) {
             cube.uniformBuffer.destroy();
             cube.texture.destroy();
         }
@@ -82,41 +80,46 @@ public:
         vkRenderPassBeginInfo.pClearValues = clearValues;
 
         for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
+			vkRenderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
+
             vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[i];
+            commandBuffer
+				.begin(vkCommandBufferBeginInfo)
+				.cmdBeginRenderPass(vkRenderPassBeginInfo)
+				.cmdBindPipeline(m_vkPipeline)
+				.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
+				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
 
-            vkRenderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
-
-            commandBuffer.begin(vkCommandBufferBeginInfo);
-            commandBuffer.cmdBeginRenderPass(vkRenderPassBeginInfo);
-            commandBuffer.cmdBindPipeline(m_vkPipeline);
-            commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
-            commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
-
-            model.bindBuffers(m_drawCommandBuffers[i]);
+            model.bindBuffers(commandBuffer);
 
             /*
                     [POI] Render cubes with separate descriptor sets
             */
-            for (auto cube : cubes) {
-                // Bind the cube's descriptor set. This tells the command buffer to use the uniform buffer and m_vkImage set for this cube
+            for (auto cube : m_cubes) {
+                // Bind the cube's descriptor set.
+				// This tells the command buffer to use the uniform buffer and m_vkImage set for this cube
                 commandBuffer.cmdBindDescriptorSet(cube.m_descriptorSet, m_pipelineLayout);
-                model.draw(m_drawCommandBuffers[i]);
+                model.draw(commandBuffer);
             }
 
-            drawUI(m_drawCommandBuffers[i]);
+            drawUI(commandBuffer);
 
-            commandBuffer.cmdEndRenderPass();
-            commandBuffer.end();
+            commandBuffer
+				.cmdEndRenderPass()
+				.end();
         }
     }
 
     void loadAssets()
     {
-        const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
+        const uint32_t glTFLoadingFlags
+			= vkglTF::FileLoadingFlags::PreTransformVertices
+			| vkglTF::FileLoadingFlags::PreMultiplyVertexColors
+			| vkglTF::FileLoadingFlags::FlipY;
         model.loadFromFile(getAssetPath() + "models/cube.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
-        cubes[0].texture.loadFromFile(
+        m_cubes[0].texture.loadFromFile(
 			getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
-        cubes[1].texture.loadFromFile(
+        m_cubes[1].texture.loadFromFile(
 			getAssetPath() + "textures/crate02_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
     }
 
@@ -128,7 +131,8 @@ public:
         /*
                 Descriptor set layout
 
-                The layout describes the shader bindings and types used for a certain descriptor layout and as such must match the shader bindings
+                The layout describes the shader bindings and types used
+				for a certain descriptor layout and as such must match the shader bindings
 
                 Shader bindings used in this example:
                 VS:
@@ -142,6 +146,7 @@ public:
         constexpr int uniformBufferBindingIndex = 0;
         constexpr int combinedImageSamplerBindingIndex = 1;
 
+		//	Note that descriptor set layouts are not tied to a particular descriptor pool.
         vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
         descriptorSetLayoutCreateInfo.addDescriptorSetLayoutBinding(
             uniformBufferBindingIndex,
@@ -166,11 +171,12 @@ public:
                 It's good practice to allocate pools with actually required descriptor types and counts
         */
 
-        //	We need a set for each cube, and each set will have one uniform buffer and one combined image sampler.
+        //	We need a set for each cube.
+		//	Each set will have one uniform buffer and one combined image sampler.
         vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
-        descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, cubes.size());
-        descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, cubes.size());
-        descriptorPoolCreateInfo.setMaxSets(cubes.size());
+        descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_cubes.size());
+        descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, m_cubes.size());
+        descriptorPoolCreateInfo.setMaxSets(m_cubes.size());
 
         m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
 
@@ -178,64 +184,38 @@ public:
 
                 Descriptor sets
 
-                Using the shared descriptor set layout and the descriptor pool we will now allocate the descriptor sets.
+                Using the shared descriptor set layout and the descriptor pool,
+				we will now allocate the descriptor sets.
 
-                Descriptor sets contain the actual descriptor for the objects (buffers, images) used at render time.
+                Descriptor sets contain the actual descriptor
+				for the objects (buffers, images) used at render time.
 
         */
 
-        for (auto& cube : cubes) {
+        for (auto& cube : m_cubes) {
 
-            //	Finally, make a descriptor set.
+            //	Make a descriptor set.
+			//	Remember that the descriptor set is still just a framework.
+			//	It's not usable until we connect the actual device resources
+			//	to the descriptor set.  Vulkan calls this "updating" the descriptor set.
             cube.m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
-            //	Now we need to write the actual resources into the descriptor set.
-
-            std::array<VkWriteDescriptorSet, 2> writeDescriptorSets {};
-
-            /*
-                    Binding 0: Object matrices Uniform buffer
-            */
-
-            writeDescriptorSets[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeDescriptorSets[0].dstSet = cube.m_descriptorSet;
-            writeDescriptorSets[0].dstBinding = uniformBufferBindingIndex;
-            writeDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            writeDescriptorSets[0].pBufferInfo = &cube.uniformBuffer.m_vkDescriptorBufferInfo;
-            writeDescriptorSets[0].descriptorCount = 1;
-
-            /*
-                    Binding 1: Object texture
-            */
-            writeDescriptorSets[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeDescriptorSets[1].dstSet = cube.m_descriptorSet;
-            writeDescriptorSets[1].dstBinding = combinedImageSamplerBindingIndex;
-            writeDescriptorSets[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            // Images use a different descriptor structure, so we use pImageInfo instead of pBufferInfo
-			writeDescriptorSets[1].pImageInfo = &cube.texture.m_vkDescriptorImageInfo;
-            writeDescriptorSets[1].descriptorCount = 1;
-
-            // Execute the writes to update descriptors for this set
-            // Note that it's also possible to gather all writes and only run updates once, even for multiple sets
-            // This is possible because each VkWriteDescriptorSet also contains the destination set to be updated
-            // For simplicity we will update once per set instead
-
-            vkcpp::DescriptorSetUpdater descriptorSetUpdater;
+            //	Write (update) the actual resources into the descriptor set.
+			//	TODO: could we make a sort of "prebound" updater that is bound
+			//	to a particular descriptor set at creation.  It would make adding
+			//	the descriptors a bit tidier.
+            vkcpp::DescriptorSetUpdater descriptorSetUpdater(cube.m_descriptorSet);
             descriptorSetUpdater.addBufferWriteDescriptor(
-                cube.m_descriptorSet,
                 uniformBufferBindingIndex,
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 cube.uniformBuffer.m_vkDescriptorBufferInfo);
 
             descriptorSetUpdater.addImageWriteDescriptor(
-                cube.m_descriptorSet,
                 combinedImageSamplerBindingIndex,
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 cube.texture.m_vkDescriptorImageInfo);
 
             descriptorSetUpdater.updateDescriptorSets();
-
-            //			vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
         }
     }
 
@@ -247,8 +227,6 @@ public:
         vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
         pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
         m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
-
-        // VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
         const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
@@ -282,7 +260,7 @@ public:
     void prepareUniformBuffers()
     {
         // Vertex shader matrix uniform buffer block
-        for (auto& cube : cubes) {
+        for (auto& cube : m_cubes) {
             VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -296,10 +274,10 @@ public:
 
     void updateUniformBuffers()
     {
-        cubes[0].matrices.model = glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
-        cubes[1].matrices.model = glm::translate(glm::mat4(1.0f), glm::vec3(1.5f, 0.5f, 0.0f));
+        m_cubes[0].matrices.model = glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
+        m_cubes[1].matrices.model = glm::translate(glm::mat4(1.0f), glm::vec3(1.5f, 0.5f, 0.0f));
 
-        for (auto& cube : cubes) {
+        for (auto& cube : m_cubes) {
             cube.matrices.projection = camera.matrices.perspective;
             cube.matrices.view = camera.matrices.view;
             cube.matrices.model = glm::rotate(cube.matrices.model, glm::radians(cube.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -313,10 +291,7 @@ public:
     void draw()
     {
         VulkanExampleBase::prepareFrame();
-        m_vkSubmitInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
-        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+		m_queue.submit2(m_drawCommandBuffers[m_currentBufferIndex]);
         VulkanExampleBase::submitFrame();
     }
 
@@ -337,12 +312,12 @@ public:
             return;
         draw();
         if (animate && !paused) {
-            cubes[0].rotation.x += 2.5f * m_frameTimer;
-            if (cubes[0].rotation.x > 360.0f)
-                cubes[0].rotation.x -= 360.0f;
-            cubes[1].rotation.y += 2.0f * m_frameTimer;
-            if (cubes[1].rotation.y > 360.0f)
-                cubes[1].rotation.y -= 360.0f;
+            m_cubes[0].rotation.x += 2.5f * m_frameTimer;
+            if (m_cubes[0].rotation.x > 360.0f)
+                m_cubes[0].rotation.x -= 360.0f;
+            m_cubes[1].rotation.y += 2.0f * m_frameTimer;
+            if (m_cubes[1].rotation.y > 360.0f)
+                m_cubes[1].rotation.y -= 360.0f;
         }
         if ((camera.updated) || (animate && !paused)) {
             updateUniformBuffers();
