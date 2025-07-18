@@ -332,22 +332,22 @@ void VulkanExample::buildCommandBuffers()
 	const VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 	const VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 
-	for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
+	for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i)
 	{
 		renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
-		VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
-		vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-		vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+		VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
+		vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
+		vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
 		// Bind scene matrices descriptor to set 0
-		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 		// POI: Draw the glTF scene
-		glTFScene.draw(drawCmdBuffers[i], m_vkPipelineLayout);
+		glTFScene.draw(m_drawCommandBuffers[i], m_vkPipelineLayout);
 
-		drawUI(drawCmdBuffers[i]);
-		vkCmdEndRenderPass(drawCmdBuffers[i]);
-		VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
+		drawUI(m_drawCommandBuffers[i]);
+		vkCmdEndRenderPass(m_drawCommandBuffers[i]);
+		VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
 	}
 }
 
@@ -366,7 +366,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 
 	// Pass some Vulkan resources required for setup and rendering to the glTF model loading class
 	glTFScene.vulkanDevice = m_pVulkanDevice;
-	glTFScene.copyQueue    = m_vkQueue;
+	glTFScene.copyQueue    = m_queue;
 
 	size_t pos = filename.find_last_of('/');
 	glTFScene.path = filename.substr(0, pos);
@@ -453,7 +453,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 		1,
 		&copyRegion);
 
-	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
 
 	// Free staging resources
 	vkDestroyBuffer(m_device, vertexStaging.buffer, nullptr);

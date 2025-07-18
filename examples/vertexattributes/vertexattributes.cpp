@@ -231,22 +231,22 @@ void VulkanExample::buildCommandBuffers()
 	const VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
 	const VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 
-	for (int32_t i = 0; i < drawCmdBuffers.size(); ++i)
+	for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i)
 	{
 		renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
-		VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
-		vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
-		vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+		VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
+		vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
+		vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
 
 		// Select the separate or interleaved vertex binding pipeline
-		vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vertexAttributeSettings == VertexAttributeSettings::separate ? pipelines.vertexAttributesSeparate : pipelines.vertexAttributesInterleaved);
+		vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vertexAttributeSettings == VertexAttributeSettings::separate ? pipelines.vertexAttributesSeparate : pipelines.vertexAttributesInterleaved);
 
 		// Bind scene matrices descriptor to set 0
-		vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
 		// Use the same index buffer, no matter how vertex attributes are passed
-		vkCmdBindIndexBuffer(drawCmdBuffers[i], indices.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(m_drawCommandBuffers[i], indices.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 		if (vertexAttributeSettings == VertexAttributeSettings::separate) {
 			// Using separate vertex attribute bindings requires binding multiple attribute buffers
@@ -256,21 +256,21 @@ void VulkanExample::buildCommandBuffers()
 				separateVertexBuffers.normal.m_vkBuffer,
 				separateVertexBuffers.uv.m_vkBuffer,
 				separateVertexBuffers.tangent.m_vkBuffer };
-			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, static_cast<uint32_t>(buffers.size()), buffers.data(), offsets);
+			vkCmdBindVertexBuffers(m_drawCommandBuffers[i], 0, static_cast<uint32_t>(buffers.size()), buffers.data(), offsets);
 		}
 		else {
 			// Using interleaved attribute bindings only requires one buffer to be bound
 			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &interleavedVertexBuffer.m_vkBuffer, offsets);
+			vkCmdBindVertexBuffers(m_drawCommandBuffers[i], 0, 1, &interleavedVertexBuffer.m_vkBuffer, offsets);
 		}
 		// Render all nodes starting at top-level
 		for (auto& node : nodes) {
-			drawSceneNode(drawCmdBuffers[i], node);
+			drawSceneNode(m_drawCommandBuffers[i], node);
 		}
 
-		drawUI(drawCmdBuffers[i]);
-		vkCmdEndRenderPass(drawCmdBuffers[i]);
-		VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
+		drawUI(m_drawCommandBuffers[i]);
+		vkCmdEndRenderPass(m_drawCommandBuffers[i]);
+		VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
 	}
 }
 
@@ -300,7 +300,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 	scene.images.resize(glTFInput.images.size());
 	for (size_t i = 0; i < glTFInput.images.size(); i++) {
 		tinygltf::Image& glTFImage = glTFInput.images[i];
-		scene.images[i].texture.loadFromFile(path + "/" + glTFImage.uri, VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
+		scene.images[i].texture.loadFromFile(path + "/" + glTFImage.uri, VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
 	}
 	// Load textures
 	scene.textures.resize(glTFInput.textures.size());
@@ -368,7 +368,7 @@ void VulkanExample::uploadVertexData()
 	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	copyRegion.size = vertexBufferSize;
 	vkCmdCopyBuffer(copyCmd, vertexStaging.m_vkBuffer, interleavedVertexBuffer.m_vkBuffer, 1, &copyRegion);
-	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
 	vertexStaging.destroy();
 
 	/*
@@ -400,7 +400,7 @@ void VulkanExample::uploadVertexData()
 		copyRegion.size = attributeBuffers[i].m_size;
 		vkCmdCopyBuffer(copyCmd, stagingBuffers[i].m_vkBuffer, attributeBuffers[i].m_vkBuffer, 1, &copyRegion);
 	}
-	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
 
 	for (size_t i = 0; i < 4; i++) {
 		stagingBuffers[i].destroy();
@@ -418,7 +418,7 @@ void VulkanExample::uploadVertexData()
 	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	copyRegion.size = indexBufferSize;
 	vkCmdCopyBuffer(copyCmd, indexStaging.m_vkBuffer, indices.m_vkBuffer, 1, &copyRegion);
-	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
+	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
 	// Free staging resources
 	indexStaging.destroy();
 }
