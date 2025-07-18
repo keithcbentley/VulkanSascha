@@ -3292,7 +3292,7 @@ public:
 struct DescriptorSetLayoutBinding {
     int m_bindingIndex;
     VkDescriptorType m_vkDescriptorType;
-    vkcpp::ShaderStageFlags m_shaderStage;
+    vkcpp::ShaderStageFlags m_shaderStageFlags;
 };
 
 class DescriptorSetLayoutCreateInfo : public VkDescriptorSetLayoutCreateInfo {
@@ -3340,7 +3340,7 @@ public:
             addDescriptorSetLayoutBinding(
                 descriptorSetLayoutBinding.m_bindingIndex,
                 descriptorSetLayoutBinding.m_vkDescriptorType,
-                descriptorSetLayoutBinding.m_shaderStage);
+                descriptorSetLayoutBinding.m_shaderStageFlags);
         }
     }
 
@@ -3732,6 +3732,7 @@ public:
 class PipelineLayoutCreateInfo : public VkPipelineLayoutCreateInfo {
 
     std::vector<VkDescriptorSetLayout> m_vkDescriptorSetLayouts;
+	std::vector<VkPushConstantRange> m_vkPushConstantRanges;
 
 public:
     PipelineLayoutCreateInfo()
@@ -3747,14 +3748,31 @@ public:
     PipelineLayoutCreateInfo(PipelineLayoutCreateInfo&&) noexcept = delete;
     PipelineLayoutCreateInfo& operator=(PipelineLayoutCreateInfo&&) noexcept = delete;
 
-    void addDescriptorSetLayout(
+	PipelineLayoutCreateInfo& addDescriptorSetLayout(
         VkDescriptorSetLayout vkDescriptorSetLayout)
     {
         //	Always up to date.
         m_vkDescriptorSetLayouts.push_back(vkDescriptorSetLayout);
         setLayoutCount = static_cast<uint32_t>(m_vkDescriptorSetLayouts.size());
         pSetLayouts = m_vkDescriptorSetLayouts.data();
+		return *this;
     }
+
+	PipelineLayoutCreateInfo& addPushConstantRange(
+		ShaderStageFlags shaderStageFlags,
+		uint32_t	offsetArg,
+		size_t		sizeArg
+	) {
+		VkPushConstantRange vkPushConstantRange{};
+		vkPushConstantRange.stageFlags = static_cast<VkShaderStageFlags>(shaderStageFlags);
+		vkPushConstantRange.offset = offsetArg;
+		vkPushConstantRange.size = static_cast<uint32_t>(sizeArg);
+
+		m_vkPushConstantRanges.emplace_back(vkPushConstantRange);
+		pushConstantRangeCount = static_cast<uint32_t>(m_vkPushConstantRanges.size());
+		pPushConstantRanges = m_vkPushConstantRanges.data();
+		return *this;
+	}
 };
 
 class PipelineLayout : public HandleWithOwner<VkPipelineLayout> {

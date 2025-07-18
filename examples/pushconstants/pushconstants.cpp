@@ -40,10 +40,10 @@ public:
     } uniformData;
     vks::Buffer uniformBuffer;
 
-    VkPipelineLayout m_vkPipelineLayout { VK_NULL_HANDLE };
+    vkcpp::PipelineLayout m_pipelineLayout;
     VkPipeline m_vkPipeline { VK_NULL_HANDLE };
-    VkDescriptorSetLayout m_vkDescriptorSetLayout { VK_NULL_HANDLE };
-    VkDescriptorSet m_vkDescriptorSet { VK_NULL_HANDLE };
+    vkcpp::DescriptorSetLayout m_descriptorSetLayout;
+	vkcpp::DescriptorSet m_descriptorSet;
 
     VulkanExample()
         : VulkanExampleBase()
@@ -60,8 +60,8 @@ public:
     {
         if (m_device) {
             vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
-            vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
-            vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
+            //vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+            //vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
             uniformBuffer.destroy();
         }
     }
@@ -108,7 +108,7 @@ public:
 				.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
 				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
 				.cmdBindPipeline(m_vkPipeline)
-				.cmdBindDescriptorSet(m_vkDescriptorSet, m_vkPipelineLayout);
+				.cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout);
 
             // [POI] Render the spheres passing color and position via push constants
             uint32_t spherecount = static_cast<uint32_t>(m_spherePushConstantDatas.size());
@@ -117,7 +117,7 @@ public:
                 commandBuffer.cmdPushConstant(
                     &m_spherePushConstantDatas[j],
                     sizeof(SpherePushConstantData),
-                    m_vkPipelineLayout,
+                    m_pipelineLayout,
                     VK_SHADER_STAGE_VERTEX_BIT);
                 model.draw(commandBuffer);
             }
@@ -137,43 +137,44 @@ public:
 
     void setupDescriptors()
     {
-        // Pool
-        std::vector<VkDescriptorPoolSize> poolSizes = {
-            vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-        };
-        VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+        //	Descriptor Pool
+		vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+		descriptorPoolCreateInfo
+			.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
+			.setMaxSets(2);
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
 
-        // Layout
-        std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-            vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
-        };
-        VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		//	Descriptor Set Layout
+		constexpr int uniformBufferBindingIndex = 0;
+		vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+		descriptorSetLayoutCreateInfo.addDescriptorSetLayoutBinding(
+			uniformBufferBindingIndex,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			vkcpp::SHADER_STAGE_VERTEX);
+		m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
 
-        // Set
-        VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &m_vkDescriptorSet));
 
-        VkWriteDescriptorSet writeDescriptorSet = vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo);
-        vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
+        //	Descriptor Set
+		m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
+
+		//	Update Descriptor Set
+		vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
+		descriptorSetUpdater.addBufferWriteDescriptor(
+			uniformBufferBindingIndex,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			uniformBuffer.m_vkDescriptorBufferInfo
+		);
+		descriptorSetUpdater.updateDescriptorSets();
+
     }
 
     void preparePipelines()
     {
-        // Layout
-        // [POI] Define the push constant range used by the m_vkPipeline layout
-        // Note that the spec only requires a minimum of 128 bytes, so for passing larger blocks of data you'd use UBOs or SSBOs
-        VkPushConstantRange pushConstantRange {};
-        // Push constants will only be accessible at the selected m_vkPipeline stages, for this sample it's the vertex shader that reads them
-        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        pushConstantRange.offset = 0;
-        pushConstantRange.size = sizeof(SpherePushConstantData);
+		vkcpp::PipelineLayoutCreateInfo pipelineCreateInfo;
+		pipelineCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
+		pipelineCreateInfo.addPushConstantRange(vkcpp::SHADER_STAGE_VERTEX, 0, sizeof(SpherePushConstantData));
+		m_pipelineLayout = vkcpp::PipelineLayout(pipelineCreateInfo);
 
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-        pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-        pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 
         // Pipeline
         VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -187,7 +188,8 @@ public:
         VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
         std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-        VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
+        VkGraphicsPipelineCreateInfo pipelineCI
+			= vks::initializers::pipelineCreateInfo(m_pipelineLayout, m_renderPassOriginal, 0);
         pipelineCI.pInputAssemblyState = &inputAssemblyState;
         pipelineCI.pRasterizationState = &rasterizationState;
         pipelineCI.pColorBlendState = &colorBlendState;
