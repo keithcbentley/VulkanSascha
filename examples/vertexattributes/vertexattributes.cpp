@@ -8,7 +8,7 @@
 
 #include "vertexattributes.h"
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 
 void VulkanExample::loadSceneNode(const tinygltf::Node& inputNode, const tinygltf::Model& input, Node* parent)

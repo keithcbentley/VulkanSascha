@@ -85,7 +85,7 @@ Queue Device::getDeviceQueue(int deviceQueueFamilyIndex, int deviceQueueIndex) c
     return Queue(vkQueue, deviceQueueFamilyIndex);
 }
 
-void AppContext::init(const AppContextCreateInfo& appContextCreateInfo) {
+void VulkanContext::init(const VulkanContextCreateInfo& appContextCreateInfo) {
 	VulkanInstanceCreateInfo vulkanInstanceCreateInfo{};
 	vulkanInstanceCreateInfo.addLayer("VK_LAYER_KHRONOS_validation");
 
@@ -97,7 +97,7 @@ void AppContext::init(const AppContextCreateInfo& appContextCreateInfo) {
 	vulkanInstanceCreateInfo.pNext = &debugCreateInfo;
 
 	//	Create the vulkan instance.  After this, use vulkanInstance().
-	s_appContext.m_vulkanInstanceOriginal = VulkanInstance(vulkanInstanceCreateInfo);
+	s_vulkanContext.m_vulkanInstanceOriginal = VulkanInstance(vulkanInstanceCreateInfo);
 
 	auto allPhysicalDevices = vulkanInstance().getAllPhysicalDevices();
 
@@ -118,7 +118,7 @@ void AppContext::init(const AppContextCreateInfo& appContextCreateInfo) {
 	}
 
 	//	Create the physical device.  After this, use physicalDevice().
-	s_appContext.m_physicalDeviceOriginal = PhysicalDevice(allPhysicalDevices[0]);
+	s_vulkanContext.m_physicalDeviceOriginal = PhysicalDevice(allPhysicalDevices[0]);
 
 	DeviceCreateInfo deviceCreateInfo;
 	deviceCreateInfo.addExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -132,8 +132,8 @@ void AppContext::init(const AppContextCreateInfo& appContextCreateInfo) {
 	deviceCreateInfo.setDeviceFeatures(deviceFeatures);
 
 	//	Create (logical) device.  After this, use device().
-	s_appContext.m_deviceOriginal = Device(deviceCreateInfo, s_appContext.m_physicalDeviceOriginal);
-	s_appContext.m_vkDeviceOriginal = device();
+	s_vulkanContext.m_deviceOriginal = Device(deviceCreateInfo, s_vulkanContext.m_physicalDeviceOriginal);
+	s_vulkanContext.m_vkDeviceOriginal = device();
 
 	std::cout << "AppContext::init()\n";
 
@@ -141,19 +141,19 @@ void AppContext::init(const AppContextCreateInfo& appContextCreateInfo) {
 
 
 const VulkanInstance& vulkanInstance() {
-	return s_appContext.vulkanInstanceAppContext();
+	return s_vulkanContext.vulkanInstanceContext();
 }
 
 const PhysicalDevice& physicalDevice() {
-	return s_appContext.physicalDeviceAppContext();
+	return s_vulkanContext.physicalDeviceContext();
 }
 
 const Device& device() {
-	return s_appContext.deviceAppContext();
+	return s_vulkanContext.deviceContext();
 }
 
 VkDevice vkDevice() {
-	return s_appContext.deviceAppContext();
+	return s_vulkanContext.deviceContext();
 }
 
 

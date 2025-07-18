@@ -28,7 +28,7 @@
 #include "vulkanexamplebase.h"
 #include <vulkan/vulkan.h>
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 
 
@@ -889,8 +889,8 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
 
 	try {
-		vkcpp::AppContextCreateInfo appContextCreateInfo;
-		vkcpp::AppContext::init(appContextCreateInfo);
+		vkcpp::VulkanContextCreateInfo appContextCreateInfo;
+		vkcpp::VulkanContext::init(appContextCreateInfo);
 
 		vulkanExample = new VulkanExample();
 		vulkanExample->initVulkan();

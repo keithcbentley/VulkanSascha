@@ -12,7 +12,7 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 
 // Vertex layout for this example

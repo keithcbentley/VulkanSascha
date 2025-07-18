@@ -9,7 +9,7 @@
 #include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 
 // Offscreen frame buffer m_vkPhysicalDeviceProperties

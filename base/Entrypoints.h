@@ -24,8 +24,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)				
 int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_  HINSTANCE hPrevInstance, _In_ LPSTR, _In_ int) \
 {																									\
 	for (int32_t i = 0; i < __argc; i++) { VulkanExample::args.push_back(__argv[i]); };  			\
-	vkcpp::AppContextCreateInfo appContextCreateInfo;	\
-	vkcpp::AppContext::init(appContextCreateInfo);		\
+	vkcpp::VulkanContextCreateInfo vulkanContextCreateInfo;	\
+	vkcpp::VulkanContext::init(vulkanContextCreateInfo);		\
 	vulkanExample = new VulkanExample();															\
 	vulkanExample->initVulkan();																	\
 	vulkanExample->setupWindow(hInstance, WndProc);													\

@@ -12,7 +12,7 @@
 #include "vulkanexamplebase.h"
 #include <VulkanCpp.hpp>
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 
 class VulkanExample : public VulkanExampleBase {

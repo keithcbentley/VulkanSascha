@@ -14,7 +14,7 @@
 
 #include "gltfscenerendering.h"
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 /*
 	Vulkan glTF scene class

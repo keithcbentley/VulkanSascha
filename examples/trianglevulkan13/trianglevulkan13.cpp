@@ -26,7 +26,7 @@
 #include "vulkanexamplebase.h"
 #include <VulkanCpp.hpp>
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 // We want to keep GPU and CPU busy. To do that we may start building a new command buffer while the previous one is still being executed
 // This number defines how many frames may be worked on simultaneously at once
@@ -765,8 +765,8 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         VulkanExample::args.push_back(__argv[i]);
     };
 
-	vkcpp::AppContextCreateInfo appContextCreateInfo;
-	vkcpp::AppContext::init(appContextCreateInfo);
+	vkcpp::VulkanContextCreateInfo appContextCreateInfo;
+	vkcpp::VulkanContext::init(appContextCreateInfo);
 
     vulkanExample = new VulkanExample();
     vulkanExample->initVulkan();

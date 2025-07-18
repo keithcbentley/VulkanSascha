@@ -18,7 +18,7 @@
 
 #include "vulkanexamplebase.h"
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 #define OBJECT_INSTANCES 125
 

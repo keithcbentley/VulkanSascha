@@ -11,7 +11,7 @@
 #include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 
 #define PARTICLE_COUNT 512

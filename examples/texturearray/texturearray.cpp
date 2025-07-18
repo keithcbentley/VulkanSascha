@@ -13,7 +13,7 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
-vkcpp::AppContext vkcpp::s_appContext;
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 #define MAX_LAYERS 8
 

@@ -1200,54 +1200,47 @@ public:
     }
 };
 
-class AppContextCreateInfo {
+class VulkanContextCreateInfo {
 
 public:
-    AppContextCreateInfo() = default;
+    VulkanContextCreateInfo() = default;
 };
 
-class AppContext {
+class VulkanContext {
 
     VulkanInstance m_vulkanInstanceOriginal;
     PhysicalDevice m_physicalDeviceOriginal;
     Device m_deviceOriginal;
-    VkDevice m_vkDeviceOriginal;
+	VkDevice m_vkDeviceOriginal{};
 
 public:
-    AppContext()
-    {
-        std::cout << "AppContext()\n";
-    }
+	VulkanContext() = default;
+	~VulkanContext() = default;
 
-    ~AppContext()
-    {
-        std::cout << "~AppContext()\n";
-    }
-
-    const VulkanInstance& vulkanInstanceAppContext()
+    const VulkanInstance& vulkanInstanceContext()
     {
         return m_vulkanInstanceOriginal;
     }
 
-    const PhysicalDevice& physicalDeviceAppContext()
+    const PhysicalDevice& physicalDeviceContext()
     {
         return m_physicalDeviceOriginal;
     }
 
-    const Device& deviceAppContext()
+    const Device& deviceContext()
     {
         return m_deviceOriginal;
     }
 
-    const VkDevice vkDeviceAppContext()
+    const VkDevice vkDeviceContext()
     {
         return m_vkDeviceOriginal;
     }
 
-    static void init(const AppContextCreateInfo& appContextCreateInfo);
+    static void init(const VulkanContextCreateInfo& appContextCreateInfo);
 };
 
-extern AppContext s_appContext;
+extern VulkanContext s_vulkanContext;
 //	Free functions just to make things easier to use.  Clients can call
 //	vkcpp::vulkanInstance(),
 //	vkcpp::physicalDevice,

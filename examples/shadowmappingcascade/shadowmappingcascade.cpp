@@ -18,6 +18,8 @@
 #include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
 
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
+
 #if defined(__ANDROID__)
 #define SHADOWMAP_DIM 2048
 #else
@@ -133,21 +135,21 @@ public:
 	~VulkanExample()
 	{
 		for (auto cascade : cascades) {
-			cascade.destroy(m_vkDevice);
+			cascade.destroy(m_device);
 		}
-		depth.destroy(m_vkDevice);
+		depth.destroy(m_device);
 
-		vkDestroyRenderPass(m_vkDevice, depthPass.renderPass, nullptr);
+		vkDestroyRenderPass(m_device, depthPass.renderPass, nullptr);
 
-		vkDestroyPipeline(m_vkDevice, pipelines.debugShadowMap, nullptr);
-		vkDestroyPipeline(m_vkDevice, depthPass.pipeline, nullptr);
-		vkDestroyPipeline(m_vkDevice, pipelines.sceneShadow, nullptr);
-		vkDestroyPipeline(m_vkDevice, pipelines.sceneShadowPCF, nullptr);
+		vkDestroyPipeline(m_device, pipelines.debugShadowMap, nullptr);
+		vkDestroyPipeline(m_device, depthPass.pipeline, nullptr);
+		vkDestroyPipeline(m_device, pipelines.sceneShadow, nullptr);
+		vkDestroyPipeline(m_device, pipelines.sceneShadowPCF, nullptr);
 
-		vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
-		vkDestroyPipelineLayout(m_vkDevice, depthPass.pipelineLayout, nullptr);
+		vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+		vkDestroyPipelineLayout(m_device, depthPass.pipelineLayout, nullptr);
 
-		vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
 
 		cascadeViewProjMatricesBuffer.destroy();
 		uniformBuffers.VS.destroy();
@@ -251,7 +253,7 @@ public:
 		renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		renderPassCreateInfo.pDependencies = dependencies.data();
 
-		VK_CHECK_RESULT(vkCreateRenderPass(m_vkDevice, &renderPassCreateInfo, nullptr, &depthPass.renderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &depthPass.renderPass));
 
 		/*
 			Layered depth m_vkImage and views
@@ -268,14 +270,14 @@ public:
 		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageInfo.format = depthFormat;
 		imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		VK_CHECK_RESULT(vkCreateImage(m_vkDevice, &imageInfo, nullptr, &depth.image));
+		VK_CHECK_RESULT(vkCreateImage(m_device, &imageInfo, nullptr, &depth.image));
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(m_vkDevice, depth.image, &memReqs);
+		vkGetImageMemoryRequirements(m_device, depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(m_vkDevice, &memAlloc, nullptr, &depth.mem));
-		VK_CHECK_RESULT(vkBindImageMemory(m_vkDevice, depth.image, depth.mem, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &depth.mem));
+		VK_CHECK_RESULT(vkBindImageMemory(m_device, depth.image, depth.mem, 0));
 		// Full depth map m_vkImageView (all layers)
 		VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
@@ -287,7 +289,7 @@ public:
 		viewInfo.subresourceRange.baseArrayLayer = 0;
 		viewInfo.subresourceRange.layerCount = SHADOW_MAP_CASCADE_COUNT;
 		viewInfo.image = depth.image;
-		VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &depth.view));
+		VK_CHECK_RESULT(vkCreateImageView(m_device, &viewInfo, nullptr, &depth.view));
 
 		// One m_vkImage m_vkImageView and framebuffer per cascade
 		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
@@ -303,7 +305,7 @@ public:
 			viewInfo.subresourceRange.baseArrayLayer = i;
 			viewInfo.subresourceRange.layerCount = 1;
 			viewInfo.image = depth.image;
-			VK_CHECK_RESULT(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &cascades[i].view));
+			VK_CHECK_RESULT(vkCreateImageView(m_device, &viewInfo, nullptr, &cascades[i].view));
 			// Framebuffer
 			VkFramebufferCreateInfo framebufferInfo = vks::initializers::framebufferCreateInfo();
 			framebufferInfo.renderPass = depthPass.renderPass;
@@ -312,7 +314,7 @@ public:
 			framebufferInfo.width = SHADOWMAP_DIM;
 			framebufferInfo.height = SHADOWMAP_DIM;
 			framebufferInfo.layers = 1;
-			VK_CHECK_RESULT(vkCreateFramebuffer(m_vkDevice, &framebufferInfo, nullptr, &cascades[i].frameBuffer));
+			VK_CHECK_RESULT(vkCreateFramebuffer(m_device, &framebufferInfo, nullptr, &cascades[i].frameBuffer));
 		}
 
 		// Shared sampler for cascade depth reads
@@ -328,16 +330,16 @@ public:
 		sampler.minLod = 0.0f;
 		sampler.maxLod = 1.0f;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(m_vkDevice, &sampler, nullptr, &depth.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(m_device, &sampler, nullptr, &depth.sampler));
 	}
 
 	void buildCommandBuffers()
 	{
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
-		for (int32_t i = 0; i < drawCmdBuffers.size(); i++) {
+		for (int32_t i = 0; i < m_drawCommandBuffers.size(); i++) {
 
-			VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
+			VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
 
 			/*
 				Generate depth map cascades
@@ -359,18 +361,18 @@ public:
 				renderPassBeginInfo.pClearValues = clearValues;
 
 				VkViewport viewport = vks::initializers::viewport((float)SHADOWMAP_DIM, (float)SHADOWMAP_DIM, 0.0f, 1.0f);
-				vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+				vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
 
 				VkRect2D scissor = vks::initializers::rect2D(SHADOWMAP_DIM, SHADOWMAP_DIM, 0, 0);
-				vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+				vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
 
 				// One pass per cascade
 				for (uint32_t j = 0; j < SHADOW_MAP_CASCADE_COUNT; j++) {
 					renderPassBeginInfo.framebuffer = cascades[j].frameBuffer;
-					vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-					vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, depthPass.pipeline);
-					renderScene(drawCmdBuffers[i], depthPass.pipelineLayout, j);
-					vkCmdEndRenderPass(drawCmdBuffers[i]);
+					vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+					vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, depthPass.pipeline);
+					renderScene(m_drawCommandBuffers[i], depthPass.pipelineLayout, j);
+					vkCmdEndRenderPass(m_drawCommandBuffers[i]);
 				}
 			}
 
@@ -388,7 +390,7 @@ public:
 				clearValues[1].depthStencil = { 1.0f, 0 };
 
 				VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-				renderPassBeginInfo.renderPass = m_vkRenderPass;
+				renderPassBeginInfo.renderPass = m_renderPassOriginal;
 				renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 				renderPassBeginInfo.renderArea.offset.x = 0;
 				renderPassBeginInfo.renderArea.offset.y = 0;
@@ -397,42 +399,44 @@ public:
 				renderPassBeginInfo.clearValueCount = 2;
 				renderPassBeginInfo.pClearValues = clearValues;
 
-				vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+				vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 				VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-				vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+				vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
 
 				VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
-				vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+				vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
 
 				// Visualize shadow map cascade
 				if (displayDepthMap) {
-					vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-					vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.debugShadowMap);
+					vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+					vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.debugShadowMap);
 					PushConstBlock pushConstBlock = {};
 					pushConstBlock.cascadeIndex = displayDepthMapCascadeIndex;
-					vkCmdPushConstants(drawCmdBuffers[i], m_vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
-					vkCmdDraw(drawCmdBuffers[i], 3, 1, 0, 0);
+					vkCmdPushConstants(m_drawCommandBuffers[i], m_vkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
+					vkCmdDraw(m_drawCommandBuffers[i], 3, 1, 0, 0);
 				}
 
 				// Render shadowed scene
-				vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, (filterPCF) ? pipelines.sceneShadowPCF : pipelines.sceneShadow);
-				renderScene(drawCmdBuffers[i], m_vkPipelineLayout);
+				vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, (filterPCF) ? pipelines.sceneShadowPCF : pipelines.sceneShadow);
+				renderScene(m_drawCommandBuffers[i], m_vkPipelineLayout);
 
-				drawUI(drawCmdBuffers[i]);
+				drawUI(m_drawCommandBuffers[i]);
 
-				vkCmdEndRenderPass(drawCmdBuffers[i]);
+				vkCmdEndRenderPass(m_drawCommandBuffers[i]);
 			}
 
-			VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
+			VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
 		}
 	}
 
 	void loadAssets()
 	{
 		uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY;
-		models.terrain.loadFromFile(getAssetPath() + "models/terrain_gridlines.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
-		models.tree.loadFromFile(getAssetPath() + "models/oaktree.gltf", m_pVulkanDevice, m_vkQueue, glTFLoadingFlags);
+		models.terrain.loadFromFile(
+			getAssetPath() + "models/terrain_gridlines.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
+		models.tree.loadFromFile(
+			getAssetPath() + "models/oaktree.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
 	}
 
 	void setupLayoutsAndDescriptors()
@@ -445,8 +449,10 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32)
 		};
 		VkDescriptorPoolCreateInfo descriptorPoolInfo =
-			vks::initializers::descriptorPoolCreateInfo(static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), 4 + SHADOW_MAP_CASCADE_COUNT);
-		VK_CHECK_RESULT(vkCreateDescriptorPool(m_vkDevice, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+			vks::initializers::descriptorPoolCreateInfo(
+				static_cast<uint32_t>(poolSizes.size()), poolSizes.data(), 4 + SHADOW_MAP_CASCADE_COUNT);
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+		//VK_CHECK_RESULT(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
 		/*
 			Descriptor set layouts
@@ -460,7 +466,7 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 3),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_vkDevice, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
 
 		/*
 			Descriptor sets
@@ -470,17 +476,21 @@ public:
 			vks::initializers::descriptorImageInfo(depth.sampler, depth.view, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
 		VkDescriptorSetAllocateInfo allocInfo =
-			vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &m_vkDescriptorSetLayout, 1);
+			vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
 
 		// Scene rendering / debug display
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
 		const std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.VS.descriptor),
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthMapDescriptor),
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers.FS.descriptor),
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3, &cascadeViewProjMatricesBuffer.descriptor),
+			vks::initializers::writeDescriptorSet(
+				descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffers.VS.m_vkDescriptorBufferInfo),
+			vks::initializers::writeDescriptorSet(
+				descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &depthMapDescriptor),
+			vks::initializers::writeDescriptorSet(
+				descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers.FS.m_vkDescriptorBufferInfo),
+			vks::initializers::writeDescriptorSet(
+				descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3, &cascadeViewProjMatricesBuffer.m_vkDescriptorBufferInfo),
 		};
-		vkUpdateDescriptorSets(m_vkDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
+		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
 
 		/*
 			Pipeline layouts
@@ -493,7 +503,7 @@ public:
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
 		}
 
 		// Depth pass pipeline layout
@@ -503,7 +513,7 @@ public:
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(setLayouts.data(), static_cast<uint32_t>(setLayouts.size()));
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-			VK_CHECK_RESULT(vkCreatePipelineLayout(m_vkDevice, &pipelineLayoutCreateInfo, nullptr, &depthPass.pipelineLayout));
+			VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &depthPass.pipelineLayout));
 		}
 	}
 
@@ -520,7 +530,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_vkRenderPass, 0);
+		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -538,7 +548,7 @@ public:
 		// Empty vertex input state
 		VkPipelineVertexInputStateCreateInfo emptyInputState = vks::initializers::pipelineVertexInputStateCreateInfo();
 		pipelineCI.pVertexInputState = &emptyInputState;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.debugShadowMap));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.debugShadowMap));
 
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal });
 		/*
@@ -552,9 +562,9 @@ public:
 		VkSpecializationMapEntry specializationMapEntry = vks::initializers::specializationMapEntry(0, 0, sizeof(uint32_t));
 		VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(1, &specializationMapEntry, sizeof(uint32_t), &enablePCF);
 		shaderStages[1].pSpecializationInfo = &specializationInfo;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadow));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadow));
 		enablePCF = 1;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadowPCF));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.sceneShadowPCF));
 
 		/*
 			Depth map generation
@@ -568,7 +578,7 @@ public:
 		rasterizationState.depthClampEnable = m_vkPhysicalDeviceFeatures.depthClamp;
 		pipelineCI.layout = depthPass.pipelineLayout;
 		pipelineCI.renderPass = depthPass.renderPass;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_vkDevice, m_vkPipelineCache, 1, &pipelineCI, nullptr, &depthPass.pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &depthPass.pipeline));
 	}
 
 	void prepareUniformBuffers()
@@ -703,7 +713,7 @@ public:
 		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
 			cascadeViewProjMatrices[i] = cascades[i].viewProjMatrix;
 		}
-		memcpy(cascadeViewProjMatricesBuffer.mapped, cascadeViewProjMatrices.data(), sizeof(glm::mat4) * SHADOW_MAP_CASCADE_COUNT);
+		memcpy(cascadeViewProjMatricesBuffer.m_pMapped, cascadeViewProjMatrices.data(), sizeof(glm::mat4) * SHADOW_MAP_CASCADE_COUNT);
 
 		/*
 			Scene rendering
@@ -712,22 +722,23 @@ public:
 		uboVS.view = camera.matrices.view;
 		uboVS.model = glm::mat4(1.0f);
 		uboVS.lightDir = normalize(-lightPos);
-		memcpy(uniformBuffers.VS.mapped, &uboVS, sizeof(uboVS));
+		memcpy(uniformBuffers.VS.m_pMapped, &uboVS, sizeof(uboVS));
 		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
 			uboFS.cascadeSplits[i] = cascades[i].splitDepth;
 		}
 		uboFS.inverseViewMat = glm::inverse(camera.matrices.view);
 		uboFS.lightDir = normalize(-lightPos);
 		uboFS.colorCascades = colorCascades;
-		memcpy(uniformBuffers.FS.mapped, &uboFS, sizeof(uboFS));
+		memcpy(uniformBuffers.FS.m_pMapped, &uboFS, sizeof(uboFS));
 	}
 
 	void draw()
 	{
 		VulkanExampleBase::prepareFrame();
 		m_vkSubmitInfo.commandBufferCount = 1;
-		m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
-		VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+		VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
 		VulkanExampleBase::submitFrame();
 	}
 
