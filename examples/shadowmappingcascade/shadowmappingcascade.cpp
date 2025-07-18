@@ -158,9 +158,9 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		m_vkPhysicalDeviceFeatures10.samplerAnisotropy = m_vkPhysicalDeviceFeatures.samplerAnisotropy;
+		// m_vkPhysicalDeviceFeatures10.samplerAnisotropy = m_vkPhysicalDeviceFeatures.samplerAnisotropy;
 		// Depth clamp to avoid near plane clipping
-		m_vkPhysicalDeviceFeatures10.depthClamp = m_vkPhysicalDeviceFeatures.depthClamp;
+		// m_vkPhysicalDeviceFeatures10.depthClamp = m_vkPhysicalDeviceFeatures.depthClamp;
 	}
 
 	/*
@@ -575,7 +575,7 @@ public:
 		colorBlendState.attachmentCount = 0;
 		depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 		// Enable depth clamp (if available)
-		rasterizationState.depthClampEnable = m_vkPhysicalDeviceFeatures.depthClamp;
+		rasterizationState.depthClampEnable = vkcpp::vkPhysicalDeviceFeatures().depthClamp;
 		pipelineCI.layout = depthPass.pipelineLayout;
 		pipelineCI.renderPass = depthPass.renderPass;
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &depthPass.pipeline));

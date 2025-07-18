@@ -540,9 +540,15 @@ public:
     }
 };
 
-class DeviceFeatures {
+class PhysicalDeviceFeatures {
 
-    void assemble()
+    VkPhysicalDeviceFeatures2 m_features2 {};
+    VkPhysicalDeviceVulkan11Features m_featuresV11 {};
+    VkPhysicalDeviceVulkan12Features m_featuresV12 {};
+    VkPhysicalDeviceVulkan13Features m_featuresV13 {};
+    VkPhysicalDeviceVulkan14Features m_featuresV14 {};
+
+    void reassemble()
     {
         m_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         m_featuresV11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
@@ -558,60 +564,58 @@ class DeviceFeatures {
     }
 
 public:
-    VkPhysicalDeviceFeatures2 m_features2 {};
-    VkPhysicalDeviceVulkan11Features m_featuresV11 {};
-    VkPhysicalDeviceVulkan12Features m_featuresV12 {};
-    VkPhysicalDeviceVulkan13Features m_featuresV13 {};
-    VkPhysicalDeviceVulkan14Features m_featuresV14 {};
-
-    DeviceFeatures()
+    PhysicalDeviceFeatures()
     {
-        assemble();
+        reassemble();
     }
 
-    ~DeviceFeatures() = default;
+    ~PhysicalDeviceFeatures() = default;
 
-    DeviceFeatures(const DeviceFeatures& other)
+    PhysicalDeviceFeatures(const PhysicalDeviceFeatures& other)
         : m_features2(other.m_features2)
         , m_featuresV11(other.m_featuresV11)
         , m_featuresV12(other.m_featuresV12)
         , m_featuresV13(other.m_featuresV13)
         , m_featuresV14(other.m_featuresV14)
     {
-        assemble();
+        reassemble();
     }
 
-    DeviceFeatures& operator=(const DeviceFeatures& other)
+    PhysicalDeviceFeatures& operator=(const PhysicalDeviceFeatures& other)
     {
         m_features2 = other.m_features2;
         m_featuresV11 = other.m_featuresV11;
         m_featuresV12 = other.m_featuresV12;
         m_featuresV13 = other.m_featuresV13;
         m_featuresV14 = other.m_featuresV14;
-        assemble();
+        reassemble();
         return *this;
     }
 
-    DeviceFeatures(DeviceFeatures&& other) noexcept
+    PhysicalDeviceFeatures(PhysicalDeviceFeatures&& other) noexcept
         : m_features2(other.m_features2)
         , m_featuresV11(other.m_featuresV11)
         , m_featuresV12(other.m_featuresV12)
         , m_featuresV13(other.m_featuresV13)
         , m_featuresV14(other.m_featuresV14)
     {
-        assemble();
+        reassemble();
     }
 
-    DeviceFeatures& operator=(DeviceFeatures&& other) noexcept
+    PhysicalDeviceFeatures& operator=(PhysicalDeviceFeatures&& other) noexcept
     {
-        m_features2 = other.m_features2;
-        m_featuresV11 = other.m_featuresV11;
-        m_featuresV12 = other.m_featuresV12;
-        m_featuresV13 = other.m_featuresV13;
-        m_featuresV14 = other.m_featuresV14;
-        assemble();
+        m_features2 = std::move(other.m_features2);
+        m_featuresV11 = std::move(other.m_featuresV11);
+        m_featuresV12 = std::move(other.m_featuresV12);
+        m_featuresV13 = std::move(other.m_featuresV13);
+        m_featuresV14 = std::move(other.m_featuresV14);
+        reassemble();
         return *this;
     }
+
+	VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures() {
+		return m_features2.features;
+	}
 
     operator VkPhysicalDeviceFeatures2*()
     {
@@ -619,9 +623,15 @@ public:
     }
 };
 
-class DeviceProperties {
+class PhysicalDeviceProperties {
 
-    void assemble()
+    VkPhysicalDeviceProperties2 m_properties2 {};
+    VkPhysicalDeviceVulkan11Properties m_propertiesV11 {};
+    VkPhysicalDeviceVulkan12Properties m_propertiesV12 {};
+    VkPhysicalDeviceVulkan13Properties m_propertiesV13 {};
+    VkPhysicalDeviceVulkan14Properties m_propertiesV14 {};
+
+    void reassemble()
     {
         m_properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
         m_propertiesV11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
@@ -637,59 +647,80 @@ class DeviceProperties {
     }
 
 public:
-    VkPhysicalDeviceProperties2 m_properties2 {};
-    VkPhysicalDeviceVulkan11Properties m_propertiesV11 {};
-    VkPhysicalDeviceVulkan12Properties m_propertiesV12 {};
-    VkPhysicalDeviceVulkan13Properties m_propertiesV13 {};
-    VkPhysicalDeviceVulkan14Properties m_propertiesV14 {};
-
-    DeviceProperties()
+    PhysicalDeviceProperties()
     {
-        assemble();
+        reassemble();
     }
 
-    ~DeviceProperties() = default;
+    ~PhysicalDeviceProperties() = default;
 
-    DeviceProperties(const DeviceProperties& other)
+    PhysicalDeviceProperties(const PhysicalDeviceProperties& other)
         : m_properties2(other.m_properties2)
         , m_propertiesV11(other.m_propertiesV11)
         , m_propertiesV12(other.m_propertiesV12)
         , m_propertiesV13(other.m_propertiesV13)
         , m_propertiesV14(other.m_propertiesV14)
     {
-        assemble();
+        reassemble();
     }
 
-    DeviceProperties& operator=(const DeviceProperties& other)
+    PhysicalDeviceProperties& operator=(const PhysicalDeviceProperties& other)
     {
         m_properties2 = other.m_properties2;
         m_propertiesV11 = other.m_propertiesV11;
         m_propertiesV12 = other.m_propertiesV12;
         m_propertiesV13 = other.m_propertiesV13;
         m_propertiesV14 = other.m_propertiesV14;
-        assemble();
+        reassemble();
         return *this;
     }
 
-    DeviceProperties(DeviceProperties&& other) noexcept
-        : m_properties2(other.m_properties2)
-        , m_propertiesV11(other.m_propertiesV11)
-        , m_propertiesV12(other.m_propertiesV12)
-        , m_propertiesV13(other.m_propertiesV13)
-        , m_propertiesV14(other.m_propertiesV14)
+    //	Not sure if std::move really helps here.
+    //	The structures are all flat.
+    PhysicalDeviceProperties(PhysicalDeviceProperties&& other) noexcept
+        : m_properties2(std::move(other.m_properties2))
+        , m_propertiesV11(std::move(other.m_propertiesV11))
+        , m_propertiesV12(std::move(other.m_propertiesV12))
+        , m_propertiesV13(std::move(other.m_propertiesV13))
+        , m_propertiesV14(std::move(other.m_propertiesV14))
     {
-        assemble();
+        reassemble();
     }
 
-    DeviceProperties& operator=(DeviceProperties&& other) noexcept
+    PhysicalDeviceProperties& operator=(PhysicalDeviceProperties&& other) noexcept
     {
-        m_properties2 = other.m_properties2;
-        m_propertiesV11 = other.m_propertiesV11;
-        m_propertiesV12 = other.m_propertiesV12;
-        m_propertiesV13 = other.m_propertiesV13;
-        m_propertiesV14 = other.m_propertiesV14;
-        assemble();
+        m_properties2 = std::move(other.m_properties2);
+        m_propertiesV11 = std::move(other.m_propertiesV11);
+        m_propertiesV12 = std::move(other.m_propertiesV12);
+        m_propertiesV13 = std::move(other.m_propertiesV13);
+        m_propertiesV14 = std::move(other.m_propertiesV14);
+        reassemble();
         return *this;
+    }
+
+    VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
+    {
+        return m_properties2.properties;
+    }
+
+    VkPhysicalDeviceVulkan11Properties& vkPhysicalDeviceVulkan11Properties()
+    {
+        return m_propertiesV11;
+    }
+
+    VkPhysicalDeviceVulkan12Properties& vkPhysicalDeviceVulkan12Properties()
+    {
+        return m_propertiesV12;
+    }
+
+    VkPhysicalDeviceVulkan13Properties& vkPhysicalDeviceVulkan13Properties()
+    {
+        return m_propertiesV13;
+    }
+
+    VkPhysicalDeviceVulkan14Properties& vkPhysicalDeviceVulkan14Properties()
+    {
+        return m_propertiesV14;
     }
 
     operator VkPhysicalDeviceProperties2*()
@@ -721,9 +752,8 @@ public:
 
     operator VkPhysicalDevice() const { return m_vkPhysicalDevice; }
 
-    DeviceFeatures getPhysicalDeviceFeatures2() const;
-
-    DeviceProperties getPhysicalDeviceProperties2() const;
+    PhysicalDeviceFeatures getPhysicalDeviceFeatures2() const;
+    PhysicalDeviceProperties getPhysicalDeviceProperties2() const;
 
     std::vector<VkExtensionProperties> EnumerateDeviceExtensionProperties() const;
 
@@ -1119,9 +1149,9 @@ public:
         return &m_vkDeviceCreateInfo;
     }
 
-    void setDeviceFeatures(DeviceFeatures& deviceFeatures)
+    void setDeviceFeatures(PhysicalDeviceFeatures& physicalDeviceFeatures)
     {
-        m_vkDeviceCreateInfo.pNext = deviceFeatures;
+        m_vkDeviceCreateInfo.pNext = physicalDeviceFeatures;
     }
 
     void addExtension(const char* extensionName)
@@ -1211,11 +1241,14 @@ class VulkanContext {
     VulkanInstance m_vulkanInstanceOriginal;
     PhysicalDevice m_physicalDeviceOriginal;
     Device m_deviceOriginal;
-	VkDevice m_vkDeviceOriginal{};
+    VkDevice m_vkDeviceOriginal {};
+
+    PhysicalDeviceFeatures m_physicalDeviceFeatures;
+    PhysicalDeviceProperties m_physicalDeviceProperties;
 
 public:
-	VulkanContext() = default;
-	~VulkanContext() = default;
+    VulkanContext() = default;
+    ~VulkanContext() = default;
 
     const VulkanInstance& vulkanInstanceContext()
     {
@@ -1237,20 +1270,34 @@ public:
         return m_vkDeviceOriginal;
     }
 
-    static void init(const VulkanContextCreateInfo& appContextCreateInfo);
+	VkPhysicalDeviceProperties& vkPhysicalDeviceProperties() {
+		return m_physicalDeviceProperties.vkPhysicalDeviceProperties();
+	}
+
+	VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures() {
+		return m_physicalDeviceFeatures.vkPhysicalDeviceFeatures();
+	}
+
+
+    void init(const VulkanContextCreateInfo& vulkanContextCreateInfo);
 };
 
 extern VulkanContext s_vulkanContext;
-//	Free functions just to make things easier to use.  Clients can call
+//	Free functions just to make things easier to use.
+//  The free functions call the corresponding function on s_vulkanContext.
+//	Clients can call
 //	vkcpp::vulkanInstance(),
 //	vkcpp::physicalDevice,
 //	vkcpp::device,
 //	etc
-
+void initVulkanContext(const VulkanContextCreateInfo& vulkanContextCreateInfo);
 const VulkanInstance& vulkanInstance();
 const PhysicalDevice& physicalDevice();
 const Device& device();
 VkDevice vkDevice();
+VkPhysicalDeviceProperties& vkPhysicalDeviceProperties();
+VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
+
 
 class Semaphore : public HandleWithOwner<VkSemaphore> {
 

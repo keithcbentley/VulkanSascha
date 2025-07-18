@@ -61,15 +61,15 @@ public:
     // Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
     virtual void getEnabledFeatures()
     {
-        // Fill mode non solid is required for wireframe display
-        if (m_physicalDeviceFeatures.m_features2.features.fillModeNonSolid) {
-            m_vkPhysicalDeviceFeatures10.fillModeNonSolid = VK_TRUE;
-        }
+        //// Fill mode non solid is required for wireframe display
+        //if (m_physicalDeviceFeatures.m_features2.features.fillModeNonSolid) {
+        //    m_vkPhysicalDeviceFeatures10.fillModeNonSolid = VK_TRUE;
+        //}
 
-        // Wide lines must be present for line m_drawAreaWidth > 1.0f
-        if (m_physicalDeviceFeatures.m_features2.features.wideLines) {
-            m_vkPhysicalDeviceFeatures10.wideLines = VK_TRUE;
-        }
+        //// Wide lines must be present for line m_drawAreaWidth > 1.0f
+        //if (m_physicalDeviceFeatures.m_features2.features.wideLines) {
+        //    m_vkPhysicalDeviceFeatures10.wideLines = VK_TRUE;
+        //}
     }
 
     void buildCommandBuffers()
@@ -117,13 +117,13 @@ public:
             vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
             vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.m_toonPipelineOriginal);
             // Line m_drawAreaWidth > 1.0f only if wide lines feature is supported
-            if (m_vkPhysicalDeviceFeatures10.wideLines) {
+            if (vkcpp::vkPhysicalDeviceFeatures().wideLines) {
                 vkCmdSetLineWidth(m_drawCommandBuffers[i], 2.0f);
             }
             scene.draw(m_drawCommandBuffers[i]);
 
             // Right : Render the scene as wireframe (if that feature is supported by the implementation)
-            if (m_vkPhysicalDeviceFeatures10.fillModeNonSolid) {
+            if (vkcpp::vkPhysicalDeviceFeatures().fillModeNonSolid) {
                 viewport.x = (float)m_drawAreaWidth / 3.0f + (float)m_drawAreaWidth / 3.0f;
                 vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
                 vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.m_wireframePipelineOriginal);
@@ -295,7 +295,7 @@ public:
 
     virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay)
     {
-        if (!m_vkPhysicalDeviceFeatures10.fillModeNonSolid) {
+        if (!vkcpp::vkPhysicalDeviceFeatures().fillModeNonSolid) {
             if (overlay->header("Info")) {
                 overlay->text("Non solid fill modes not supported!");
             }

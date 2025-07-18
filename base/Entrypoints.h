@@ -25,7 +25,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_  HINSTANCE hPrevInstance
 {																									\
 	for (int32_t i = 0; i < __argc; i++) { VulkanExample::args.push_back(__argv[i]); };  			\
 	vkcpp::VulkanContextCreateInfo vulkanContextCreateInfo;	\
-	vkcpp::VulkanContext::init(vulkanContextCreateInfo);		\
+	vkcpp::initVulkanContext(vulkanContextCreateInfo);		\
 	vulkanExample = new VulkanExample();															\
 	vulkanExample->initVulkan();																	\
 	vulkanExample->setupWindow(hInstance, WndProc);													\

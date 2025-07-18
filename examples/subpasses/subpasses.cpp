@@ -103,7 +103,8 @@ public:
 		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
 		m_UIOverlay.subpass = 2;
 
-		m_vkPhysicalDeviceFeatures10.fragmentStoresAndAtomics = VK_TRUE;
+		//	TODO: need to check if this is available.
+		//m_vkPhysicalDeviceFeatures10.fragmentStoresAndAtomics = VK_TRUE;
 	}
 
 	~VulkanExample()

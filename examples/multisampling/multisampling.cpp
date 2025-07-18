@@ -89,14 +89,14 @@ public:
     {
         // Enable sample rate shading filtering if supported
         //		if (m_vkPhysicalDeviceFeatures.sampleRateShading)
-        {
-            m_vkPhysicalDeviceFeatures10.sampleRateShading = VK_TRUE;
-        }
+        //{
+        //    m_vkPhysicalDeviceFeatures10.sampleRateShading = VK_TRUE;
+        //}
         // Enable anisotropic filtering if supported
         //		if (m_vkPhysicalDeviceFeatures.samplerAnisotropy)
-        {
-            m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
-        }
+        //{
+        //    m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
+        //}
     }
 
     // Creates a multi sample render target (m_vkImage and m_vkImageView) that is used to resolve

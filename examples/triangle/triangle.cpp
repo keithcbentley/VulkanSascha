@@ -890,7 +890,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
 	try {
 		vkcpp::VulkanContextCreateInfo appContextCreateInfo;
-		vkcpp::VulkanContext::init(appContextCreateInfo);
+		vkcpp::initVulkanContext(appContextCreateInfo);
 
 		vulkanExample = new VulkanExample();
 		vulkanExample->initVulkan();

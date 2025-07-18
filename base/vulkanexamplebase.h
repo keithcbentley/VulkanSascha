@@ -117,13 +117,13 @@ protected:
 
 	std::vector<std::string> m_supportedInstanceExtensions;
    
-	vkcpp::DeviceFeatures m_physicalDeviceFeatures;
-    vkcpp::DeviceProperties m_physicalDeviceProperties;
+	//vkcpp::DeviceFeatures m_physicalDeviceFeatures;
+	//vkcpp::DeviceProperties m_physicalDeviceProperties;
 
 
 	VkPhysicalDeviceMemoryProperties m_vkPhysicalDeviceMemoryProperties{};
 
-	VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures10{};
+	//VkPhysicalDeviceFeatures m_vkPhysicalDeviceFeatures10{};
 
 	std::vector<const char*> m_requestedDeviceExtensions;
 
@@ -131,7 +131,7 @@ protected:
 
 	std::vector<VkLayerSettingEXT> m_requestedLayerSettings;
 
-	void* m_deviceCreatepNextChain = nullptr;
+	//void* m_deviceCreatepNextChain = nullptr;
 
 	vkcpp::Queue m_queue;
 

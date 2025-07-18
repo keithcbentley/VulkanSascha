@@ -24,7 +24,7 @@ void VulkanExampleBase::renderFrame()
 
 std::string VulkanExampleBase::getWindowTitle() const
 {
-    std::string windowTitle { title + " - " + m_physicalDeviceProperties.m_properties2.properties.deviceName };
+	std::string windowTitle{title + " - " + vkcpp::vkPhysicalDeviceProperties().deviceName};
     if (!m_exampleSettings.m_showUIOverlay) {
         windowTitle += " - " + std::to_string(m_frameCounter) + " fps";
     }
@@ -203,7 +203,7 @@ void VulkanExampleBase::updateOverlay()
     ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiSetCond_FirstUseEver);
     ImGui::Begin("Vulkan Example", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
     ImGui::TextUnformatted(title.c_str());
-    ImGui::TextUnformatted(m_physicalDeviceProperties.m_properties2.properties.deviceName);
+    ImGui::TextUnformatted(vkcpp::vkPhysicalDeviceProperties().deviceName);
     ImGui::Text("%.2f ms/frame (%.1d fps)", (1000.0f / m_lastFPS), m_lastFPS);
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -432,8 +432,6 @@ bool VulkanExampleBase::initVulkan()
     // m_vkPhysicalDeviceFeatures and m_vkDeviceMemory m_vkPhysicalDeviceProperties
     // of the physical m_vkDevice (so that examples can check against them)
 
-    m_physicalDeviceFeatures = m_physicalDevice.getPhysicalDeviceFeatures2();
-    m_physicalDeviceProperties = m_physicalDevice.getPhysicalDeviceProperties2();
     m_vkPhysicalDeviceMemoryProperties = m_physicalDevice.getPhysicalDeviceMemoryProperties();
 
     // Derived examples can override this to set actual m_vkPhysicalDeviceFeatures (based on above readings) to enable for logical m_vkDevice creation

@@ -79,9 +79,9 @@ public:
     virtual void getEnabledFeatures()
     {
         // Enable anisotropic filtering if supported
-        if (m_physicalDeviceFeatures.m_features2.features.samplerAnisotropy) {
-            m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
-        };
+        //if (m_physicalDeviceFeatures.m_features2.features.samplerAnisotropy) {
+        //    m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
+        //};
     }
 
     /*
@@ -337,9 +337,9 @@ public:
         vkSamplerCreateInfo.maxLod = (useStaging) ? (float)m_texture.m_mipLevels : 0.0f;
         // Enable anisotropic filtering
         // This feature is optional, so we must check if it's supported on the m_vkDevice
-        if (m_physicalDeviceFeatures.m_features2.features.samplerAnisotropy) {
+        if ( vkcpp::vkPhysicalDeviceFeatures().samplerAnisotropy) {
             // Use max. level of anisotropy for this example
-            vkSamplerCreateInfo.maxAnisotropy = m_physicalDeviceProperties.m_properties2.properties.limits.maxSamplerAnisotropy;
+            vkSamplerCreateInfo.maxAnisotropy = vkcpp::vkPhysicalDeviceProperties().limits.maxSamplerAnisotropy;
             vkSamplerCreateInfo.anisotropyEnable = VK_TRUE;
         } else {
             // The m_vkDevice does not support anisotropic filtering

@@ -299,8 +299,7 @@ public:
 		// We allocate this manually as the alignment of the offset differs between GPUs
 
 		// Calculate required alignment based on minimum m_vkDevice offset alignment
-//		size_t minUboAlignment = m_pVulkanDevice->m_vkPhysicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
-		size_t minUboAlignment = m_physicalDeviceProperties.m_properties2.properties.limits.minUniformBufferOffsetAlignment;
+		size_t minUboAlignment = vkcpp::vkPhysicalDeviceProperties().limits.minUniformBufferOffsetAlignment;
 		dynamicAlignment = sizeof(glm::mat4);
 		if (minUboAlignment > 0) {
 			dynamicAlignment = (dynamicAlignment + minUboAlignment - 1) & ~(minUboAlignment - 1);

@@ -89,8 +89,11 @@ public:
 		camera.setRotation(glm::vec3(-2.5f, 0.0f, 0.0f));
 		camera.setRotationSpeed(0.5f);
 		camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
+
 		// The scene shader uses a clipping plane, so this feature has to be enabled
-		m_vkPhysicalDeviceFeatures10.shaderClipDistance = VK_TRUE;
+		// TODO: Need to check if this is enabled.
+		//m_vkPhysicalDeviceFeatures10.shaderClipDistance = VK_TRUE;
+
 	}
 
 	~VulkanExample()

@@ -110,11 +110,12 @@ public:
         camera.setPosition(glm::vec3(0.0f, 0.0f, -2.5f));
         camera.setRotation(glm::vec3(0.0f));
         camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 1.0f, 256.0f);
+
         // We want to use Vulkan 1.3 with the dynamic rendering and sync 2 m_vkPhysicalDeviceFeatures
-        m_requestedApiVersion = VK_API_VERSION_1_3;
-        m_vkPhysicalDeviceVulkan13Features.dynamicRendering = VK_TRUE;
-        m_vkPhysicalDeviceVulkan13Features.synchronization2 = VK_TRUE;
-        m_deviceCreatepNextChain = &m_vkPhysicalDeviceVulkan13Features;
+        //m_requestedApiVersion = VK_API_VERSION_1_3;
+        //m_vkPhysicalDeviceVulkan13Features.dynamicRendering = VK_TRUE;
+        //m_vkPhysicalDeviceVulkan13Features.synchronization2 = VK_TRUE;
+        //m_deviceCreatepNextChain = &m_vkPhysicalDeviceVulkan13Features;
     }
 
     ~VulkanExample() override
@@ -145,7 +146,7 @@ public:
     virtual void getEnabledFeatures() override
     {
         // Vulkan 1.3 m_vkDevice support is required for this example
-        if (m_physicalDeviceProperties.m_properties2.properties.apiVersion < VK_API_VERSION_1_3) {
+        if (vkcpp::vkPhysicalDeviceProperties().apiVersion < VK_API_VERSION_1_3) {
             vks::tools::exitFatal("Selected GPU does not support support Vulkan 1.3", VK_ERROR_INCOMPATIBLE_DRIVER);
         }
     }
@@ -766,7 +767,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
     };
 
 	vkcpp::VulkanContextCreateInfo appContextCreateInfo;
-	vkcpp::VulkanContext::init(appContextCreateInfo);
+	vkcpp::initVulkanContext(appContextCreateInfo);
 
     vulkanExample = new VulkanExample();
     vulkanExample->initVulkan();

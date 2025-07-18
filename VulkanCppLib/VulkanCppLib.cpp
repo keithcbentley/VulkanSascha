@@ -5,8 +5,6 @@
 
 namespace vkcpp {
 
-
-
 VersionNumber VersionNumber::getVersionNumber()
 {
     uint32_t vkVersionNumber;
@@ -14,19 +12,18 @@ VersionNumber VersionNumber::getVersionNumber()
     return { vkVersionNumber };
 }
 
-
-DeviceFeatures PhysicalDevice::getPhysicalDeviceFeatures2() const
+PhysicalDeviceFeatures PhysicalDevice::getPhysicalDeviceFeatures2() const
 {
-    DeviceFeatures deviceFeatures;
-    vkGetPhysicalDeviceFeatures2(m_vkPhysicalDevice, deviceFeatures);
-    return deviceFeatures;
+    PhysicalDeviceFeatures physicalDeviceFeatures;
+    vkGetPhysicalDeviceFeatures2(m_vkPhysicalDevice, physicalDeviceFeatures);
+    return physicalDeviceFeatures;
 }
 
-DeviceProperties PhysicalDevice::getPhysicalDeviceProperties2() const
+PhysicalDeviceProperties PhysicalDevice::getPhysicalDeviceProperties2() const
 {
-    DeviceProperties deviceProperties {};
-    vkGetPhysicalDeviceProperties2(m_vkPhysicalDevice, deviceProperties);
-    return deviceProperties;
+    PhysicalDeviceProperties physicalDeviceProperties;
+    vkGetPhysicalDeviceProperties2(m_vkPhysicalDevice, physicalDeviceProperties);
+    return physicalDeviceProperties;
 }
 
 std::vector<VkExtensionProperties> PhysicalDevice::EnumerateDeviceExtensionProperties() const
@@ -52,7 +49,7 @@ uint32_t PhysicalDevice::findMemoryTypeIndex(
     uint32_t usableMemoryIndexBits,
     MemoryPropertyFlags requiredPropertiesArg) const
 {
-	MemoryPropertyFlags requiredProperties(requiredPropertiesArg);
+    MemoryPropertyFlags requiredProperties(requiredPropertiesArg);
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice, &memProperties);
 
@@ -85,75 +82,92 @@ Queue Device::getDeviceQueue(int deviceQueueFamilyIndex, int deviceQueueIndex) c
     return Queue(vkQueue, deviceQueueFamilyIndex);
 }
 
-void VulkanContext::init(const VulkanContextCreateInfo& appContextCreateInfo) {
-	VulkanInstanceCreateInfo vulkanInstanceCreateInfo{};
-	vulkanInstanceCreateInfo.addLayer("VK_LAYER_KHRONOS_validation");
+void VulkanContext::init(const VulkanContextCreateInfo& vulkanContextCreateInfo)
+{
+    VulkanInstanceCreateInfo vulkanInstanceCreateInfo {};
+    vulkanInstanceCreateInfo.addLayer("VK_LAYER_KHRONOS_validation");
 
-	vulkanInstanceCreateInfo.addExtension("VK_EXT_debug_utils");
-	vulkanInstanceCreateInfo.addExtension("VK_KHR_surface");
-	vulkanInstanceCreateInfo.addExtension("VK_KHR_win32_surface");
+    vulkanInstanceCreateInfo.addExtension("VK_EXT_debug_utils");
+    vulkanInstanceCreateInfo.addExtension("VK_KHR_surface");
+    vulkanInstanceCreateInfo.addExtension("VK_KHR_win32_surface");
 
-	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = DebugUtilsMessenger::getCreateInfo();
-	vulkanInstanceCreateInfo.pNext = &debugCreateInfo;
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = DebugUtilsMessenger::getCreateInfo();
+    vulkanInstanceCreateInfo.pNext = &debugCreateInfo;
 
-	//	Create the vulkan instance.  After this, use vulkanInstance().
-	s_vulkanContext.m_vulkanInstanceOriginal = VulkanInstance(vulkanInstanceCreateInfo);
+    //	Create the vulkan instance.  After this, use vulkanInstance().
+    s_vulkanContext.m_vulkanInstanceOriginal = VulkanInstance(vulkanInstanceCreateInfo);
 
-	auto allPhysicalDevices = vulkanInstance().getAllPhysicalDevices();
+    auto allPhysicalDevices = vulkanInstance().getAllPhysicalDevices();
 
-	for (auto p : allPhysicalDevices) {
-		PhysicalDevice physicalDevice = PhysicalDevice(p);
-		auto deviceProperties = physicalDevice.getPhysicalDeviceProperties2();
+    for (auto p : allPhysicalDevices) {
+        PhysicalDevice physicalDevice = PhysicalDevice(p);
+        auto deviceProperties = physicalDevice.getPhysicalDeviceProperties2();
 
-		std::cout << std::format("deviceName: {}\n", deviceProperties.m_properties2.properties.deviceName);
-		std::cout << std::format("m_requestedApiVersion: {}  driverVersion: {}\n",
-								 VersionNumber(deviceProperties.m_properties2.properties.apiVersion).asString(),
-								 VersionNumber(deviceProperties.m_properties2.properties.driverVersion).asString());
-		auto extensions = physicalDevice.EnumerateDeviceExtensionProperties();
-		for (VkExtensionProperties extension : extensions) {
-			std::cout << std::format("extension: {}\n", extension.extensionName);
-		}
+        std::cout << std::format("deviceName: {}\n", deviceProperties.vkPhysicalDeviceProperties().deviceName);
+        std::cout << std::format("m_requestedApiVersion: {}  driverVersion: {}\n",
+            VersionNumber(deviceProperties.vkPhysicalDeviceProperties().apiVersion).asString(),
+            VersionNumber(deviceProperties.vkPhysicalDeviceProperties().driverVersion).asString());
+        auto extensions = physicalDevice.EnumerateDeviceExtensionProperties();
+        for (VkExtensionProperties extension : extensions) {
+            std::cout << std::format("extension: {}\n", extension.extensionName);
+        }
 
-		std::cout << '\n';
-	}
+        std::cout << '\n';
+    }
 
-	//	Create the physical device.  After this, use physicalDevice().
-	s_vulkanContext.m_physicalDeviceOriginal = PhysicalDevice(allPhysicalDevices[0]);
+    //	Create the physical device.  After this, use physicalDevice().
+    s_vulkanContext.m_physicalDeviceOriginal = PhysicalDevice(allPhysicalDevices[0]);
+    m_physicalDeviceFeatures = physicalDevice().getPhysicalDeviceFeatures2();
+    m_physicalDeviceProperties = physicalDevice().getPhysicalDeviceProperties2();
 
-	DeviceCreateInfo deviceCreateInfo;
-	deviceCreateInfo.addExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    DeviceCreateInfo deviceCreateInfo;
+    deviceCreateInfo.addExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-	deviceCreateInfo.addDeviceQueue(0, 1);
-	deviceCreateInfo.addDeviceQueue(0, 1);
-	deviceCreateInfo.addDeviceQueue(1, 1);
-	deviceCreateInfo.addDeviceQueue(1, 1);
+    deviceCreateInfo.addDeviceQueue(0, 1);
+    deviceCreateInfo.addDeviceQueue(0, 1);
+    deviceCreateInfo.addDeviceQueue(1, 1);
+    deviceCreateInfo.addDeviceQueue(1, 1);
 
-	DeviceFeatures deviceFeatures = physicalDevice().getPhysicalDeviceFeatures2();
-	deviceCreateInfo.setDeviceFeatures(deviceFeatures);
+    deviceCreateInfo.setDeviceFeatures(m_physicalDeviceFeatures);
 
-	//	Create (logical) device.  After this, use device().
-	s_vulkanContext.m_deviceOriginal = Device(deviceCreateInfo, s_vulkanContext.m_physicalDeviceOriginal);
-	s_vulkanContext.m_vkDeviceOriginal = device();
+    //	Create (logical) device.  After this, use device().
+    s_vulkanContext.m_deviceOriginal = Device(deviceCreateInfo, s_vulkanContext.m_physicalDeviceOriginal);
+    s_vulkanContext.m_vkDeviceOriginal = device();
 
-	std::cout << "AppContext::init()\n";
-
+    std::cout << "AppContext::init()\n";
 }
 
-
-const VulkanInstance& vulkanInstance() {
-	return s_vulkanContext.vulkanInstanceContext();
+void initVulkanContext(const VulkanContextCreateInfo& vulkanContextCreateInfo)
+{
+	s_vulkanContext.init(vulkanContextCreateInfo);
 }
 
-const PhysicalDevice& physicalDevice() {
-	return s_vulkanContext.physicalDeviceContext();
+const VulkanInstance& vulkanInstance()
+{
+    return s_vulkanContext.vulkanInstanceContext();
 }
 
-const Device& device() {
-	return s_vulkanContext.deviceContext();
+const PhysicalDevice& physicalDevice()
+{
+    return s_vulkanContext.physicalDeviceContext();
 }
 
-VkDevice vkDevice() {
-	return s_vulkanContext.deviceContext();
+const Device& device()
+{
+    return s_vulkanContext.deviceContext();
+}
+
+VkDevice vkDevice()
+{
+    return s_vulkanContext.deviceContext();
+}
+
+VkPhysicalDeviceProperties& vkPhysicalDeviceProperties() {
+	return s_vulkanContext.vkPhysicalDeviceProperties();
+}
+
+VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures() {
+	return s_vulkanContext.vkPhysicalDeviceFeatures();
 }
 
 
