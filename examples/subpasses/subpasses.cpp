@@ -63,16 +63,16 @@ public:
 
     // G-Buffer framebuffer attachments
     struct FrameBufferAttachment {
-        VkImage image = VK_NULL_HANDLE;
-        VkDeviceMemory mem = VK_NULL_HANDLE;
-        VkImageView view = VK_NULL_HANDLE;
-        VkFormat format;
+        VkImage m_vkImage = VK_NULL_HANDLE;
+        VkDeviceMemory m_vkDeviceMemory = VK_NULL_HANDLE;
+        VkImageView m_vkImageView = VK_NULL_HANDLE;
+        VkFormat m_vkFormat;
     };
 
     struct Attachments {
-        FrameBufferAttachment position;
-        FrameBufferAttachment normal;
-        FrameBufferAttachment albedo;
+        FrameBufferAttachment m_position;
+        FrameBufferAttachment m_normal;
+        FrameBufferAttachment m_albedo;
         int32_t width=0;
         int32_t height=0;
     } m_attachments;
@@ -111,9 +111,9 @@ public:
         vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayoutComposition, nullptr);
         vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayoutTransparent, nullptr);
 
-        clearAttachment(&m_attachments.position);
-        clearAttachment(&m_attachments.normal);
-        clearAttachment(&m_attachments.albedo);
+        clearAttachment(&m_attachments.m_position);
+        clearAttachment(&m_attachments.m_normal);
+        clearAttachment(&m_attachments.m_albedo);
 
         m_textureGlass.destroy();
         m_bufferGBuffer.destroy();
@@ -130,21 +130,21 @@ public:
 
     void clearAttachment(FrameBufferAttachment* attachment)
     {
-        vkDestroyImageView(m_device, attachment->view, nullptr);
-        vkDestroyImage(m_device, attachment->image, nullptr);
-        vkFreeMemory(m_device, attachment->mem, nullptr);
+        vkDestroyImageView(m_device, attachment->m_vkImageView, nullptr);
+        vkDestroyImage(m_device, attachment->m_vkImage, nullptr);
+        vkFreeMemory(m_device, attachment->m_vkDeviceMemory, nullptr);
     }
 
     // Create a frame buffer attachment
     void createAttachment(VkFormat format, VkImageUsageFlags usage, FrameBufferAttachment* attachment)
     {
-        if (attachment->image != VK_NULL_HANDLE) {
+        if (attachment->m_vkImage != VK_NULL_HANDLE) {
             clearAttachment(attachment);
         }
 
         VkImageAspectFlags aspectMask = 0;
 
-        attachment->format = format;
+        attachment->m_vkFormat = format;
 
         if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
             aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -172,12 +172,12 @@ public:
         VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
         VkMemoryRequirements memReqs;
 
-        VK_CHECK_RESULT(vkCreateImage(m_device, &image, nullptr, &attachment->image));
-        vkGetImageMemoryRequirements(m_device, attachment->image, &memReqs);
+        VK_CHECK_RESULT(vkCreateImage(m_device, &image, nullptr, &attachment->m_vkImage));
+        vkGetImageMemoryRequirements(m_device, attachment->m_vkImage, &memReqs);
         memAlloc.allocationSize = memReqs.size;
         memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &attachment->mem));
-        VK_CHECK_RESULT(vkBindImageMemory(m_device, attachment->image, attachment->mem, 0));
+        VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &attachment->m_vkDeviceMemory));
+        VK_CHECK_RESULT(vkBindImageMemory(m_device, attachment->m_vkImage, attachment->m_vkDeviceMemory, 0));
 
         VkImageViewCreateInfo imageView = vks::initializers::imageViewCreateInfo();
         imageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -188,16 +188,16 @@ public:
         imageView.subresourceRange.levelCount = 1;
         imageView.subresourceRange.baseArrayLayer = 0;
         imageView.subresourceRange.layerCount = 1;
-        imageView.image = attachment->image;
-        VK_CHECK_RESULT(vkCreateImageView(m_device, &imageView, nullptr, &attachment->view));
+        imageView.image = attachment->m_vkImage;
+        VK_CHECK_RESULT(vkCreateImageView(m_device, &imageView, nullptr, &attachment->m_vkImageView));
     }
 
     // Create color attachments for the G-Buffer components
     void createGBufferAttachments()
     {
-        createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.position); // (World space) Positions
-        createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.normal); // (World space) Normals
-        createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.albedo); // Albedo (color)
+        createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.m_position); // (World space) Positions
+        createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.m_normal); // (World space) Normals
+        createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.m_albedo); // Albedo (color)
     }
 
     // Override framebuffer setup from base class, will automatically be called upon setup and if a m_hwnd is m_resized
@@ -211,9 +211,9 @@ public:
             // Since the framebuffers/attachments are referred in the descriptor sets, these need to be updated too
             // Composition pass
             std::vector<VkDescriptorImageInfo> descriptorImageInfos = {
-                vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.position.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-                vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.normal.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-                vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.albedo.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+                vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.m_position.m_vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+                vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.m_normal.m_vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+                vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.m_albedo.m_vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
             };
             std::vector<VkWriteDescriptorSet> writeDescriptorSets;
             for (size_t i = 0; i < descriptorImageInfos.size(); i++) {
@@ -242,9 +242,9 @@ public:
         m_vkFrameBuffers.resize(m_swapChain.images.size());
         for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++) {
             attachments[0] = m_swapChain.imageViews[i];
-            attachments[1] = this->m_attachments.position.view;
-            attachments[2] = this->m_attachments.normal.view;
-            attachments[3] = this->m_attachments.albedo.view;
+            attachments[1] = this->m_attachments.m_position.m_vkImageView;
+            attachments[2] = this->m_attachments.m_normal.m_vkImageView;
+            attachments[3] = this->m_attachments.m_albedo.m_vkImageView;
             attachments[4] = m_defaultDepthStencil.m_imageView;
             VK_CHECK_RESULT(vkCreateFramebuffer(m_device, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
         }
@@ -271,7 +271,7 @@ public:
 
         // Deferred attachments
         // Position
-        attachments[1].format = this->m_attachments.position.format;
+        attachments[1].format = this->m_attachments.m_position.m_vkFormat;
         attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -280,7 +280,7 @@ public:
         attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         // Normals
-        attachments[2].format = this->m_attachments.normal.format;
+        attachments[2].format = this->m_attachments.m_normal.m_vkFormat;
         attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -289,7 +289,7 @@ public:
         attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         // Albedo
-        attachments[3].format = this->m_attachments.albedo.format;
+        attachments[3].format = this->m_attachments.m_albedo.m_vkFormat;
         attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -643,11 +643,11 @@ public:
 
         // Image descriptors for the offscreen color attachments
         VkDescriptorImageInfo texDescriptorPosition
-            = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.position.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.m_position.m_vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         VkDescriptorImageInfo texDescriptorNormal
-            = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.normal.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.m_normal.m_vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         VkDescriptorImageInfo texDescriptorAlbedo
-            = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.albedo.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.m_albedo.m_vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             // Binding 0: Position texture target
