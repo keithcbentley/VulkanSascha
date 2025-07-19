@@ -49,9 +49,9 @@ public:
     vkcpp::PipelineLayout m_pipelineLayoutComposition;
     vkcpp::PipelineLayout m_pipelineLayoutTransparent;
 
-    VkPipeline m_vkPipelineOffscreen;
-    VkPipeline m_vkPipelineComposition;
-    VkPipeline m_vkPipelineTransparent;
+    vkcpp::GraphicsPipeline m_pipelineOffscreen;
+    vkcpp::GraphicsPipeline m_pipelineComposition;
+    vkcpp::GraphicsPipeline m_pipelineTransparent;
 
     VkDescriptorSetLayout m_vkDescriptorSetLayoutScene;
     VkDescriptorSetLayout m_vkDescriptorSetLayoutComposition;
@@ -99,14 +99,6 @@ public:
     {
         // Clean up used Vulkan resources
         // Note : Inherited destructor cleans up resources stored in base class
-        vkDestroyPipeline(m_device, m_vkPipelineOffscreen, nullptr);
-        vkDestroyPipeline(m_device, m_vkPipelineComposition, nullptr);
-        vkDestroyPipeline(m_device, m_vkPipelineTransparent, nullptr);
-
-//        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutOffscreen, nullptr);
-//        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutComposition, nullptr);
-//        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutTransparent, nullptr);
-
         vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayoutScene, nullptr);
         vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayoutComposition, nullptr);
         vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayoutTransparent, nullptr);
@@ -451,7 +443,7 @@ public:
             // Renders the components of the scene to the G-Buffer attachments
             {
                 vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 0: Deferred G-Buffer creation", { 1.0f, 0.78f, 0.05f, 1.0f });
-				commandBuffer.cmdBindPipeline(m_vkPipelineOffscreen);
+				commandBuffer.cmdBindPipeline(m_pipelineOffscreen);
 				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetScene, m_pipelineLayoutOffscreen);
                 m_modelScene.draw(commandBuffer);
                 vks::debugutils::cmdEndLabel(commandBuffer);
@@ -462,7 +454,7 @@ public:
             {
                 vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 1: Deferred composition", { 0.0f, 0.5f, 1.0f, 1.0f });
 				commandBuffer.cmdNextSubpass();
-				commandBuffer.cmdBindPipeline(m_vkPipelineComposition);
+				commandBuffer.cmdBindPipeline(m_pipelineComposition);
 				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetComposition, m_pipelineLayoutComposition);
 				//	TODO: magic numbers
 				commandBuffer.cmdDraw(3, 1);	//	vertexCount, indexCount
@@ -474,7 +466,7 @@ public:
             {
                 vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 2: Forward transparency", { 0.5f, 0.76f, 0.34f, 1.0f });
 				commandBuffer.cmdNextSubpass();
-				commandBuffer.cmdBindPipeline(m_vkPipelineTransparent);
+				commandBuffer.cmdBindPipeline(m_pipelineTransparent);
 				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetTransparent, m_pipelineLayoutTransparent);
                 m_modelTransparent.draw(commandBuffer);
                 vks::debugutils::cmdEndLabel(commandBuffer);
@@ -537,12 +529,7 @@ public:
 
     void preparePipelines()
     {
-        // Layout
-        //VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
-        //    = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayoutScene, 1);
-        //VK_CHECK_RESULT(vkCreatePipelineLayout(
-        //    m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayoutOffscreen));
-
+        // Pipeline Layout
 		vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
 		pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayoutScene);
 		m_pipelineLayoutOffscreen = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
@@ -587,8 +574,7 @@ public:
         // Offscreen scene rendering pipeline
         shaderStages[0] = loadShader(getShadersPath() + "subpasses/gbuffer.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
         shaderStages[1] = loadShader(getShadersPath() + "subpasses/gbuffer.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-        VK_CHECK_RESULT(
-            vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipelineOffscreen));
+		m_pipelineOffscreen = vkcpp::GraphicsPipeline(pipelineCI);
     }
 
     // Create the Vulkan objects used in the composition pass (descriptor sets, pipelines, etc.)
@@ -685,9 +671,7 @@ public:
         pipelineCI.subpass = 1;
 
         depthStencilState.depthWriteEnable = VK_FALSE;
-
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-            m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipelineComposition));
+		m_pipelineComposition = vkcpp::GraphicsPipeline(pipelineCI);
 
         // Transparent (forward) pipeline
 
@@ -739,8 +723,7 @@ public:
 
         shaderStages[0] = loadShader(getShadersPath() + "subpasses/transparent.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
         shaderStages[1] = loadShader(getShadersPath() + "subpasses/transparent.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-            m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipelineTransparent));
+		m_pipelineTransparent = vkcpp::GraphicsPipeline(pipelineCI);
     }
 
     // Prepare and initialize uniform buffer containing shader uniforms
