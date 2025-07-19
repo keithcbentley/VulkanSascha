@@ -438,73 +438,52 @@ public:
         renderPassBeginInfo.pClearValues = clearValues;
 
         for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
+			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
             // Set target frame buffer
             renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-            VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
-
-            vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-            vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
-
-            VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
-            vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
+			commandBuffer.begin();
+			commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
+			commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
+			commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
 
             // First sub pass
             // Renders the components of the scene to the G-Buffer attachments
             {
-                vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 0: Deferred G-Buffer creation", { 1.0f, 0.78f, 0.05f, 1.0f });
-
-                vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineOffscreen);
-                vkCmdBindDescriptorSets(
-                    m_drawCommandBuffers[i],
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    m_vkPipelineLayoutOffscreen, 0, 1, &m_vkDescriptorSetScene, 0, NULL);
-                m_modelScene.draw(m_drawCommandBuffers[i]);
-
-                vks::debugutils::cmdEndLabel(m_drawCommandBuffers[i]);
+                vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 0: Deferred G-Buffer creation", { 1.0f, 0.78f, 0.05f, 1.0f });
+				commandBuffer.cmdBindPipeline(m_vkPipelineOffscreen);
+				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetScene, m_vkPipelineLayoutOffscreen);
+                m_modelScene.draw(commandBuffer);
+                vks::debugutils::cmdEndLabel(commandBuffer);
             }
 
             // Second sub pass
             // This subpass will use the G-Buffer components that have been filled in the first subpass as input attachment for the final compositing
             {
-                vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 1: Deferred composition", { 0.0f, 0.5f, 1.0f, 1.0f });
-
-                vkCmdNextSubpass(m_drawCommandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
-
-                vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineComposition);
-                vkCmdBindDescriptorSets(
-                    m_drawCommandBuffers[i],
-					VK_PIPELINE_BIND_POINT_GRAPHICS,
-					m_vkPipelineLayoutComposition, 0, 1, &m_vkDescriptorSetComposition, 0, NULL);
-                vkCmdDraw(m_drawCommandBuffers[i], 3, 1, 0, 0);
-
-                vks::debugutils::cmdEndLabel(m_drawCommandBuffers[i]);
+                vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 1: Deferred composition", { 0.0f, 0.5f, 1.0f, 1.0f });
+				commandBuffer.cmdNextSubpass();
+				commandBuffer.cmdBindPipeline(m_vkPipelineComposition);
+				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetComposition, m_vkPipelineLayoutComposition);
+				//	TODO: magic numbers
+				commandBuffer.cmdDraw(3, 1);	//	vertexCount, indexCount
+                vks::debugutils::cmdEndLabel(commandBuffer);
             }
 
             // Third subpass
             // Render transparent geometry using a forward pass that compares against depth generated during G-Buffer fill
             {
                 vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 2: Forward transparency", { 0.5f, 0.76f, 0.34f, 1.0f });
-
-                vkCmdNextSubpass(m_drawCommandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
-
-                vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineTransparent);
-                vkCmdBindDescriptorSets(
-                    m_drawCommandBuffers[i],
-					VK_PIPELINE_BIND_POINT_GRAPHICS,
-					m_vkPipelineLayoutTransparent, 0, 1, &m_vkDescriptorSetTransparent, 0, NULL);
-                m_modelTransparent.draw(m_drawCommandBuffers[i]);
-
-                vks::debugutils::cmdEndLabel(m_drawCommandBuffers[i]);
+				commandBuffer.cmdNextSubpass();
+				commandBuffer.cmdBindPipeline(m_vkPipelineTransparent);
+				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetTransparent, m_vkPipelineLayoutTransparent);
+                m_modelTransparent.draw(commandBuffer);
+                vks::debugutils::cmdEndLabel(commandBuffer);
             }
 
-            drawUI(m_drawCommandBuffers[i]);
+            drawUI(commandBuffer);
 
-            vkCmdEndRenderPass(m_drawCommandBuffers[i]);
-
-            VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
+			commandBuffer.cmdEndRenderPass();
+			commandBuffer.end();
         }
     }
 

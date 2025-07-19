@@ -2859,6 +2859,12 @@ public:
         return *this;
     }
 
+	const CommandBuffer& cmdNextSubpass() const {
+		vkCmdNextSubpass(*this, VK_SUBPASS_CONTENTS_INLINE);
+		return *this;
+	}
+
+
     const CommandBuffer& cmdEndRenderPass() const
     {
         vkCmdEndRenderPass(*this);
@@ -2961,6 +2967,11 @@ public:
         vkCmdDrawIndexed(*this, indexCount, 1, 0, 0, 0);
         return *this;
     }
+
+	const CommandBuffer& cmdDraw(uint32_t vertexCount, uint32_t indexCount) const {
+		vkCmdDraw(*this, vertexCount, indexCount, 0, 0);
+		return *this;
+	}
 
     const CommandBuffer& cmdPushConstant(
         void* pData,
