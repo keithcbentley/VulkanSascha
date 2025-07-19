@@ -49,16 +49,6 @@ public:
     }
 };
 
-//	Use this to make pre-existing type act like
-//	another (smarter) type.
-template <typename Real_t, typename ActsLike_t>
-    requires(sizeof(Real_t) == sizeof(ActsLike_t))
-ActsLike_t& wrapToRef(Real_t& real)
-{
-    ActsLike_t* p = static_cast<ActsLike_t*>(&real);
-    return *p;
-}
-
 //	Yikes! Vulkan uses enums for bit values but uses
 //	non-typesafe uints for the combination of flags.
 //	The newer flags use 64 bit uints for values and combinations
@@ -124,56 +114,121 @@ public:
     }
 };
 
+//	Some Vulkan structures are embedded in other structures
+//	rather than being standalone.  We would like to have
+//	the advantages of the smarter structure, but can't redefine
+//  the embedded structure.  This template allows us to take
+//	an existing structure/object and make it look like the
+//	smarter structure.  Operations on the smarter variable
+//	actually modify the existing object.  This is a type of
+//	downcast.  Of course, this only works when the smarter object
+//	is just a simple extension.  If the smarter object added
+//	any member data, we might trash memory beyond the existing
+//	object.
+//	TODO: is there some way to use templatey stuff to guarantee equal sizes?
+template <typename Real_t, typename ActsLike_t>
+    requires(sizeof(Real_t) == sizeof(ActsLike_t))
+ActsLike_t& smartenUp(Real_t& real)
+{
+    ActsLike_t* p = static_cast<ActsLike_t*>(&real);
+    return *p;
+}
+
 class Extent2D : public VkExtent2D {
 
 public:
-    Extent2D(int widthArg, int heightArg)
+    Extent2D()
+        : VkExtent2D {}
     {
-        width = static_cast<uint32_t>(widthArg);
-        height = static_cast<uint32_t>(heightArg);
+    }
+
+    Extent2D(uint32_t widthArg, uint32_t heightArg)
+    {
+        width = widthArg;
+        height = heightArg;
+    }
+
+    template <typename Arg_t>
+    Extent2D setWidthHeight(
+        Arg_t widthArg,
+        Arg_t heightArg)
+    {
+        width = static_cast<Arg_t>(widthArg);
+        height = static_cast<Arg_t>(heightArg);
+        return *this;
+    }
+
+    template <typename Arg_t>
+    Extent2D& setWidth(Arg_t widthArg)
+    {
+        width = static_cast<Arg_t>(widthArg);
+        return *this;
+    }
+
+    template <typename Arg_t>
+    Extent2D& setHeight(Arg_t heightArg)
+    {
+        height = static_cast<Arg_t>(heightArg);
+        return *this;
     }
 };
+static_assert(sizeof(Extent2D) == sizeof(VkExtent2D));
+template Extent2D& smartenUp<VkExtent2D, Extent2D>(VkExtent2D&);
 
-class Extent3D : public VkExtent3D { };
-//	uint32_t    m_drawAreaWidth;
-//	uint32_t    m_drawAreaHeight;
-//	uint32_t    depth;
-//} VkExtent3D;
+// class Extent3D : public VkExtent3D { };
+//
+// class Offset2D : public VkOffset2D { };
+//
+// class Offset3D : public VkOffset3D { };
 
-class Offset2D : public VkOffset2D { };
-//	int32_t    x;
-//	int32_t    y;
-//} VkOffset2D;
+//class Rect2D : public VkRect2D {
+//
+//public:
+//    Rect2D()
+//        : VkRect2D {}
+//    {
+//    }
+//
+//    Rect2D(VkOffset2D vkOffset2D, VkExtent2D vkExtent2D)
+//    {
+//        offset = vkOffset2D;
+//        extent = vkExtent2D;
+//    }
+//
+//    Rect2D(VkExtent2D vkExtent2D)
+//    {
+//        offset.x = 0;
+//        offset.y = 0;
+//        extent = vkExtent2D;
+//    }
+//};
+//static_assert(sizeof(Rect2D) == sizeof(VkRect2D));
+//template Rect2D& smartenUp<VkRect2D, Rect2D>(VkRect2D&);
 
-class Offset3D : public VkOffset3D { };
-//	int32_t    x;
-//	int32_t    y;
-//	int32_t    z;
-//} VkOffset3D;
-
-class Rect2D : public VkRect2D {
+class Viewport : public VkViewport
+{
 
 public:
-    Rect2D()
-        : VkRect2D {}
-    {
-    }
 
-    Rect2D(VkOffset2D vkOffset2D, VkExtent2D vkExtent2D)
-    {
-        offset = vkOffset2D;
-        extent = vkExtent2D;
-    }
+	Viewport()
+		: VkViewport{} {
+		maxDepth = 1.0;
+	}
 
-    Rect2D(VkExtent2D vkExtent2D)
-    {
-        offset.x = 0;
-        offset.y = 0;
-        extent = vkExtent2D;
-    }
+	Viewport& setWidthHeight(
+		float	widthArg,
+		float	heightArg
+	) {
+		width = widthArg;
+		height = heightArg;
+		return *this;
+	}
+
+	Viewport& setX(float xArg) {
+		x = xArg;
+		return *this;
+	}
 };
-static_assert(sizeof(Rect2D) == sizeof(VkRect2D));
-template Rect2D& wrapToRef<VkRect2D, Rect2D>(VkRect2D&);
 
 class PipelineStageFlags2Id { };
 
@@ -613,9 +668,10 @@ public:
         return *this;
     }
 
-	VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures() {
-		return m_features2.features;
-	}
+    VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
+    {
+        return m_features2.features;
+    }
 
     operator VkPhysicalDeviceFeatures2*()
     {
@@ -1270,14 +1326,15 @@ public:
         return m_vkDeviceOriginal;
     }
 
-	VkPhysicalDeviceProperties& vkPhysicalDeviceProperties() {
-		return m_physicalDeviceProperties.vkPhysicalDeviceProperties();
-	}
+    VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
+    {
+        return m_physicalDeviceProperties.vkPhysicalDeviceProperties();
+    }
 
-	VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures() {
-		return m_physicalDeviceFeatures.vkPhysicalDeviceFeatures();
-	}
-
+    VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
+    {
+        return m_physicalDeviceFeatures.vkPhysicalDeviceFeatures();
+    }
 
     void init(const VulkanContextCreateInfo& vulkanContextCreateInfo);
 };
@@ -1297,7 +1354,6 @@ const Device& device();
 VkDevice vkDevice();
 VkPhysicalDeviceProperties& vkPhysicalDeviceProperties();
 VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
-
 
 class Semaphore : public HandleWithOwner<VkSemaphore> {
 
@@ -2646,10 +2702,10 @@ static_assert(sizeof(BufferImageCopy) == sizeof(VkBufferImageCopy));
 
 class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
 
-	//	We need a smart command pool for the destroy work.
-	//	We need both the command pool and the device for the destroy call.
-	//	We grab the device from the command pool so that we don't have to store
-	//	the device in addition to the regular owner object.
+    //	We need a smart command pool for the destroy work.
+    //	We need both the command pool and the device for the destroy call.
+    //	We grab the device from the command pool so that we don't have to store
+    //	the device in addition to the regular owner object.
     static void destroy(VkCommandBuffer vkCommandBuffer, CommandPool commandPool)
     {
         vkFreeCommandBuffers(commandPool.getVkDevice(), commandPool, 1, &vkCommandBuffer);
@@ -2678,11 +2734,11 @@ public:
         new (this) CommandBuffer(vkCommandBuffer, commandPool, &destroy);
     }
 
-	//	Handy way to make simple copy from an existing vkCommandBuffer.
-	//	Note that we don't have a real command pool.
+    //	Handy way to make simple copy from an existing vkCommandBuffer.
+    //	Note that we don't have a real command pool.
     static CommandBuffer makeCopy(VkCommandBuffer vkCommandBuffer)
     {
-		return CommandBuffer(vkCommandBuffer, CommandPool(), nullptr);
+        return CommandBuffer(vkCommandBuffer, CommandPool(), nullptr);
     }
 
     const CommandBuffer& reset() const
@@ -2877,15 +2933,15 @@ public:
         return *this;
     }
 
-	const CommandBuffer& cmdBindDescriptorSetDynamicOffset(
-		VkDescriptorSet vkDescriptorSet,
-		VkPipelineLayout vkPipelineLayout,
-		uint32_t	dynamicOffset) const {
-		vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
-								vkPipelineLayout, 0, 1, &vkDescriptorSet, 1, &dynamicOffset);
-		return *this;
-	}
-
+    const CommandBuffer& cmdBindDescriptorSetDynamicOffset(
+        VkDescriptorSet vkDescriptorSet,
+        VkPipelineLayout vkPipelineLayout,
+        uint32_t dynamicOffset) const
+    {
+        vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            vkPipelineLayout, 0, 1, &vkDescriptorSet, 1, &dynamicOffset);
+        return *this;
+    }
 
     const CommandBuffer& cmdBindVertexBuffer(VkBuffer vkBuffer) const
     {
@@ -2973,7 +3029,7 @@ public:
 
 class SubmitInfo : public VkSubmitInfo {
 
-	//	Always up to date.
+    //	Always up to date.
     std::vector<VkSemaphore> m_vkWaitSemaphores;
     std::vector<VkPipelineStageFlags> m_vkPipelineStateFlags;
     std::vector<VkCommandBuffer> m_vkCommandBuffers;
@@ -3019,7 +3075,7 @@ public:
 
 class SubmitInfo2 : public VkSubmitInfo2 {
 
-	//	Always up to date.
+    //	Always up to date.
     std::vector<VkSemaphoreSubmitInfo> m_waitSemaphoreInfos;
     std::vector<VkCommandBufferSubmitInfo> m_commandBufferInfos;
     std::vector<VkSemaphoreSubmitInfo> m_signalSemaphoreInfos;
@@ -3138,29 +3194,29 @@ public:
         vkQueueWaitIdle(*this);
     }
 
-    //void submit(const SubmitInfo& submitInfo, VkFence vkFence) const
+    // void submit(const SubmitInfo& submitInfo, VkFence vkFence) const
     //{
-    //    VkResult vkResult = vkQueueSubmit(*this, 1, &submitInfo, vkFence);
-    //    if (vkResult != VK_SUCCESS) {
-    //        throw Exception(vkResult);
-    //    }
-    //}
+    //     VkResult vkResult = vkQueueSubmit(*this, 1, &submitInfo, vkFence);
+    //     if (vkResult != VK_SUCCESS) {
+    //         throw Exception(vkResult);
+    //     }
+    // }
 
-	void submit(const VkSubmitInfo& vkSubmitInfo, VkFence vkFence) const {
-		VkResult vkResult = vkQueueSubmit(*this, 1, &vkSubmitInfo, vkFence);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-	}
+    void submit(const VkSubmitInfo& vkSubmitInfo, VkFence vkFence) const
+    {
+        VkResult vkResult = vkQueueSubmit(*this, 1, &vkSubmitInfo, vkFence);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+    }
 
-
-    //void submit(const VkSubmitInfo& vkSubmitInfo, VkFence vkFence) const
+    // void submit(const VkSubmitInfo& vkSubmitInfo, VkFence vkFence) const
     //{
-    //    VkResult vkResult = vkQueueSubmit(*this, 1, &vkSubmitInfo, vkFence);
-    //    if (vkResult != VK_SUCCESS) {
-    //        throw Exception(vkResult);
-    //    }
-    //}
+    //     VkResult vkResult = vkQueueSubmit(*this, 1, &vkSubmitInfo, vkFence);
+    //     if (vkResult != VK_SUCCESS) {
+    //         throw Exception(vkResult);
+    //     }
+    // }
 
     void submit2(VkCommandBuffer vkCommandBuffer) const
     {
@@ -3218,7 +3274,7 @@ public:
 
 class DescriptorPoolCreateInfo : public VkDescriptorPoolCreateInfo {
 
-	//	Always up to date.
+    //	Always up to date.
     std::vector<VkDescriptorPoolSize> m_vkDescriptorPoolSizes;
 
 public:
@@ -3226,7 +3282,7 @@ public:
         : VkDescriptorPoolCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		maxSets = 1;
+        maxSets = 1;
     }
 
     ~DescriptorPoolCreateInfo() = default;
@@ -3243,13 +3299,13 @@ public:
         m_vkDescriptorPoolSizes.emplace_back(vkDescriptorPoolSize);
         poolSizeCount = static_cast<uint32_t>(m_vkDescriptorPoolSizes.size());
         pPoolSizes = m_vkDescriptorPoolSizes.data();
-		return *this;
+        return *this;
     }
 
-	DescriptorPoolCreateInfo& setMaxSets(uint32_t maxSetsArg)
+    DescriptorPoolCreateInfo& setMaxSets(uint32_t maxSetsArg)
     {
         maxSets = maxSetsArg;
-		return *this;
+        return *this;
     }
 };
 
@@ -3504,7 +3560,7 @@ class DescriptorSetUpdater {
     std::vector<VkWriteDescriptorSet> m_vkWriteDescriptorSets;
     std::vector<WriteDescriptorInfo> m_writeDescriptorInfos;
 
-	VkDescriptorSet	m_preboundDescriptorSet = VK_NULL_HANDLE;
+    VkDescriptorSet m_preboundDescriptorSet = VK_NULL_HANDLE;
 
 public:
     DescriptorSetUpdater() = default;
@@ -3514,13 +3570,12 @@ public:
     DescriptorSetUpdater(DescriptorSetUpdater&&) noexcept = delete;
     DescriptorSetUpdater& operator=(DescriptorSetUpdater&&) noexcept = delete;
 
-	DescriptorSetUpdater(VkDescriptorSet vkDescriptorSet)
-		: m_preboundDescriptorSet(vkDescriptorSet) {
+    DescriptorSetUpdater(VkDescriptorSet vkDescriptorSet)
+        : m_preboundDescriptorSet(vkDescriptorSet)
+    {
+    }
 
-	}
-
-
-	DescriptorSetUpdater& addBufferWriteDescriptor(
+    DescriptorSetUpdater& addBufferWriteDescriptor(
         VkDescriptorSet vkDescriptorSet,
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
@@ -3549,13 +3604,13 @@ public:
 
         m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
         m_writeDescriptorInfos.emplace_back(vkDescriptorBufferInfo);
-		return *this;
+        return *this;
     }
 
     //	Handy version for Sascha Willems demos.
-	//	Descriptor buffer info is already created.
-	//	Uses prebound descriptor set.
-	DescriptorSetUpdater& addBufferWriteDescriptor(
+    //	Descriptor buffer info is already created.
+    //	Uses prebound descriptor set.
+    DescriptorSetUpdater& addBufferWriteDescriptor(
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
         const VkDescriptorBufferInfo& vkDescriptorBufferInfo)
@@ -3563,7 +3618,7 @@ public:
         //	Just need a non-zero marker
         const VkDescriptorBufferInfo* bufferMarker = reinterpret_cast<VkDescriptorBufferInfo*>(-1);
 
-		//	TODO: maybe check prebound descriptor set for null handle.
+        //	TODO: maybe check prebound descriptor set for null handle.
         VkWriteDescriptorSet vkWriteDescriptorSet {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet = m_preboundDescriptorSet,
@@ -3576,10 +3631,10 @@ public:
 
         m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
         m_writeDescriptorInfos.emplace_back(vkDescriptorBufferInfo);
-		return *this;
+        return *this;
     }
 
-	DescriptorSetUpdater& addImageWriteDescriptor(
+    DescriptorSetUpdater& addImageWriteDescriptor(
         VkDescriptorSet vkDescriptorSet,
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
@@ -3608,10 +3663,10 @@ public:
 
         m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
         m_writeDescriptorInfos.emplace_back(vkDescriptorImageInfo);
-		return *this;
+        return *this;
     }
 
-	DescriptorSetUpdater& addImageWriteDescriptor(
+    DescriptorSetUpdater& addImageWriteDescriptor(
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
         const VkDescriptorImageInfo& vkDescriptorImageInfo)
@@ -3631,7 +3686,7 @@ public:
 
         m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
         m_writeDescriptorInfos.emplace_back(vkDescriptorImageInfo);
-		return *this;
+        return *this;
     }
 
     void assemble()
@@ -3732,7 +3787,7 @@ public:
 class PipelineLayoutCreateInfo : public VkPipelineLayoutCreateInfo {
 
     std::vector<VkDescriptorSetLayout> m_vkDescriptorSetLayouts;
-	std::vector<VkPushConstantRange> m_vkPushConstantRanges;
+    std::vector<VkPushConstantRange> m_vkPushConstantRanges;
 
 public:
     PipelineLayoutCreateInfo()
@@ -3748,31 +3803,31 @@ public:
     PipelineLayoutCreateInfo(PipelineLayoutCreateInfo&&) noexcept = delete;
     PipelineLayoutCreateInfo& operator=(PipelineLayoutCreateInfo&&) noexcept = delete;
 
-	PipelineLayoutCreateInfo& addDescriptorSetLayout(
+    PipelineLayoutCreateInfo& addDescriptorSetLayout(
         VkDescriptorSetLayout vkDescriptorSetLayout)
     {
         //	Always up to date.
         m_vkDescriptorSetLayouts.push_back(vkDescriptorSetLayout);
         setLayoutCount = static_cast<uint32_t>(m_vkDescriptorSetLayouts.size());
         pSetLayouts = m_vkDescriptorSetLayouts.data();
-		return *this;
+        return *this;
     }
 
-	PipelineLayoutCreateInfo& addPushConstantRange(
-		ShaderStageFlags shaderStageFlags,
-		uint32_t	offsetArg,
-		size_t		sizeArg
-	) {
-		VkPushConstantRange vkPushConstantRange{};
-		vkPushConstantRange.stageFlags = static_cast<VkShaderStageFlags>(shaderStageFlags);
-		vkPushConstantRange.offset = offsetArg;
-		vkPushConstantRange.size = static_cast<uint32_t>(sizeArg);
+    PipelineLayoutCreateInfo& addPushConstantRange(
+        ShaderStageFlags shaderStageFlags,
+        uint32_t offsetArg,
+        size_t sizeArg)
+    {
+        VkPushConstantRange vkPushConstantRange {};
+        vkPushConstantRange.stageFlags = static_cast<VkShaderStageFlags>(shaderStageFlags);
+        vkPushConstantRange.offset = offsetArg;
+        vkPushConstantRange.size = static_cast<uint32_t>(sizeArg);
 
-		m_vkPushConstantRanges.emplace_back(vkPushConstantRange);
-		pushConstantRangeCount = static_cast<uint32_t>(m_vkPushConstantRanges.size());
-		pPushConstantRanges = m_vkPushConstantRanges.data();
-		return *this;
-	}
+        m_vkPushConstantRanges.emplace_back(vkPushConstantRange);
+        pushConstantRangeCount = static_cast<uint32_t>(m_vkPushConstantRanges.size());
+        pPushConstantRanges = m_vkPushConstantRanges.data();
+        return *this;
+    }
 };
 
 class PipelineLayout : public HandleWithOwner<VkPipelineLayout> {

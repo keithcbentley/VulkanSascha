@@ -1,287 +1,305 @@
 /*
-* Vulkan Example - Shader specialization constants
-* 
-* This samples uses specialization constants to define shader constants at pipeline creation
-* These are used to compile shaders with different execution paths and settings 
-* With these constants one can create different shader configurations from a single shader file
-* See uber.frag for how such a shader can look
-*
-* For details see https://www.khronos.org/registry/vulkan/specs/misc/GL_KHR_vulkan_glsl.txt
-*
-* Copyright (C) 2016-2023 by Sascha Willems - www.saschawillems.de
-*
-* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
-*/
+ * Vulkan Example - Shader specialization constants
+ *
+ * This samples uses specialization constants to define shader constants at pipeline creation
+ * These are used to compile shaders with different execution paths and settings
+ * With these constants one can create different shader configurations from a single shader file
+ * See uber.frag for how such a shader can look
+ *
+ * For details see https://www.khronos.org/registry/vulkan/specs/misc/GL_KHR_vulkan_glsl.txt
+ *
+ * Copyright (C) 2016-2023 by Sascha Willems - www.saschawillems.de
+ *
+ * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+ */
 
-#include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
+#include "vulkanexamplebase.h"
 
 vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
-
-class VulkanExample: public VulkanExampleBase
-{
+class VulkanExample : public VulkanExampleBase {
 public:
-	vkglTF::Model scene;
-	vks::Texture2D colormap;
+    vkglTF::Model scene;
+    vks::Texture2D colormap;
 
-	struct UniformData {
-		glm::mat4 projection;
-		glm::mat4 modelView;
-		glm::vec4 lightPos{ 0.0f, -2.0f, 1.0f, 0.0f };
-	} uniformData;
+    struct UniformData {
+        glm::mat4 projection;
+        glm::mat4 modelView;
+        glm::vec4 lightPos { 0.0f, -2.0f, 1.0f, 0.0f };
+    } uniformData;
 
-	vks::Buffer uniformBuffer;
+    vks::Buffer uniformBuffer;
 
-	VkPipelineLayout m_vkPipelineLayout{ VK_NULL_HANDLE };
-	VkDescriptorSet m_vkDescriptorSet{ VK_NULL_HANDLE };
-	VkDescriptorSetLayout m_vkDescriptorSetLayout{ VK_NULL_HANDLE };
+    vkcpp::DescriptorSetLayout m_descriptorSetLayout;
+    vkcpp::DescriptorSet m_descriptorSet;
 
-	struct Pipelines{
-		VkPipeline phong{ VK_NULL_HANDLE };
-		VkPipeline toon{ VK_NULL_HANDLE };
-		VkPipeline textured{ VK_NULL_HANDLE };
-	} pipelines;
+    vkcpp::PipelineLayout m_pipelineLayout;
 
-	VulkanExample() : VulkanExampleBase()
-	{
-		title = "Specialization constants";
-		camera.type = Camera::CameraType::lookat;
-		camera.setPerspective(60.0f, ((float)m_drawAreaWidth / 3.0f) / (float)m_drawAreaHeight, 0.1f, 512.0f);
-		camera.setRotation(glm::vec3(-40.0f, -90.0f, 0.0f));
-		camera.setTranslation(glm::vec3(0.0f, 0.0f, -2.0f));
-	}
+    vkcpp::GraphicsPipeline m_pipelinePhong;
+    vkcpp::GraphicsPipeline m_pipelineToon;
+    vkcpp::GraphicsPipeline m_pipelineTextured;
 
-	~VulkanExample()
-	{
-		if (m_device) {
-			vkDestroyPipeline(m_device, pipelines.phong, nullptr);
-			vkDestroyPipeline(m_device, pipelines.textured, nullptr);
-			vkDestroyPipeline(m_device, pipelines.toon, nullptr);
-			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
-			vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
-			colormap.destroy();
-			uniformBuffer.destroy();
-		}
-	}
+    VulkanExample()
+        : VulkanExampleBase()
+    {
+        title = "Specialization constants";
+        camera.type = Camera::CameraType::lookat;
+        camera.setPerspective(60.0f, ((float)m_drawAreaWidth / 3.0f) / (float)m_drawAreaHeight, 0.1f, 512.0f);
+        camera.setRotation(glm::vec3(-40.0f, -90.0f, 0.0f));
+        camera.setTranslation(glm::vec3(0.0f, 0.0f, -2.0f));
+    }
 
-	void buildCommandBuffers()
-	{
-		VkCommandBufferBeginInfo vkCommandBufferBeginInfo = vks::initializers::commandBufferBeginInfo();
+    ~VulkanExample()
+    {
+        if (m_device) {
+//            vkDestroyPipeline(m_device, m_vkPipelinePhong, nullptr);
+//            vkDestroyPipeline(m_device, m_vkPipelineTextured, nullptr);
+//            vkDestroyPipeline(m_device, m_vkPipelineToon, nullptr);
+            colormap.destroy();
+            uniformBuffer.destroy();
+        }
+    }
 
-		VkClearValue clearValues[2];
-		clearValues[0].color = m_vkClearColorValueDefault;
-		clearValues[1].depthStencil = { 1.0f, 0 };
+    void buildCommandBuffers()
+    {
+        VkCommandBufferBeginInfo vkCommandBufferBeginInfo = vks::initializers::commandBufferBeginInfo();
 
-		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-		renderPassBeginInfo.renderPass = m_renderPassOriginal;
-		renderPassBeginInfo.renderArea.offset.x = 0;
-		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
-		renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
-		renderPassBeginInfo.clearValueCount = 2;
-		renderPassBeginInfo.pClearValues = clearValues;
+        VkClearValue clearValues[2];
+        clearValues[0].color = m_vkClearColorValueDefault;
+        clearValues[1].depthStencil = { 1.0f, 0 };
 
-		for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i)
-		{
-			// Set target frame buffer
-			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
+        VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
+        renderPassBeginInfo.renderPass = m_renderPassOriginal;
+        renderPassBeginInfo.renderArea.offset.x = 0;
+        renderPassBeginInfo.renderArea.offset.y = 0;
+        renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
+        renderPassBeginInfo.renderArea.extent.height = m_drawAreaHeight;
+        renderPassBeginInfo.clearValueCount = 2;
+        renderPassBeginInfo.pClearValues = clearValues;
 
-			vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[i];
-			commandBuffer.begin();
-			commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
-			commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
-			commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSet, m_vkPipelineLayout);
+        for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
+            // Set target frame buffer
+            renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-			// Left
-			VkViewport viewport = vks::initializers::viewport((float) m_drawAreaWidth / 3.0f, (float) m_drawAreaHeight, 0.0f, 1.0f);
-			commandBuffer.cmdSetViewport(viewport);
-			commandBuffer.cmdBindPipeline(pipelines.phong);
-			scene.draw(commandBuffer);
-			
-			// Center
-			viewport.x = (float)m_drawAreaWidth / 3.0f;
-			commandBuffer.cmdSetViewport(viewport);
-			commandBuffer.cmdBindPipeline(pipelines.toon);
-			scene.draw(commandBuffer);
+            vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[i];
+            commandBuffer
+                .begin()
+                .cmdBeginRenderPass(renderPassBeginInfo)
+                .cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
+                .cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout);
 
-			// Right
-			viewport.x = (float)m_drawAreaWidth / 3.0f + (float)m_drawAreaWidth / 3.0f;
-			commandBuffer.cmdSetViewport(viewport);
-			commandBuffer.cmdBindPipeline(pipelines.textured);
-			scene.draw(commandBuffer);
+            const float drawAreaWidth_3 = static_cast<float>(m_drawAreaWidth) / 3.0f;
+            vkcpp::Viewport viewport;
+            viewport.setWidthHeight(drawAreaWidth_3, static_cast<float>(m_drawAreaHeight));
 
-			drawUI(commandBuffer);
+            // Left
+            commandBuffer.cmdSetViewport(viewport);
+            commandBuffer.cmdBindPipeline(m_pipelinePhong);
+            scene.draw(commandBuffer);
 
-			commandBuffer.cmdEndRenderPass();
-			commandBuffer.end();
-		}
-	}
+            // Center
+            viewport.setX(drawAreaWidth_3); //	shift over
+            commandBuffer.cmdSetViewport(viewport);
+            commandBuffer.cmdBindPipeline(m_pipelineToon);
+            scene.draw(commandBuffer);
 
-	void loadAssets()
-	{
-		scene.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", m_pVulkanDevice, m_queue , vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
-		colormap.loadFromFile(getAssetPath() + "textures/metalplate_nomips_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
-	}
+            // Right
+            viewport.setX(drawAreaWidth_3 * 2.0f); //	shift over 2/3 width
+            commandBuffer.cmdSetViewport(viewport);
+            commandBuffer.cmdBindPipeline(m_pipelineTextured);
+            scene.draw(commandBuffer);
 
-	void setupDescriptors()
-	{
-		// Pool
-		std::vector<VkDescriptorPoolSize> poolSizes = {
-			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
-		};
-		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 1);
-		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+            drawUI(commandBuffer);
 
-		// Layout
-		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
-			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1),
-		};
-		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+            commandBuffer.cmdEndRenderPass();
+            commandBuffer.end();
+        }
+    }
 
-		// Set
-		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &m_vkDescriptorSet));
-		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-			vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo),
-			vks::initializers::writeDescriptorSet(m_vkDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &colormap.m_vkDescriptorImageInfo),
-		};
-		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
-	}
+    void loadAssets()
+    {
+        scene.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", m_pVulkanDevice, m_queue, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
+        colormap.loadFromFile(getAssetPath() + "textures/metalplate_nomips_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
+    }
 
-	void preparePipelines()
-	{
-		// Layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout));
+    void setupDescriptors()
+    {
+        // Descriptor Pool
+        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        descriptorPoolCreateInfo
+            .addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
+            .addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);
 
-		// Pipeline
-		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
-		VkPipelineRasterizationStateCreateInfo rasterizationState = vks::initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE, 0);
-		VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
-		VkPipelineColorBlendStateCreateInfo colorBlendState = vks::initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
-		VkPipelineDepthStencilStateCreateInfo depthStencilState = vks::initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
-		VkPipelineViewportStateCreateInfo viewportState = vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
-		VkPipelineMultisampleStateCreateInfo multisampleState = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
-		std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH };
-		VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
-		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
 
-		VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
-		pipelineCI.pInputAssemblyState = &inputAssemblyState;
-		pipelineCI.pRasterizationState = &rasterizationState;
-		pipelineCI.pColorBlendState = &colorBlendState;
-		pipelineCI.pMultisampleState = &multisampleState;
-		pipelineCI.pViewportState = &viewportState;
-		pipelineCI.pDepthStencilState = &depthStencilState;
-		pipelineCI.pDynamicState = &dynamicState;
-		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
-		pipelineCI.pStages = shaderStages.data();
-		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color });
+        // Descriptor Set Layout
+        constexpr int uniformBufferDescriptorIndex = 0;
+        constexpr int combinedImageSamplerDescriptorIndex = 1;
+        vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+        descriptorSetLayoutCreateInfo
+            .addDescriptorSetLayoutBinding(
+                uniformBufferDescriptorIndex,
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                vkcpp::SHADER_STAGE_VERTEX)
+            .addDescriptorSetLayoutBinding(
+                combinedImageSamplerDescriptorIndex,
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                vkcpp::SHADER_STAGE_FRAGMENT);
 
-		// Prepare specialization constants data
+        m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
 
-		// Host data to take specialization constants from
-		struct SpecializationData {
-			// Sets the lighting model used in the fragment "uber" shader
-			uint32_t lightingModel{ 0 };
-			// Parameter for the toon shading part of the fragment shader
-			float toonDesaturationFactor{ 0.5f };
-		} specializationData;
+        // Descriptor Set
+        m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
-		// Each shader constant of a shader stage corresponds to one map entry
-		std::array<VkSpecializationMapEntry, 2> specializationMapEntries;
-		// Shader bindings based on specialization constants are marked by the new "constant_id" layout qualifier:
-		//	layout (constant_id = 0) const int LIGHTING_MODEL = 0;
-		//	layout (constant_id = 1) const float PARAM_TOON_DESATURATION = 0.0f;
+        vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
+        descriptorSetUpdater
+            .addBufferWriteDescriptor(
+                uniformBufferDescriptorIndex,
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                uniformBuffer.m_vkDescriptorBufferInfo)
+            .addImageWriteDescriptor(
+                combinedImageSamplerDescriptorIndex,
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                colormap.m_vkDescriptorImageInfo);
 
-		// Map entry for the lighting model to be used by the fragment shader
-		specializationMapEntries[0].constantID = 0;
-		specializationMapEntries[0].size = sizeof(specializationData.lightingModel);
-		specializationMapEntries[0].offset = 0;
+        descriptorSetUpdater.updateDescriptorSets();
+    }
 
-		// Map entry for the toon shader parameter
-		specializationMapEntries[1].constantID = 1;
-		specializationMapEntries[1].size = sizeof(specializationData.toonDesaturationFactor);
-		specializationMapEntries[1].offset = offsetof(SpecializationData, toonDesaturationFactor);
+    void preparePipelines()
+    {
+        // Layout
+        vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+        pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
+        m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
 
-		// Prepare specialization info block for the shader stage
-		VkSpecializationInfo specializationInfo{};
-		specializationInfo.dataSize = sizeof(specializationData);
-		specializationInfo.mapEntryCount = static_cast<uint32_t>(specializationMapEntries.size());
-		specializationInfo.pMapEntries = specializationMapEntries.data();
-		specializationInfo.pData = &specializationData;
+        // Pipeline
+        VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+        VkPipelineRasterizationStateCreateInfo rasterizationState = vks::initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE, 0);
+        VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
+        VkPipelineColorBlendStateCreateInfo colorBlendState = vks::initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+        VkPipelineDepthStencilStateCreateInfo depthStencilState = vks::initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+        VkPipelineViewportStateCreateInfo viewportState = vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
+        VkPipelineMultisampleStateCreateInfo multisampleState = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+        std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH };
+        VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
+        std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-		// Create pipelines
-		// All pipelines will use the same "uber" shader and specialization constants to change branching and parameters of that shader
-		shaderStages[0] = loadShader(getShadersPath() + "specializationconstants/uber.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-		shaderStages[1] = loadShader(getShadersPath() + "specializationconstants/uber.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		// Specialization info is assigned is part of the shader stage (modul) and must be set after creating the module and before creating the pipeline
-		shaderStages[1].pSpecializationInfo = &specializationInfo;
+        VkGraphicsPipelineCreateInfo pipelineCI
+            = vks::initializers::pipelineCreateInfo(m_pipelineLayout, m_renderPassOriginal, 0);
+        pipelineCI.pInputAssemblyState = &inputAssemblyState;
+        pipelineCI.pRasterizationState = &rasterizationState;
+        pipelineCI.pColorBlendState = &colorBlendState;
+        pipelineCI.pMultisampleState = &multisampleState;
+        pipelineCI.pViewportState = &viewportState;
+        pipelineCI.pDepthStencilState = &depthStencilState;
+        pipelineCI.pDynamicState = &dynamicState;
+        pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
+        pipelineCI.pStages = shaderStages.data();
+        pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color });
 
-		// Solid phong shading
-		specializationData.lightingModel = 0;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.phong));
+        // Prepare specialization constants data
 
-		// Phong and textured
-		specializationData.lightingModel = 1;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.toon));
+        // Host data to take specialization constants from
+        struct SpecializationData {
+            // Sets the lighting model used in the fragment "uber" shader
+            uint32_t lightingModel { 0 };
+            // Parameter for the toon shading part of the fragment shader
+            float toonDesaturationFactor { 0.5f };
+        } specializationData;
 
-		// Textured discard
-		specializationData.lightingModel = 2;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.textured));
-	}
+        // Each shader constant of a shader stage corresponds to one map entry
+        std::array<VkSpecializationMapEntry, 2> specializationMapEntries;
+        // Shader bindings based on specialization constants are marked by the new "constant_id" layout qualifier:
+        //	layout (constant_id = 0) const int LIGHTING_MODEL = 0;
+        //	layout (constant_id = 1) const float PARAM_TOON_DESATURATION = 0.0f;
 
-	// Prepare and initialize uniform buffer containing shader uniforms
-	void prepareUniformBuffers()
-	{
-		// Create the vertex shader uniform buffer block
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
-		VK_CHECK_RESULT(uniformBuffer.map());
-	}
+        // Map entry for the lighting model to be used by the fragment shader
+        specializationMapEntries[0].constantID = 0;
+        specializationMapEntries[0].size = sizeof(specializationData.lightingModel);
+        specializationMapEntries[0].offset = 0;
 
-	void updateUniformBuffers()
-	{
-		camera.setPerspective(60.0f, ((float)m_drawAreaWidth / 3.0f) / (float)m_drawAreaHeight, 0.1f, 512.0f);
+        // Map entry for the toon shader parameter
+        specializationMapEntries[1].constantID = 1;
+        specializationMapEntries[1].size = sizeof(specializationData.toonDesaturationFactor);
+        specializationMapEntries[1].offset = offsetof(SpecializationData, toonDesaturationFactor);
 
-		uniformData.projection = camera.matrices.perspective;
-		uniformData.modelView = camera.matrices.view;
+        // Prepare specialization info block for the shader stage
+        VkSpecializationInfo specializationInfo {};
+        specializationInfo.dataSize = sizeof(specializationData);
+        specializationInfo.mapEntryCount = static_cast<uint32_t>(specializationMapEntries.size());
+        specializationInfo.pMapEntries = specializationMapEntries.data();
+        specializationInfo.pData = &specializationData;
 
-		memcpy(uniformBuffer.m_pMapped, &uniformData, sizeof(UniformData));
-	}
+        // Create pipelines
+        // All pipelines will use the same "uber" shader and specialization constants to change branching and parameters of that shader
+        shaderStages[0] = loadShader(getShadersPath() + "specializationconstants/uber.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+        shaderStages[1] = loadShader(getShadersPath() + "specializationconstants/uber.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+        // Specialization info is assigned is part of the shader stage (modul) and must be set after creating the module and before creating the pipeline
+        shaderStages[1].pSpecializationInfo = &specializationInfo;
 
-	void prepare()
-	{
-		VulkanExampleBase::prepare();
-		loadAssets();
-		prepareUniformBuffers();
-		setupDescriptors();
-		preparePipelines();
-		buildCommandBuffers();
-		m_prepared = true;
-	}
+        // Solid phong shading
+        specializationData.lightingModel = 0;
+		m_pipelinePhong = vkcpp::GraphicsPipeline(pipelineCI);
+   //     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+			//m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipelinePhong));
 
-	void draw()
-	{
-		VulkanExampleBase::prepareFrame();
-		m_vkSubmitInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
-		VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
-		VulkanExampleBase::submitFrame();
-	}
+        // Phong and textured
+        specializationData.lightingModel = 1;
+		m_pipelineToon = vkcpp::GraphicsPipeline(pipelineCI);
 
-	virtual void render()
-	{
-		if (!m_prepared) {
-			return;
-		}
-		updateUniformBuffers();
-		draw();
-	}
+        // Textured discard
+        specializationData.lightingModel = 2;
+		m_pipelineTextured = vkcpp::GraphicsPipeline(pipelineCI);
+    }
+
+    // Prepare and initialize uniform buffer containing shader uniforms
+    void prepareUniformBuffers()
+    {
+        // Create the vertex shader uniform buffer block
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+        VK_CHECK_RESULT(uniformBuffer.map());
+    }
+
+    void updateUniformBuffers()
+    {
+        camera.setPerspective(60.0f, ((float)m_drawAreaWidth / 3.0f) / (float)m_drawAreaHeight, 0.1f, 512.0f);
+
+        uniformData.projection = camera.matrices.perspective;
+        uniformData.modelView = camera.matrices.view;
+
+        memcpy(uniformBuffer.m_pMapped, &uniformData, sizeof(UniformData));
+    }
+
+    void prepare()
+    {
+        VulkanExampleBase::prepare();
+        loadAssets();
+        prepareUniformBuffers();
+        setupDescriptors();
+        preparePipelines();
+        buildCommandBuffers();
+        m_prepared = true;
+    }
+
+    void draw()
+    {
+        VulkanExampleBase::prepareFrame();
+        m_vkSubmitInfo.commandBufferCount = 1;
+        VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+        VulkanExampleBase::submitFrame();
+    }
+
+    virtual void render()
+    {
+        if (!m_prepared) {
+            return;
+        }
+        updateUniformBuffers();
+        draw();
+    }
 };
 
 VULKAN_EXAMPLE_MAIN()

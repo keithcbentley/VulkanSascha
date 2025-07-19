@@ -14,7 +14,6 @@
 
 vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
-
 class VulkanExample : public VulkanExampleBase {
 public:
     vkglTF::Model scene;
@@ -32,11 +31,9 @@ public:
     VkDescriptorSet descriptorSet { VK_NULL_HANDLE };
     VkDescriptorSetLayout m_vkDescriptorSetLayout { VK_NULL_HANDLE };
 
-    struct {
-        vkcpp::GraphicsPipeline m_phongPipelineOriginal;
-        vkcpp::GraphicsPipeline m_wireframePipelineOriginal;
-        vkcpp::GraphicsPipeline m_toonPipelineOriginal;
-    } m_pipelines;
+    vkcpp::GraphicsPipeline m_pipelinePhong;
+    vkcpp::GraphicsPipeline m_pipelineWireframe;
+    vkcpp::GraphicsPipeline m_pipelineToon;
 
     VulkanExample()
         : VulkanExampleBase()
@@ -62,14 +59,14 @@ public:
     virtual void getEnabledFeatures()
     {
         //// Fill mode non solid is required for wireframe display
-        //if (m_physicalDeviceFeatures.m_features2.features.fillModeNonSolid) {
-        //    m_vkPhysicalDeviceFeatures10.fillModeNonSolid = VK_TRUE;
-        //}
+        // if (m_physicalDeviceFeatures.m_features2.features.fillModeNonSolid) {
+        //     m_vkPhysicalDeviceFeatures10.fillModeNonSolid = VK_TRUE;
+        // }
 
         //// Wide lines must be present for line m_drawAreaWidth > 1.0f
-        //if (m_physicalDeviceFeatures.m_features2.features.wideLines) {
-        //    m_vkPhysicalDeviceFeatures10.wideLines = VK_TRUE;
-        //}
+        // if (m_physicalDeviceFeatures.m_features2.features.wideLines) {
+        //     m_vkPhysicalDeviceFeatures10.wideLines = VK_TRUE;
+        // }
     }
 
     void buildCommandBuffers()
@@ -108,14 +105,14 @@ public:
             // Left : Render the scene using the solid colored pipeline with phong shading
             viewport.width = (float)m_drawAreaWidth / 3.0f;
             vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
-            vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.m_phongPipelineOriginal);
+            vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelinePhong);
             vkCmdSetLineWidth(m_drawCommandBuffers[i], 1.0f);
             scene.draw(m_drawCommandBuffers[i]);
 
             // Center : Render the scene using a toon style pipeline
             viewport.x = (float)m_drawAreaWidth / 3.0f;
             vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
-            vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.m_toonPipelineOriginal);
+            vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineToon);
             // Line m_drawAreaWidth > 1.0f only if wide lines feature is supported
             if (vkcpp::vkPhysicalDeviceFeatures().wideLines) {
                 vkCmdSetLineWidth(m_drawCommandBuffers[i], 2.0f);
@@ -126,7 +123,7 @@ public:
             if (vkcpp::vkPhysicalDeviceFeatures().fillModeNonSolid) {
                 viewport.x = (float)m_drawAreaWidth / 3.0f + (float)m_drawAreaWidth / 3.0f;
                 vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
-                vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.m_wireframePipelineOriginal);
+                vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineWireframe);
                 scene.draw(m_drawCommandBuffers[i]);
             }
 
@@ -151,7 +148,7 @@ public:
             vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
         };
         VkDescriptorPoolCreateInfo vkDescriptorPoolCreateInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		m_descriptorPool = vkcpp::DescriptorPool(vkDescriptorPoolCreateInfo);
+        m_descriptorPool = vkcpp::DescriptorPool(vkDescriptorPoolCreateInfo);
 
         // Layout
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -201,7 +198,6 @@ public:
                 { vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Color }));
         graphicsPipelineCreateInfo.allowDerivatives(true);
 
-
         //	Shader modules can be safely destroyed after pipeline creation, so RAII
         //	for the handles is ok for this situation.
         vkcpp::ShaderModule vertexShaderModulePhong = vkcpp::ShaderModule::createShaderModuleFromFile(
@@ -212,38 +208,37 @@ public:
             getShadersPath() + "pipelines/phong.frag.spv");
         graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModulePhong, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
 
-        m_pipelines.m_phongPipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
+        m_pipelinePhong = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
 
         //	Not sure if this is necessary, but original code turned this off.
         graphicsPipelineCreateInfo.allowDerivatives(false);
-        graphicsPipelineCreateInfo.setBasePipeline(m_pipelines.m_phongPipelineOriginal);
+        graphicsPipelineCreateInfo.setBasePipeline(m_pipelinePhong);
 
         // Toon shading pipeline
-		graphicsPipelineCreateInfo.clearShaders();
-		vkcpp::ShaderModule vertexShaderModuleToon = vkcpp::ShaderModule::createShaderModuleFromFile(
-			getShadersPath() + "pipelines/toon.vert.spv");
-		graphicsPipelineCreateInfo.addShaderModule(vertexShaderModuleToon, VK_SHADER_STAGE_VERTEX_BIT, "main");
+        graphicsPipelineCreateInfo.clearShaders();
+        vkcpp::ShaderModule vertexShaderModuleToon = vkcpp::ShaderModule::createShaderModuleFromFile(
+            getShadersPath() + "pipelines/toon.vert.spv");
+        graphicsPipelineCreateInfo.addShaderModule(vertexShaderModuleToon, VK_SHADER_STAGE_VERTEX_BIT, "main");
 
-		vkcpp::ShaderModule fragmentShaderModuleToon = vkcpp::ShaderModule::createShaderModuleFromFile(
-			getShadersPath() + "pipelines/toon.frag.spv");
-		graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModuleToon, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
+        vkcpp::ShaderModule fragmentShaderModuleToon = vkcpp::ShaderModule::createShaderModuleFromFile(
+            getShadersPath() + "pipelines/toon.frag.spv");
+        graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModuleToon, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
 
-        m_pipelines.m_toonPipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
+        m_pipelineToon = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
 
-		//	Wireframe
-		graphicsPipelineCreateInfo.setRasterizationPolygonMode(VK_POLYGON_MODE_LINE);
+        //	Wireframe
+        graphicsPipelineCreateInfo.setRasterizationPolygonMode(VK_POLYGON_MODE_LINE);
 
-		graphicsPipelineCreateInfo.clearShaders();
-		vkcpp::ShaderModule vertexShaderModuleWireframe = vkcpp::ShaderModule::createShaderModuleFromFile(
-			getShadersPath() + "pipelines/wireframe.vert.spv");
-		graphicsPipelineCreateInfo.addShaderModule(vertexShaderModuleWireframe, VK_SHADER_STAGE_VERTEX_BIT, "main");
+        graphicsPipelineCreateInfo.clearShaders();
+        vkcpp::ShaderModule vertexShaderModuleWireframe = vkcpp::ShaderModule::createShaderModuleFromFile(
+            getShadersPath() + "pipelines/wireframe.vert.spv");
+        graphicsPipelineCreateInfo.addShaderModule(vertexShaderModuleWireframe, VK_SHADER_STAGE_VERTEX_BIT, "main");
 
-		vkcpp::ShaderModule fragmentShaderModuleWireframe = vkcpp::ShaderModule::createShaderModuleFromFile(
-			getShadersPath() + "pipelines/wireframe.frag.spv");
-		graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModuleWireframe, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
+        vkcpp::ShaderModule fragmentShaderModuleWireframe = vkcpp::ShaderModule::createShaderModuleFromFile(
+            getShadersPath() + "pipelines/wireframe.frag.spv");
+        graphicsPipelineCreateInfo.addShaderModule(fragmentShaderModuleWireframe, VK_SHADER_STAGE_FRAGMENT_BIT, "main");
 
-		m_pipelines.m_wireframePipelineOriginal = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
-
+        m_pipelineWireframe = vkcpp::GraphicsPipeline(graphicsPipelineCreateInfo);
     }
 
     // Prepare and initialize uniform buffer containing shader uniforms
@@ -279,7 +274,7 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
         m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
         VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
