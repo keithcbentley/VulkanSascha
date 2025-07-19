@@ -480,16 +480,14 @@ public:
         // The current layout of the m_vkImage(Note: Should always fit the actual use, e.g.shader read)
         textureDescriptor.imageLayout = m_texture.m_vkImageLayout;
 
-        vkcpp::DescriptorSetUpdater descriptorSetUpdater;
+        vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
 
         descriptorSetUpdater.addBufferWriteDescriptor(
-            m_descriptorSet,
             uniformBufferIndex,
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             uniformBuffer.m_vkDescriptorBufferInfo);
 
         descriptorSetUpdater.addImageWriteDescriptor(
-            m_descriptorSet,
             combinedImageSamplerIndex,
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             textureDescriptor);

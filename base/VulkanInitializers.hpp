@@ -312,7 +312,8 @@ namespace initializers {
         return descriptorSetAllocateInfo;
     }
 
-    inline VkDescriptorImageInfo descriptorImageInfo(VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout)
+    inline VkDescriptorImageInfo descriptorImageInfo(
+		VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout)
     {
         VkDescriptorImageInfo descriptorImageInfo {};
         descriptorImageInfo.sampler = sampler;

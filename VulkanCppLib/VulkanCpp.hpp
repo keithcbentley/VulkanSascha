@@ -181,53 +181,53 @@ template Extent2D& smartenUp<VkExtent2D, Extent2D>(VkExtent2D&);
 //
 // class Offset3D : public VkOffset3D { };
 
-//class Rect2D : public VkRect2D {
+// class Rect2D : public VkRect2D {
 //
-//public:
-//    Rect2D()
-//        : VkRect2D {}
-//    {
-//    }
+// public:
+//     Rect2D()
+//         : VkRect2D {}
+//     {
+//     }
 //
-//    Rect2D(VkOffset2D vkOffset2D, VkExtent2D vkExtent2D)
-//    {
-//        offset = vkOffset2D;
-//        extent = vkExtent2D;
-//    }
+//     Rect2D(VkOffset2D vkOffset2D, VkExtent2D vkExtent2D)
+//     {
+//         offset = vkOffset2D;
+//         extent = vkExtent2D;
+//     }
 //
-//    Rect2D(VkExtent2D vkExtent2D)
-//    {
-//        offset.x = 0;
-//        offset.y = 0;
-//        extent = vkExtent2D;
-//    }
-//};
-//static_assert(sizeof(Rect2D) == sizeof(VkRect2D));
-//template Rect2D& smartenUp<VkRect2D, Rect2D>(VkRect2D&);
+//     Rect2D(VkExtent2D vkExtent2D)
+//     {
+//         offset.x = 0;
+//         offset.y = 0;
+//         extent = vkExtent2D;
+//     }
+// };
+// static_assert(sizeof(Rect2D) == sizeof(VkRect2D));
+// template Rect2D& smartenUp<VkRect2D, Rect2D>(VkRect2D&);
 
-class Viewport : public VkViewport
-{
+class Viewport : public VkViewport {
 
 public:
+    Viewport()
+        : VkViewport {}
+    {
+        maxDepth = 1.0;
+    }
 
-	Viewport()
-		: VkViewport{} {
-		maxDepth = 1.0;
-	}
+    Viewport& setWidthHeight(
+        float widthArg,
+        float heightArg)
+    {
+        width = widthArg;
+        height = heightArg;
+        return *this;
+    }
 
-	Viewport& setWidthHeight(
-		float	widthArg,
-		float	heightArg
-	) {
-		width = widthArg;
-		height = heightArg;
-		return *this;
-	}
-
-	Viewport& setX(float xArg) {
-		x = xArg;
-		return *this;
-	}
+    Viewport& setX(float xArg)
+    {
+        x = xArg;
+        return *this;
+    }
 };
 
 class PipelineStageFlags2Id { };
@@ -3576,10 +3576,9 @@ public:
     }
 
     DescriptorSetUpdater& addBufferWriteDescriptor(
-        VkDescriptorSet vkDescriptorSet,
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
-        vkcpp::Buffer bufferArg,
+        VkBuffer vkBufferArg,
         VkDeviceSize offsetArg,
         VkDeviceSize rangeArg)
     {
@@ -3588,7 +3587,7 @@ public:
 
         VkWriteDescriptorSet vkWriteDescriptorSet {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vkDescriptorSet,
+            .dstSet = m_preboundDescriptorSet,
             .dstBinding = bindingIndex,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -3597,7 +3596,7 @@ public:
         };
 
         VkDescriptorBufferInfo vkDescriptorBufferInfo {
-            .buffer = bufferArg,
+            .buffer = vkBufferArg,
             .offset = offsetArg,
             .range = rangeArg
         };
@@ -3635,19 +3634,18 @@ public:
     }
 
     DescriptorSetUpdater& addImageWriteDescriptor(
-        VkDescriptorSet vkDescriptorSet,
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
-        ImageView imageViewArg,
+        VkImageView vkImageViewArg,
         VkImageLayout vkImageLayout,
-        Sampler samplerArg)
+		VkSampler vkSamplerArg)
     {
         //	Just need a non-zero marker
         const VkDescriptorImageInfo* imageMarker = reinterpret_cast<VkDescriptorImageInfo*>(-1);
 
         VkWriteDescriptorSet vkWriteDescriptorSet {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vkDescriptorSet,
+            .dstSet = m_preboundDescriptorSet,
             .dstBinding = bindingIndex,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -3656,8 +3654,8 @@ public:
         };
 
         VkDescriptorImageInfo vkDescriptorImageInfo {
-            .sampler = samplerArg,
-            .imageView = imageViewArg,
+            .sampler = vkSamplerArg,
+            .imageView = vkImageViewArg,
             .imageLayout = vkImageLayout,
         };
 
