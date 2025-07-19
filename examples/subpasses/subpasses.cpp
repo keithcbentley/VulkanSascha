@@ -27,18 +27,18 @@ class VulkanExample : public VulkanExampleBase
 public:
 	struct {
 		vks::Texture2D glass;
-	} textures;
+	} m_textures;
 
 	struct {
 		vkglTF::Model scene;
 		vkglTF::Model transparent;
-	} models;
+	} m_models;
 
 	struct {
 		glm::mat4 projection;
 		glm::mat4 model;
 		glm::mat4 view;
-	} uboGBuffer;
+	} m_uboGBuffer;
 
 	struct Light {
 		glm::vec4 position;
@@ -46,36 +46,36 @@ public:
 		float radius;
 	};
 
-	std::array<Light, 64> lights;
+	std::array<Light, 64> m_lights;
 
 	struct {
 		vks::Buffer GBuffer;
 		vks::Buffer lights;
-	} buffers;
+	} m_buffers;
 
 	struct {
 		VkPipeline offscreen;
 		VkPipeline composition;
 		VkPipeline transparent;
-	} pipelines;
+	} m_pipelines;
 
 	struct {
 		VkPipelineLayout offscreen;
 		VkPipelineLayout composition;
 		VkPipelineLayout transparent;
-	} pipelineLayouts;
+	} m_pipelineLayouts;
 
 	struct {
 		VkDescriptorSet scene;
 		VkDescriptorSet composition;
 		VkDescriptorSet transparent;
-	} descriptorSets;
+	} m_descriptorSets;
 
 	struct {
 		VkDescriptorSetLayout scene;
 		VkDescriptorSetLayout composition;
 		VkDescriptorSetLayout transparent;
-	} descriptorSetLayouts;
+	} m_descriptorSetLayouts;
 
 	// G-Buffer framebuffer attachments
 	struct FrameBufferAttachment {
@@ -84,11 +84,12 @@ public:
 		VkImageView view = VK_NULL_HANDLE;
 		VkFormat format;
 	};
+
 	struct Attachments {
 		FrameBufferAttachment position, normal, albedo;
 		int32_t width;
 		int32_t height;
-	} attachments;
+	} m_attachments;
 
 	VulkanExample() : VulkanExampleBase()
 	{
@@ -111,25 +112,25 @@ public:
 	{
 		// Clean up used Vulkan resources
 		// Note : Inherited destructor cleans up resources stored in base class
-		vkDestroyPipeline(m_device, pipelines.offscreen, nullptr);
-		vkDestroyPipeline(m_device, pipelines.composition, nullptr);
-		vkDestroyPipeline(m_device, pipelines.transparent, nullptr);
+		vkDestroyPipeline(m_device, m_pipelines.offscreen, nullptr);
+		vkDestroyPipeline(m_device, m_pipelines.composition, nullptr);
+		vkDestroyPipeline(m_device, m_pipelines.transparent, nullptr);
 
-		vkDestroyPipelineLayout(m_device, pipelineLayouts.offscreen, nullptr);
-		vkDestroyPipelineLayout(m_device, pipelineLayouts.composition, nullptr);
-		vkDestroyPipelineLayout(m_device, pipelineLayouts.transparent, nullptr);
+		vkDestroyPipelineLayout(m_device, m_pipelineLayouts.offscreen, nullptr);
+		vkDestroyPipelineLayout(m_device, m_pipelineLayouts.composition, nullptr);
+		vkDestroyPipelineLayout(m_device, m_pipelineLayouts.transparent, nullptr);
 
-		vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.scene, nullptr);
-		vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.composition, nullptr);
-		vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.transparent, nullptr);
+		vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayouts.scene, nullptr);
+		vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayouts.composition, nullptr);
+		vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayouts.transparent, nullptr);
 
-		clearAttachment(&attachments.position);
-		clearAttachment(&attachments.normal);
-		clearAttachment(&attachments.albedo);
+		clearAttachment(&m_attachments.position);
+		clearAttachment(&m_attachments.normal);
+		clearAttachment(&m_attachments.albedo);
 
-		textures.glass.destroy();
-		buffers.GBuffer.destroy();
-		buffers.lights.destroy();
+		m_textures.glass.destroy();
+		m_buffers.GBuffer.destroy();
+		m_buffers.lights.destroy();
 	}
 
 	// Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
@@ -173,8 +174,8 @@ public:
 		VkImageCreateInfo image = vks::initializers::imageCreateInfo();
 		image.imageType = VK_IMAGE_TYPE_2D;
 		image.format = format;
-		image.extent.width = attachments.width;
-		image.extent.height = attachments.height;
+		image.extent.width = m_attachments.width;
+		image.extent.height = m_attachments.height;
 		image.extent.depth = 1;
 		image.mipLevels = 1;
 		image.arrayLayers = 1;
@@ -210,34 +211,34 @@ public:
 	// Create color attachments for the G-Buffer components
 	void createGBufferAttachments()
 	{
-		createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments.position);	// (World space) Positions
-		createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments.normal);		// (World space) Normals
-		createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments.albedo);			// Albedo (color)
+		createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.position);	// (World space) Positions
+		createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.normal);		// (World space) Normals
+		createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &m_attachments.albedo);			// Albedo (color)
 	}
 
 	// Override framebuffer setup from base class, will automatically be called upon setup and if a m_hwnd is m_resized
 	void setupFrameBuffer()
 	{
-		// If the m_hwnd is m_resized, all the framebuffers/attachments used in our composition passes need to be recreated
-		if (attachments.width != m_drawAreaWidth || attachments.height != m_drawAreaHeight) {
-			attachments.width = m_drawAreaWidth;
-			attachments.height = m_drawAreaHeight;
+		//	If the m_hwnd is m_resized, all the framebuffers/attachments used in our composition passes need to be recreated
+		if (m_attachments.width != m_drawAreaWidth || m_attachments.height != m_drawAreaHeight) {
+			m_attachments.width = m_drawAreaWidth;
+			m_attachments.height = m_drawAreaHeight;
 			createGBufferAttachments();
 			// Since the framebuffers/attachments are referred in the descriptor sets, these need to be updated too
 			// Composition pass
 			std::vector< VkDescriptorImageInfo> descriptorImageInfos = {
-				vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, attachments.position.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-				vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, attachments.normal.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-				vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, attachments.albedo.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+				vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.position.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+				vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.normal.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+				vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.albedo.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
 			};
 			std::vector<VkWriteDescriptorSet> writeDescriptorSets;
 			for (size_t i = 0; i < descriptorImageInfos.size(); i++) {
-				writeDescriptorSets.push_back(vks::initializers::writeDescriptorSet(descriptorSets.composition, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, static_cast<uint32_t>(i), &descriptorImageInfos[i]));
+				writeDescriptorSets.push_back(vks::initializers::writeDescriptorSet(m_descriptorSets.composition, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, static_cast<uint32_t>(i), &descriptorImageInfos[i]));
 			}
 			vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 			// Forward pass
 			writeDescriptorSets = {
-				vks::initializers::writeDescriptorSet(descriptorSets.transparent, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &descriptorImageInfos[0]),
+				vks::initializers::writeDescriptorSet(m_descriptorSets.transparent, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &descriptorImageInfos[0]),
 			};
 			vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 		}
@@ -258,9 +259,9 @@ public:
 		for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++)
 		{
 			attachments[0] = m_swapChain.imageViews[i];
-			attachments[1] = this->attachments.position.view;
-			attachments[2] = this->attachments.normal.view;
-			attachments[3] = this->attachments.albedo.view;
+			attachments[1] = this->m_attachments.position.view;
+			attachments[2] = this->m_attachments.normal.view;
+			attachments[3] = this->m_attachments.albedo.view;
 			attachments[4] = m_defaultDepthStencil.m_imageView;
 			VK_CHECK_RESULT(vkCreateFramebuffer(m_device, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
 		}
@@ -269,8 +270,8 @@ public:
 	// Override render pass setup from base class
 	void setupRenderPass()
 	{
-		attachments.width = m_drawAreaWidth;
-		attachments.height = m_drawAreaHeight;
+		m_attachments.width = m_drawAreaWidth;
+		m_attachments.height = m_drawAreaHeight;
 
 		createGBufferAttachments();
 
@@ -287,7 +288,7 @@ public:
 
 		// Deferred attachments
 		// Position
-		attachments[1].format = this->attachments.position.format;
+		attachments[1].format = this->m_attachments.position.format;
 		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -296,7 +297,7 @@ public:
 		attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		// Normals
-		attachments[2].format = this->attachments.normal.format;
+		attachments[2].format = this->m_attachments.normal.format;
 		attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -305,7 +306,7 @@ public:
 		attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		// Albedo
-		attachments[3].format = this->attachments.albedo.format;
+		attachments[3].format = this->m_attachments.albedo.format;
 		attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -471,9 +472,10 @@ public:
 			{
 				vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 0: Deferred G-Buffer creation", { 1.0f, 0.78f, 0.05f, 1.0f });
 
-				vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.offscreen);
-				vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.offscreen, 0, 1, &descriptorSets.scene, 0, NULL);
-				models.scene.draw(m_drawCommandBuffers[i]);
+				vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.offscreen);
+				vkCmdBindDescriptorSets(
+					m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayouts.offscreen, 0, 1, &m_descriptorSets.scene, 0, NULL);
+				m_models.scene.draw(m_drawCommandBuffers[i]);
 
 				vks::debugutils::cmdEndLabel(m_drawCommandBuffers[i]);
 			}
@@ -485,8 +487,9 @@ public:
 
 				vkCmdNextSubpass(m_drawCommandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
 
-				vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.composition);
-				vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.composition, 0, 1, &descriptorSets.composition, 0, NULL);
+				vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.composition);
+				vkCmdBindDescriptorSets(
+					m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayouts.composition, 0, 1, &m_descriptorSets.composition, 0, NULL);
 				vkCmdDraw(m_drawCommandBuffers[i], 3, 1, 0, 0);
 
 				vks::debugutils::cmdEndLabel(m_drawCommandBuffers[i]);
@@ -499,9 +502,10 @@ public:
 
 				vkCmdNextSubpass(m_drawCommandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
 
-				vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.transparent);
-				vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.transparent, 0, 1, &descriptorSets.transparent, 0, NULL);
-				models.transparent.draw(m_drawCommandBuffers[i]);
+				vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines.transparent);
+				vkCmdBindDescriptorSets(
+					m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayouts.transparent, 0, 1, &m_descriptorSets.transparent, 0, NULL);
+				m_models.transparent.draw(m_drawCommandBuffers[i]);
 
 				vks::debugutils::cmdEndLabel(m_drawCommandBuffers[i]);
 			}
@@ -517,9 +521,9 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models.scene.loadFromFile(getAssetPath() + "models/samplebuilding.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
-		models.transparent.loadFromFile(getAssetPath() + "models/samplebuilding_glass.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
-		textures.glass.loadFromFile(getAssetPath() + "textures/colored_glass_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
+		m_models.scene.loadFromFile(getAssetPath() + "models/samplebuilding.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
+		m_models.transparent.loadFromFile(getAssetPath() + "models/samplebuilding_glass.gltf", m_pVulkanDevice, m_queue, glTFLoadingFlags);
+		m_textures.glass.loadFromFile(getAssetPath() + "textures/colored_glass_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_queue);
 	}
 
 	void setupDescriptors()
@@ -542,16 +546,16 @@ public:
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0)
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &descriptorSetLayouts.scene));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_descriptorSetLayouts.scene));
 
 		// Sets
 		VkDescriptorSetAllocateInfo allocInfo
-			= vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.scene, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSets.scene));
+			= vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_descriptorSetLayouts.scene, 1);
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSets.scene));
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0: Vertex shader uniform buffer
 			vks::initializers::writeDescriptorSet(
-				descriptorSets.scene, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &buffers.GBuffer.m_vkDescriptorBufferInfo)
+				m_descriptorSets.scene, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &m_buffers.GBuffer.m_vkDescriptorBufferInfo)
 		};
 		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
 	}
@@ -559,8 +563,10 @@ public:
 	void preparePipelines()
 	{
 		// Layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.scene, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.offscreen));
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
+			= vks::initializers::pipelineLayoutCreateInfo(&m_descriptorSetLayouts.scene, 1);
+		VK_CHECK_RESULT(vkCreatePipelineLayout(
+			m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayouts.offscreen));
 
 		// Pipeline
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -576,7 +582,7 @@ public:
 
 		// Final fullscreen pass pipeline
 		VkGraphicsPipelineCreateInfo pipelineCI
-			= vks::initializers::pipelineCreateInfo(pipelineLayouts.offscreen, m_renderPassOriginal, 0);
+			= vks::initializers::pipelineCreateInfo(m_pipelineLayouts.offscreen, m_renderPassOriginal, 0);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;
@@ -602,7 +608,8 @@ public:
 		// Offscreen scene rendering pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "subpasses/gbuffer.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "subpasses/gbuffer.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.offscreen));
+		VK_CHECK_RESULT(
+			vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_pipelines.offscreen));
 	}
 
 	// Create the Vulkan objects used in the composition pass (descriptor sets, pipelines, etc.)
@@ -626,32 +633,41 @@ public:
 				setLayoutBindings.data(),
 				static_cast<uint32_t>(setLayoutBindings.size()));
 
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &descriptorSetLayouts.composition));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
+			m_device, &descriptorLayout, nullptr, &m_descriptorSetLayouts.composition));
 
 		// Pipeline layout
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.composition, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.composition));
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
+			= vks::initializers::pipelineLayoutCreateInfo(&m_descriptorSetLayouts.composition, 1);
+		VK_CHECK_RESULT(vkCreatePipelineLayout(
+			m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayouts.composition));
 
 		// Descriptor sets
 		VkDescriptorSetAllocateInfo allocInfo
-			= vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.composition, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSets.composition));
+			= vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_descriptorSetLayouts.composition, 1);
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSets.composition));
 
 		// Image descriptors for the offscreen color attachments
-		VkDescriptorImageInfo texDescriptorPosition = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, attachments.position.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		VkDescriptorImageInfo texDescriptorNormal = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, attachments.normal.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		VkDescriptorImageInfo texDescriptorAlbedo = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, attachments.albedo.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VkDescriptorImageInfo texDescriptorPosition
+			= vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.position.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VkDescriptorImageInfo texDescriptorNormal
+			= vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.normal.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VkDescriptorImageInfo texDescriptorAlbedo
+			= vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, m_attachments.albedo.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0: Position texture target
-			vks::initializers::writeDescriptorSet(descriptorSets.composition, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 0, &texDescriptorPosition),
+			vks::initializers::writeDescriptorSet(
+				m_descriptorSets.composition, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 0, &texDescriptorPosition),
 			// Binding 1: Normals texture target
-			vks::initializers::writeDescriptorSet(descriptorSets.composition, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &texDescriptorNormal),
+			vks::initializers::writeDescriptorSet(
+				m_descriptorSets.composition, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &texDescriptorNormal),
 			// Binding 2: Albedo texture target
-			vks::initializers::writeDescriptorSet(descriptorSets.composition, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, &texDescriptorAlbedo),
+			vks::initializers::writeDescriptorSet(
+				m_descriptorSets.composition, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, &texDescriptorAlbedo),
 			// Binding 4: Fragment shader lights
 			vks::initializers::writeDescriptorSet(
-				descriptorSets.composition, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, &buffers.lights.m_vkDescriptorBufferInfo),
+				m_descriptorSets.composition, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, &m_buffers.lights.m_vkDescriptorBufferInfo),
 		};
 
 		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
@@ -672,7 +688,7 @@ public:
 		shaderStages[1] = loadShader(getShadersPath() + "subpasses/composition.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
 		VkGraphicsPipelineCreateInfo pipelineCI
-			= vks::initializers::pipelineCreateInfo(pipelineLayouts.composition, m_renderPassOriginal, 0);
+			= vks::initializers::pipelineCreateInfo(m_pipelineLayouts.composition, m_renderPassOriginal, 0);
 
 		VkPipelineVertexInputStateCreateInfo emptyInputState{};
 		emptyInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -692,7 +708,8 @@ public:
 
 		depthStencilState.depthWriteEnable = VK_FALSE;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.composition));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+			m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_pipelines.composition));
 
 		// Transparent (forward) pipeline
 
@@ -704,22 +721,25 @@ public:
 		};
 
 		descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings.data(), static_cast<uint32_t>(setLayoutBindings.size()));
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &descriptorSetLayouts.transparent));
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
+			m_device, &descriptorLayout, nullptr, &m_descriptorSetLayouts.transparent));
 
 		// Pipeline layout
-		pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&descriptorSetLayouts.transparent, 1);
-		VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayouts.transparent));
+		pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_descriptorSetLayouts.transparent, 1);
+		VK_CHECK_RESULT(vkCreatePipelineLayout(
+			m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayouts.transparent));
 
 		// Descriptor sets
-		allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &descriptorSetLayouts.transparent, 1);
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSets.transparent));
+		allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_descriptorSetLayouts.transparent, 1);
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSets.transparent));
 
 		writeDescriptorSets = {
 			vks::initializers::writeDescriptorSet(
-				descriptorSets.transparent, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &buffers.GBuffer.m_vkDescriptorBufferInfo),
-			vks::initializers::writeDescriptorSet(descriptorSets.transparent, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &texDescriptorPosition),
+				m_descriptorSets.transparent, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &m_buffers.GBuffer.m_vkDescriptorBufferInfo),
 			vks::initializers::writeDescriptorSet(
-				descriptorSets.transparent, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &textures.glass.m_vkDescriptorImageInfo),
+				m_descriptorSets.transparent, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &texDescriptorPosition),
+			vks::initializers::writeDescriptorSet(
+				m_descriptorSets.transparent, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &m_textures.glass.m_vkDescriptorImageInfo),
 		};
 		vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
 
@@ -734,24 +754,33 @@ public:
 		blendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV});
-		pipelineCI.layout            = pipelineLayouts.transparent;
+		pipelineCI.layout            = m_pipelineLayouts.transparent;
 		pipelineCI.subpass           = 2;
 
 		shaderStages[0] = loadShader(getShadersPath() + "subpasses/transparent.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "subpasses/transparent.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.transparent));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+			m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_pipelines.transparent));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
 		// Matrices
-		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffers.GBuffer, sizeof(uboGBuffer));
-		VK_CHECK_RESULT(buffers.GBuffer.map());
+		m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&m_buffers.GBuffer,
+			sizeof(m_uboGBuffer));
+		VK_CHECK_RESULT(m_buffers.GBuffer.map());
 
 		// Lights
-		m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffers.lights, lights.size() * sizeof(Light));
-		VK_CHECK_RESULT(buffers.lights.map());
+		m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&m_buffers.lights,
+			m_lights.size() * sizeof(Light));
+		VK_CHECK_RESULT(m_buffers.lights.map());
 
 		// Update
 		updateUniformBufferDeferredMatrices();
@@ -759,10 +788,10 @@ public:
 
 	void updateUniformBufferDeferredMatrices()
 	{
-		uboGBuffer.projection = camera.matrices.perspective;
-		uboGBuffer.view = camera.matrices.view;
-		uboGBuffer.model = glm::mat4(1.0f);
-		memcpy(buffers.GBuffer.m_pMapped, &uboGBuffer, sizeof(uboGBuffer));
+		m_uboGBuffer.projection = camera.matrices.perspective;
+		m_uboGBuffer.view = camera.matrices.view;
+		m_uboGBuffer.model = glm::mat4(1.0f);
+		memcpy(m_buffers.GBuffer.m_pMapped, &m_uboGBuffer, sizeof(m_uboGBuffer));
 	}
 
 	void initLights()
@@ -781,7 +810,7 @@ public:
 		std::uniform_real_distribution<float> rndDist(-1.0f, 1.0f);
 		std::uniform_real_distribution<float> rndCol(0.0f, 0.5f);
 
-		for (auto& light : lights)
+		for (auto& light : m_lights)
 		{
 			light.position = glm::vec4(rndDist(rndGen) * 8.0f, 0.25f + std::abs(rndDist(rndGen)) * 4.0f, rndDist(rndGen) * 8.0f, 1.0f);
 			//light.color = colors[rndCol(rndGen)];
@@ -789,7 +818,7 @@ public:
 			light.radius = 1.0f + std::abs(rndDist(rndGen));
 		}
 
-		memcpy(buffers.lights.m_pMapped, lights.data(), lights.size() * sizeof(Light));
+		memcpy(m_buffers.lights.m_pMapped, m_lights.data(), m_lights.size() * sizeof(Light));
 	}
 
 	void draw()
