@@ -45,9 +45,9 @@ public:
     vks::Buffer m_bufferGBuffer;
     vks::Buffer m_bufferLights;
 
-    VkPipelineLayout m_vkPipelineLayoutOffscreen;
-    VkPipelineLayout m_vkPipelineLayoutComposition;
-    VkPipelineLayout m_vkPipelineLayoutTransparent;
+    vkcpp::PipelineLayout m_pipelineLayoutOffscreen;
+    vkcpp::PipelineLayout m_pipelineLayoutComposition;
+    vkcpp::PipelineLayout m_pipelineLayoutTransparent;
 
     VkPipeline m_vkPipelineOffscreen;
     VkPipeline m_vkPipelineComposition;
@@ -103,9 +103,9 @@ public:
         vkDestroyPipeline(m_device, m_vkPipelineComposition, nullptr);
         vkDestroyPipeline(m_device, m_vkPipelineTransparent, nullptr);
 
-        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutOffscreen, nullptr);
-        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutComposition, nullptr);
-        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutTransparent, nullptr);
+//        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutOffscreen, nullptr);
+//        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutComposition, nullptr);
+//        vkDestroyPipelineLayout(m_device, m_vkPipelineLayoutTransparent, nullptr);
 
         vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayoutScene, nullptr);
         vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayoutComposition, nullptr);
@@ -452,7 +452,7 @@ public:
             {
                 vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 0: Deferred G-Buffer creation", { 1.0f, 0.78f, 0.05f, 1.0f });
 				commandBuffer.cmdBindPipeline(m_vkPipelineOffscreen);
-				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetScene, m_vkPipelineLayoutOffscreen);
+				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetScene, m_pipelineLayoutOffscreen);
                 m_modelScene.draw(commandBuffer);
                 vks::debugutils::cmdEndLabel(commandBuffer);
             }
@@ -463,7 +463,7 @@ public:
                 vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 1: Deferred composition", { 0.0f, 0.5f, 1.0f, 1.0f });
 				commandBuffer.cmdNextSubpass();
 				commandBuffer.cmdBindPipeline(m_vkPipelineComposition);
-				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetComposition, m_vkPipelineLayoutComposition);
+				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetComposition, m_pipelineLayoutComposition);
 				//	TODO: magic numbers
 				commandBuffer.cmdDraw(3, 1);	//	vertexCount, indexCount
                 vks::debugutils::cmdEndLabel(commandBuffer);
@@ -475,7 +475,7 @@ public:
                 vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 2: Forward transparency", { 0.5f, 0.76f, 0.34f, 1.0f });
 				commandBuffer.cmdNextSubpass();
 				commandBuffer.cmdBindPipeline(m_vkPipelineTransparent);
-				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetTransparent, m_vkPipelineLayoutTransparent);
+				commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSetTransparent, m_pipelineLayoutTransparent);
                 m_modelTransparent.draw(commandBuffer);
                 vks::debugutils::cmdEndLabel(commandBuffer);
             }
@@ -538,10 +538,14 @@ public:
     void preparePipelines()
     {
         // Layout
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
-            = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayoutScene, 1);
-        VK_CHECK_RESULT(vkCreatePipelineLayout(
-            m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayoutOffscreen));
+        //VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
+        //    = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayoutScene, 1);
+        //VK_CHECK_RESULT(vkCreatePipelineLayout(
+        //    m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayoutOffscreen));
+
+		vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+		pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayoutScene);
+		m_pipelineLayoutOffscreen = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
 
         // Pipeline
         VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -557,7 +561,7 @@ public:
 
         // Final fullscreen pass pipeline
         VkGraphicsPipelineCreateInfo pipelineCI
-            = vks::initializers::pipelineCreateInfo(m_vkPipelineLayoutOffscreen, m_renderPassOriginal, 0);
+            = vks::initializers::pipelineCreateInfo(m_pipelineLayoutOffscreen, m_renderPassOriginal, 0);
         pipelineCI.pInputAssemblyState = &inputAssemblyState;
         pipelineCI.pRasterizationState = &rasterizationState;
         pipelineCI.pColorBlendState = &colorBlendState;
@@ -609,11 +613,12 @@ public:
         VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
             m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayoutComposition));
 
-        // Pipeline layout
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
-            = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayoutComposition, 1);
-        VK_CHECK_RESULT(vkCreatePipelineLayout(
-            m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayoutComposition));
+        // Pipeline Layout
+		{
+			vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+			pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayoutComposition);
+			m_pipelineLayoutComposition = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
+		}
 
         // Descriptor sets
         VkDescriptorSetAllocateInfo allocInfo
@@ -661,7 +666,7 @@ public:
         shaderStages[1] = loadShader(getShadersPath() + "subpasses/composition.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
         VkGraphicsPipelineCreateInfo pipelineCI
-            = vks::initializers::pipelineCreateInfo(m_vkPipelineLayoutComposition, m_renderPassOriginal, 0);
+            = vks::initializers::pipelineCreateInfo(m_pipelineLayoutComposition, m_renderPassOriginal, 0);
 
         VkPipelineVertexInputStateCreateInfo emptyInputState {};
         emptyInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -697,10 +702,12 @@ public:
         VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
             m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayoutTransparent));
 
-        // Pipeline layout
-        pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayoutTransparent, 1);
-        VK_CHECK_RESULT(vkCreatePipelineLayout(
-            m_device, &pipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayoutTransparent));
+        // Pipeline Layout
+		{
+			vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+			pipelineLayoutCreateInfo.addDescriptorSetLayout(m_vkDescriptorSetLayoutTransparent);
+			m_pipelineLayoutTransparent = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
+		}
 
         // Descriptor sets
         allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayoutTransparent, 1);
@@ -727,7 +734,7 @@ public:
         blendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
         pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV });
-        pipelineCI.layout = m_vkPipelineLayoutTransparent;
+        pipelineCI.layout = m_pipelineLayoutTransparent;
         pipelineCI.subpass = 2;
 
         shaderStages[0] = loadShader(getShadersPath() + "subpasses/transparent.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
