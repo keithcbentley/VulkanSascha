@@ -16,7 +16,6 @@
 
 vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
-
 class VulkanExample : public VulkanExampleBase {
 public:
     bool displaySkybox = true;
@@ -40,14 +39,12 @@ public:
 
     vks::Buffer uniformBuffer;
 
-    struct {
-        VkPipeline skybox { VK_NULL_HANDLE };
-        VkPipeline reflect { VK_NULL_HANDLE };
-    } pipelines;
+	vkcpp::PipelineLayout m_pipelineLayout;
+	vkcpp::GraphicsPipeline m_pipelineSkybox;
+    vkcpp::GraphicsPipeline m_pipelineReflect;
 
-    VkPipelineLayout m_vkPipelineLayout { VK_NULL_HANDLE };
-    VkDescriptorSet descriptorSet { VK_NULL_HANDLE };
-    VkDescriptorSetLayout m_vkDescriptorSetLayout { VK_NULL_HANDLE };
+	vkcpp::DescriptorSetLayout m_descriptorSetLayout;
+	vkcpp::DescriptorSet m_descriptorSet;
 
     std::vector<std::string> objectNames;
 
@@ -68,10 +65,10 @@ public:
             vkDestroyImage(m_device, cubeMapArray.m_vkImage, nullptr);
             vkDestroySampler(m_device, cubeMapArray.m_vkSampler, nullptr);
             vkFreeMemory(m_device, cubeMapArray.m_vkDeviceMemory, nullptr);
-            vkDestroyPipeline(m_device, pipelines.skybox, nullptr);
-            vkDestroyPipeline(m_device, pipelines.reflect, nullptr);
-            vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
-            vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
+//            vkDestroyPipeline(m_device, m_vkPipelineSkybox, nullptr);
+//            vkDestroyPipeline(m_device, m_vkPipelineReflect, nullptr);
+//            vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
+//            vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
             uniformBuffer.destroy();
         }
     }
@@ -309,33 +306,27 @@ public:
             // Set target frame buffer
             renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-            VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
-
-            vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-            vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
-
-            VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
-            vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
-
-            vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
+			commandBuffer.begin(cmdBufInfo);
+			commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
+			commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
+			commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
+			commandBuffer.cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout);
 
             // Skybox
             if (displaySkybox) {
-                vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.skybox);
-                models.skybox.draw(m_drawCommandBuffers[i]);
+				commandBuffer.cmdBindPipeline(m_pipelineSkybox);
+                models.skybox.draw(commandBuffer);
             }
 
             // 3D object
-            vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.reflect);
-            models.objects[models.objectIndex].draw(m_drawCommandBuffers[i]);
+			commandBuffer.cmdBindPipeline(m_pipelineReflect);
+            models.objects[models.objectIndex].draw(commandBuffer);
 
-            drawUI(m_drawCommandBuffers[i]);
+            drawUI(commandBuffer);
 
-            vkCmdEndRenderPass(m_drawCommandBuffers[i]);
-
-            VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
+			commandBuffer.cmdEndRenderPass();
+			commandBuffer.end();
         }
     }
 
@@ -357,47 +348,56 @@ public:
 
     void setupDescriptors()
     {
-        // Pool
-        std::vector<VkDescriptorPoolSize> poolSizes = {
-            vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-            vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
-        };
-        VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
-        // VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+        // Descriptor Pool
+		vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+		descriptorPoolCreateInfo
+			.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
+			.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
 
-        // Layout
-        std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-            // Binding 0 : Vertex shader uniform buffer
-            vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0),
-            // Binding 1 : Fragment shader m_vkImage sampler
-            vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
-        };
-        VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &m_vkDescriptorSetLayout));
+        // Descriptor Set Layout
+		constexpr int uniformBufferBindingIndex = 0;
+		constexpr int combinedImageSamplerBindingIndex = 1;
 
-        // Set
-        VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_descriptorPool, &m_vkDescriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet));
+		vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+		descriptorSetLayoutCreateInfo
+			.addDescriptorSetLayoutBinding(
+				uniformBufferBindingIndex,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				vkcpp::SHADER_STAGE_VERTEX | vkcpp::SHADER_STAGE_FRAGMENT)
+			.addDescriptorSetLayoutBinding(
+				combinedImageSamplerBindingIndex,
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				vkcpp::SHADER_STAGE_FRAGMENT);
+		m_descriptorSetLayout = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
 
-        // Image descriptor for the cube map array texture
-        VkDescriptorImageInfo textureDescriptor
-			= vks::initializers::descriptorImageInfo(cubeMapArray.m_vkSampler, cubeMapArray.m_vkImageView, cubeMapArray.m_vkImageLayout);
+        // Descriptor Set
+		m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
-        std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-            // Binding 0 : Vertex shader uniform buffer
-            vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo),
-            // Binding 1 : Fragment shader cubemap sampler
-            vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor)
-        };
-        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+		// Update Descriptor Set
+		vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
+		descriptorSetUpdater
+			.addBufferWriteDescriptor(
+				uniformBufferBindingIndex,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				uniformBuffer.m_vkDescriptorBufferInfo)
+			.addImageWriteDescriptor(
+				combinedImageSamplerBindingIndex,
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				cubeMapArray.m_vkImageView,
+				cubeMapArray.m_vkImageLayout,
+				cubeMapArray.m_vkSampler);
+		descriptorSetUpdater.updateDescriptorSets();
+
     }
 
     void preparePipelines()
     {
-        // Layout
-        const VkPipelineLayoutCreateInfo pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(&m_vkDescriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
+        // Pipeline Layout
+		vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+		pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayout);
+
+		m_pipelineLayout = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
 
         // Pipelines
         VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -411,7 +411,7 @@ public:
         VkPipelineDynamicStateCreateInfo dynamicState = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
         std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-        VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_vkPipelineLayout, m_renderPassOriginal, 0);
+        VkGraphicsPipelineCreateInfo pipelineCI = vks::initializers::pipelineCreateInfo(m_pipelineLayout, m_renderPassOriginal, 0);
         pipelineCI.pInputAssemblyState = &inputAssemblyState;
         pipelineCI.pRasterizationState = &rasterizationState;
         pipelineCI.pColorBlendState = &colorBlendState;
@@ -427,7 +427,7 @@ public:
         shaderStages[0] = loadShader(getShadersPath() + "texturecubemaparray/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
         shaderStages[1] = loadShader(getShadersPath() + "texturecubemaparray/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
         rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.skybox));
+		m_pipelineSkybox = vkcpp::GraphicsPipeline(pipelineCI);
 
         // Cube map reflect pipeline
         shaderStages[0] = loadShader(getShadersPath() + "texturecubemaparray/reflect.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -437,7 +437,7 @@ public:
         depthStencilState.depthTestEnable = VK_TRUE;
         // Flip cull mode
         rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &pipelines.reflect));
+		m_pipelineReflect = vkcpp::GraphicsPipeline(pipelineCI);
     }
 
     void prepareUniformBuffers()
@@ -471,8 +471,8 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+        VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
         VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
     }
