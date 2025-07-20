@@ -1782,6 +1782,10 @@ public:
     AttachmentDescription()
         : VkAttachmentDescription {}
     {
+        //	This almost always the default, but these aren't 0 values
+        //	so they need to be set explicitly.
+        stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     }
 
     ~AttachmentDescription() = default;
@@ -1805,51 +1809,46 @@ public:
         return *this;
     }
 
-    static AttachmentDescription simpleColorAttachmentPresentDescription(
-        VkFormat colorAttachmentVkFormat)
+    static AttachmentDescription simpleColorPresent(
+        VkFormat vkFormatArg)
     {
-        AttachmentDescription colorAttachmentDescription;
+        AttachmentDescription attachmentDescription;
         //	Reasonable defaults
-        colorAttachmentDescription.format = colorAttachmentVkFormat;
-        colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-        colorAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        colorAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        colorAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        return colorAttachmentDescription;
+        attachmentDescription.format = vkFormatArg;
+        attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+        attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        return attachmentDescription;
     }
 
-    static AttachmentDescription simpleColorAttachmentDescription(
-        VkFormat colorAttachmentVkFormat)
+    static AttachmentDescription simpleColor(
+        VkFormat vkFormatArg)
     {
-        AttachmentDescription colorAttachmentDescription;
+        AttachmentDescription attachmentDescription;
         //	Reasonable defaults
-        colorAttachmentDescription.format = colorAttachmentVkFormat;
-        colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-        colorAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        colorAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        colorAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        return colorAttachmentDescription;
+        attachmentDescription.format = vkFormatArg;
+        attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+        attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        return attachmentDescription;
     }
 
-    static AttachmentDescription simpleDepthAttachmentDescription()
+    static AttachmentDescription simpleDepth(
+        VkFormat vkFormatArg)
     {
-        AttachmentDescription depthAttachmentDescription;
+        AttachmentDescription attachmentDescription;
         //	Reasonable defaults
-        depthAttachmentDescription.format = VK_FORMAT_D32_SFLOAT;
-        depthAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-        depthAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        depthAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depthAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        return depthAttachmentDescription;
+        attachmentDescription.format = vkFormatArg;
+        attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+        attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        return attachmentDescription;
     }
 
     AttachmentDescription& setFormat(VkFormat vkFormat)
@@ -1903,7 +1902,7 @@ class SubpassDescription {
     //	Use an internal Vulkan structure rather than subclass.
     VkSubpassDescription m_vkSubpassDescription {};
 
-    //	There is a max of one depth stencil attachment but it's easier
+    //	There is a max of one depth stencil attachment, but it's easier
     //	to save it as a vector rather than special casing it.
     std::vector<VkAttachmentReference> m_inputAttachmentReferences;
     std::vector<VkAttachmentReference> m_colorAttachmentReferences;
@@ -1917,7 +1916,7 @@ class SubpassDescription {
         m_vkSubpassDescription.colorAttachmentCount = static_cast<uint32_t>(m_colorAttachmentReferences.size());
         m_vkSubpassDescription.pColorAttachments = m_colorAttachmentReferences.data();
 
-        if (m_depthStencilAttachmentReferences.size() > 0) {
+        if (!m_depthStencilAttachmentReferences.empty()) {
             m_vkSubpassDescription.pDepthStencilAttachment = m_depthStencilAttachmentReferences.data();
         }
     }
@@ -1975,8 +1974,38 @@ public:
         return *this;
     }
 
+	SubpassDescription& addInputAttachmentReference(
+		uint32_t attachmentIndexArg,
+		VkImageLayout vkImageLayoutArg) {
+		VkAttachmentReference vkAttachmentReference{
+			.attachment = attachmentIndexArg,
+			.layout = vkImageLayoutArg
+		};
+
+		m_inputAttachmentReferences.emplace_back(vkAttachmentReference);
+		m_vkSubpassDescription.inputAttachmentCount = static_cast<uint32_t>(m_colorAttachmentReferences.size());
+		m_vkSubpassDescription.pInputAttachments = m_colorAttachmentReferences.data();
+		return *this;
+	}
+
+
     SubpassDescription& addColorAttachmentReference(const VkAttachmentReference& vkAttachmentReference)
     {
+        m_colorAttachmentReferences.emplace_back(vkAttachmentReference);
+        m_vkSubpassDescription.colorAttachmentCount = static_cast<uint32_t>(m_colorAttachmentReferences.size());
+        m_vkSubpassDescription.pColorAttachments = m_colorAttachmentReferences.data();
+        return *this;
+    }
+
+    SubpassDescription& addColorAttachmentReference(
+        uint32_t attachmentIndexArg,
+        VkImageLayout vkImageLayoutArg)
+    {
+        VkAttachmentReference vkAttachmentReference {
+            .attachment = attachmentIndexArg,
+            .layout = vkImageLayoutArg
+        };
+
         m_colorAttachmentReferences.emplace_back(vkAttachmentReference);
         m_vkSubpassDescription.colorAttachmentCount = static_cast<uint32_t>(m_colorAttachmentReferences.size());
         m_vkSubpassDescription.pColorAttachments = m_colorAttachmentReferences.data();
@@ -1986,6 +2015,20 @@ public:
     SubpassDescription& setDepthStencilAttachmentReference(const VkAttachmentReference& vkDepthStencilAttachmentReference)
     {
         m_depthStencilAttachmentReferences.emplace_back(vkDepthStencilAttachmentReference);
+        m_vkSubpassDescription.pDepthStencilAttachment = m_depthStencilAttachmentReferences.data();
+        return *this;
+    }
+
+    SubpassDescription& setDepthStencilAttachmentReference(
+        uint32_t attachmentIndexArg,
+        VkImageLayout vkImageLayoutArg)
+    {
+		VkAttachmentReference vkAttachmentReference{
+			.attachment = attachmentIndexArg,
+			.layout = vkImageLayoutArg
+		};
+		//	TODO: error check for multiple calls. Only one depth/stencil allowed.
+        m_depthStencilAttachmentReferences.emplace_back(vkAttachmentReference);
         m_vkSubpassDescription.pDepthStencilAttachment = m_depthStencilAttachmentReferences.data();
         return *this;
     }
@@ -2088,10 +2131,18 @@ class RenderPassCreateInfo {
     std::vector<SubpassDependency> m_subpassDependencies;
 
 public:
-    RenderPassCreateInfo(int attachmentCountArg, int subpassCountArg)
+
+	~RenderPassCreateInfo() = default;
+
+	RenderPassCreateInfo(const RenderPassCreateInfo&) = delete;
+	RenderPassCreateInfo& operator=(const RenderPassCreateInfo&) = delete;
+	RenderPassCreateInfo(RenderPassCreateInfo&&) noexcept = delete;
+	RenderPassCreateInfo& operator=(RenderPassCreateInfo&&) noexcept = delete;
+
+    RenderPassCreateInfo(int subpassCountArg, int attachmentCountArg)
     {
-        m_attachmentDescriptions.resize(attachmentCountArg);
         m_subpassDescriptions.resize(subpassCountArg);
+        m_attachmentDescriptions.resize(attachmentCountArg);
 
         //	Watch out for name collisions between args and member variables.
         m_vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -2099,12 +2150,6 @@ public:
         m_vkRenderPassCreateInfo.pAttachments = m_attachmentDescriptions.data();
     }
 
-    ~RenderPassCreateInfo() = default;
-
-    RenderPassCreateInfo(const RenderPassCreateInfo&) = delete;
-    RenderPassCreateInfo& operator=(const RenderPassCreateInfo&) = delete;
-    RenderPassCreateInfo(RenderPassCreateInfo&&) noexcept = delete;
-    RenderPassCreateInfo& operator=(RenderPassCreateInfo&&) noexcept = delete;
 
     const VkRenderPassCreateInfo* operator&() = delete;
 
@@ -2126,6 +2171,9 @@ public:
         return subpassDescription;
     }
 
+	//	Useful for migrating existing code.  This is a shallow copy
+	//	so the RenderPassCreateInfo is only valid as long as the original
+	//	VkSubpassDependency is valid.
     void addSubpassDependency(const VkSubpassDependency& vkSubpassDependency)
     {
         m_subpassDependencies.emplace_back(vkSubpassDependency);
@@ -2133,6 +2181,11 @@ public:
         m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
     }
 
+
+	//	Note that this returns a reference to the newly created
+	//	subpass dependency, not the RenderPassCreateInfo.  This
+	//	allows adding the dependency and then adding the rest of
+	//	the dependency data.
     SubpassDependency& addSubpassDependency(
         uint32_t srcSubpassArg,
         uint32_t dstSubpassArg)
@@ -2842,8 +2895,7 @@ public:
         Buffer srcBuffer,
         Buffer dstBuffer) const
     {
-        cmdCopyBuffer(srcBuffer, dstBuffer, srcBuffer.size());
-        return *this;
+        return cmdCopyBuffer(srcBuffer, dstBuffer, srcBuffer.size());
     }
 
     const CommandBuffer& cmdPipelineBarrier2(
@@ -2859,11 +2911,11 @@ public:
         return *this;
     }
 
-	const CommandBuffer& cmdNextSubpass() const {
-		vkCmdNextSubpass(*this, VK_SUBPASS_CONTENTS_INLINE);
-		return *this;
-	}
-
+    const CommandBuffer& cmdNextSubpass() const
+    {
+        vkCmdNextSubpass(*this, VK_SUBPASS_CONTENTS_INLINE);
+        return *this;
+    }
 
     const CommandBuffer& cmdEndRenderPass() const
     {
@@ -2968,10 +3020,12 @@ public:
         return *this;
     }
 
-	const CommandBuffer& cmdDraw(uint32_t vertexCount, uint32_t indexCount) const {
-		vkCmdDraw(*this, vertexCount, indexCount, 0, 0);
-		return *this;
-	}
+	
+    const CommandBuffer& cmdDraw(uint32_t vertexCount, uint32_t indexCount) const
+    {
+        vkCmdDraw(*this, vertexCount, indexCount, 0, 0);
+        return *this;
+    }
 
     const CommandBuffer& cmdPushConstant(
         void* pData,
@@ -3545,6 +3599,9 @@ class DescriptorSetUpdater {
     //	Use vector for each type of info, and then set pointer
     //	after saving info.  Does it matter?
 
+	//	TODO: add a check to see if the destructor is called without
+	//	a call to 
+
     //	Union to hold each type of info that can be updated/written.
     union WriteDescriptorInfo {
         VkDescriptorBufferInfo m_vkDescriptorBufferInfo;
@@ -3573,9 +3630,15 @@ class DescriptorSetUpdater {
 
     VkDescriptorSet m_preboundDescriptorSet = VK_NULL_HANDLE;
 
+	bool	m_updateCalled = false;
+
 public:
     DescriptorSetUpdater() = default;
-    ~DescriptorSetUpdater() = default;
+	~DescriptorSetUpdater() noexcept(false) {
+		if (!m_updateCalled) {
+			throw Exception("DescriptorSetUpdater destroyed before calling update.");
+		}
+	}
     DescriptorSetUpdater(const DescriptorSetUpdater&) = delete;
     DescriptorSetUpdater& operator=(const DescriptorSetUpdater&) = delete;
     DescriptorSetUpdater(DescriptorSetUpdater&&) noexcept = delete;
@@ -3649,7 +3712,7 @@ public:
         VkDescriptorType vkDescriptorType,
         VkImageView vkImageViewArg,
         VkImageLayout vkImageLayout,
-		VkSampler vkSamplerArg)
+        VkSampler vkSamplerArg)
     {
         //	Just need a non-zero marker
         const VkDescriptorImageInfo* imageMarker = reinterpret_cast<VkDescriptorImageInfo*>(-1);
@@ -3723,6 +3786,7 @@ public:
             static_cast<uint32_t>(m_vkWriteDescriptorSets.size()),
             m_vkWriteDescriptorSets.data(),
             0, nullptr);
+		m_updateCalled = true;
         //	TODO: should the update info be cleared after this?
         //	is it ever reused?
     }

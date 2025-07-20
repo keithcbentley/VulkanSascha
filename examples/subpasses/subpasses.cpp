@@ -109,14 +109,6 @@ public:
         m_bufferLights.destroy();
     }
 
-    // Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
-    virtual void getEnabledFeatures() {
-        //// Enable anisotropic filtering if supported
-        // if (m_vkPhysicalDeviceFeatures.samplerAnisotropy) {
-        //	m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
-        // }
-    };
-
     void clearAttachment(FrameBufferAttachment* attachment)
     {
         vkDestroyImageView(m_device, attachment->m_vkImageView, nullptr);
@@ -191,7 +183,7 @@ public:
 
     // Override framebuffer setup from base class,
     // will automatically be called upon setup and if a m_hwnd is m_resized
-    void setupFrameBuffer()
+    void setupFrameBuffer() override
     {
         //	If the m_hwnd is resized, all the framebuffers/attachments used
         //	in our composition passes need to be recreated
@@ -236,7 +228,7 @@ public:
             }
             {
                 // Forward pass
-                vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetComposition);
+                vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetTransparent);
                 descriptorSetUpdater
                     .addImageWriteDescriptor(
                         positionBindingIndex,
@@ -263,120 +255,170 @@ public:
         m_vkFrameBuffers.resize(m_swapChain.images.size());
         for (uint32_t i = 0; i < m_vkFrameBuffers.size(); i++) {
             attachments[0] = m_swapChain.imageViews[i];
-            attachments[1] = this->m_attachments.m_position.m_vkImageView;
-            attachments[2] = this->m_attachments.m_normal.m_vkImageView;
-            attachments[3] = this->m_attachments.m_albedo.m_vkImageView;
+            attachments[1] = m_attachments.m_position.m_vkImageView;
+            attachments[2] = m_attachments.m_normal.m_vkImageView;
+            attachments[3] = m_attachments.m_albedo.m_vkImageView;
             attachments[4] = m_defaultDepthStencil.m_imageView;
             VK_CHECK_RESULT(vkCreateFramebuffer(m_device, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
         }
     }
 
     // Override render pass setup from base class
-    void setupRenderPass()
+    void setupRenderPass() override
     {
         m_attachments.width = m_drawAreaWidth;
         m_attachments.height = m_drawAreaHeight;
 
         createGBufferAttachments();
 
-        std::array<VkAttachmentDescription, 5> attachments {};
+        constexpr int subpassCount = 3;
+        constexpr int subpassFillG = 0;
+        constexpr int subpassFinalComposition = 1;
+        constexpr int subpassForwardTransparency = 2;
+
+        constexpr int attachmentCount = 5;
+        constexpr int colorPresentAttachmentIndex = 0;
+        constexpr int positionAttachmentIndex = 1;
+        constexpr int normalAttachmentIndex = 2;
+        constexpr int albedoAttachmentIndex = 3;
+        constexpr int depthAttachmentIndex = 4;
+
+        vkcpp::RenderPassCreateInfo renderPassCreateInfo(subpassCount, attachmentCount);
+
+        renderPassCreateInfo.attachmentDescription(colorPresentAttachmentIndex)
+            = vkcpp::AttachmentDescription::simpleColorPresent(m_swapChain.colorFormat);
+
+        renderPassCreateInfo.attachmentDescription(positionAttachmentIndex)
+            = vkcpp::AttachmentDescription::simpleColor(m_attachments.m_position.m_vkFormat);
+
+        renderPassCreateInfo.attachmentDescription(normalAttachmentIndex)
+            = vkcpp::AttachmentDescription::simpleColor(m_attachments.m_normal.m_vkFormat);
+
+        renderPassCreateInfo.attachmentDescription(albedoAttachmentIndex)
+            = vkcpp::AttachmentDescription::simpleColor(m_attachments.m_albedo.m_vkFormat);
+
+        renderPassCreateInfo.attachmentDescription(depthAttachmentIndex)
+            = vkcpp::AttachmentDescription::simpleDepth(m_vkFormatDepth);
+
+        std::array<VkAttachmentDescription, attachmentCount> attachments {};
         // Color attachment
-        attachments[0].format = m_swapChain.colorFormat;
-        attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        attachments[colorPresentAttachmentIndex].format = m_swapChain.colorFormat;
+        attachments[colorPresentAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[colorPresentAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[colorPresentAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[colorPresentAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[colorPresentAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[colorPresentAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[colorPresentAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
         // Deferred attachments
         // Position
-        attachments[1].format = this->m_attachments.m_position.m_vkFormat;
-        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachments[positionAttachmentIndex].format = m_attachments.m_position.m_vkFormat;
+        attachments[positionAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[positionAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[positionAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[positionAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[positionAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[positionAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[positionAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         // Normals
-        attachments[2].format = this->m_attachments.m_normal.m_vkFormat;
-        attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachments[normalAttachmentIndex].format = m_attachments.m_normal.m_vkFormat;
+        attachments[normalAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[normalAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[normalAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[normalAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[normalAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[normalAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[normalAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         // Albedo
-        attachments[3].format = this->m_attachments.m_albedo.m_vkFormat;
-        attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachments[albedoAttachmentIndex].format = m_attachments.m_albedo.m_vkFormat;
+        attachments[albedoAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[albedoAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[albedoAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[albedoAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[albedoAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[albedoAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[albedoAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         // Depth attachment
-        attachments[4].format = m_vkFormatDepth;
-        attachments[4].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[4].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[4].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[depthAttachmentIndex].format = m_vkFormatDepth;
+        attachments[depthAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[depthAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[depthAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[depthAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[depthAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[depthAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[depthAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        constexpr VkAttachmentReference colorPresentAttachmentReference
+            = { colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+        constexpr VkAttachmentReference depthAttachmentReference
+            = { depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
         // Three subpasses
-        std::array<VkSubpassDescription, 3> subpassDescriptions {};
+        std::array<VkSubpassDescription, subpassCount> subpassDescriptions {};
 
         // First subpass: Fill G-Buffer components
         // ----------------------------------------------------------------------------------------
 
         VkAttachmentReference colorReferences[4];
-        colorReferences[0] = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-        colorReferences[1] = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-        colorReferences[2] = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-        colorReferences[3] = { 3, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-        VkAttachmentReference depthReference = { 4, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+        colorReferences[0] = { colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+        colorReferences[1] = { positionAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+        colorReferences[2] = { normalAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+        colorReferences[3] = { albedoAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
-        subpassDescriptions[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpassDescriptions[0].colorAttachmentCount = 4;
-        subpassDescriptions[0].pColorAttachments = colorReferences;
-        subpassDescriptions[0].pDepthStencilAttachment = &depthReference;
+        renderPassCreateInfo.subpassDescription(subpassFillG)
+            .addColorAttachmentReference(colorPresentAttachmentReference)
+            .setDepthStencilAttachmentReference(depthAttachmentReference)
+            .addColorAttachmentReference(positionAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+            .addColorAttachmentReference(normalAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+            .addColorAttachmentReference(albedoAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+        subpassDescriptions[subpassFillG].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDescriptions[subpassFillG].colorAttachmentCount = 4;
+        subpassDescriptions[subpassFillG].pColorAttachments = colorReferences;
+        subpassDescriptions[subpassFillG].pDepthStencilAttachment = &depthAttachmentReference;
 
         // Second subpass: Final composition (using G-Buffer components)
         // ----------------------------------------------------------------------------------------
 
-        VkAttachmentReference colorReference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-
         VkAttachmentReference inputReferences[3];
-        inputReferences[0] = { 1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
-        inputReferences[1] = { 2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
-        inputReferences[2] = { 3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+        inputReferences[0] = { positionAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+        inputReferences[1] = { normalAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+        inputReferences[2] = { albedoAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 
-        subpassDescriptions[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpassDescriptions[1].colorAttachmentCount = 1;
-        subpassDescriptions[1].pColorAttachments = &colorReference;
-        subpassDescriptions[1].pDepthStencilAttachment = &depthReference;
+        //	Note that the "extra" attachments now become input attachments.
+        renderPassCreateInfo.subpassDescription(subpassFinalComposition)
+            .addColorAttachmentReference(colorPresentAttachmentReference)
+            .setDepthStencilAttachmentReference(depthAttachmentReference)
+            .addInputAttachmentReference(positionAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .addInputAttachmentReference(normalAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .addInputAttachmentReference(albedoAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        subpassDescriptions[subpassFinalComposition].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDescriptions[subpassFinalComposition].colorAttachmentCount = 1;
+        subpassDescriptions[subpassFinalComposition].pColorAttachments = &colorPresentAttachmentReference;
+        subpassDescriptions[subpassFinalComposition].pDepthStencilAttachment = &depthAttachmentReference;
         // Use the color attachments filled in the first pass as input attachments
-        subpassDescriptions[1].inputAttachmentCount = 3;
-        subpassDescriptions[1].pInputAttachments = inputReferences;
+        subpassDescriptions[subpassFinalComposition].inputAttachmentCount = 3;
+        subpassDescriptions[subpassFinalComposition].pInputAttachments = inputReferences;
 
         // Third subpass: Forward transparency
         // ----------------------------------------------------------------------------------------
-        colorReference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
-        inputReferences[0] = { 1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+        inputReferences[0] = { positionAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 
-        subpassDescriptions[2].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpassDescriptions[2].colorAttachmentCount = 1;
-        subpassDescriptions[2].pColorAttachments = &colorReference;
-        subpassDescriptions[2].pDepthStencilAttachment = &depthReference;
+        renderPassCreateInfo.subpassDescription(subpassForwardTransparency)
+            .addColorAttachmentReference(colorPresentAttachmentReference)
+            .setDepthStencilAttachmentReference(depthAttachmentReference)
+            .addInputAttachmentReference(positionAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        subpassDescriptions[subpassForwardTransparency].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDescriptions[subpassForwardTransparency].colorAttachmentCount = 1;
+        subpassDescriptions[subpassForwardTransparency].pColorAttachments = &colorPresentAttachmentReference;
+        subpassDescriptions[subpassForwardTransparency].pDepthStencilAttachment = &depthAttachmentReference;
         // Use the color/depth attachments filled in the first pass as input attachments
-        subpassDescriptions[2].inputAttachmentCount = 1;
-        subpassDescriptions[2].pInputAttachments = inputReferences;
+        subpassDescriptions[subpassForwardTransparency].inputAttachmentCount = 1;
+        subpassDescriptions[subpassForwardTransparency].pInputAttachments = inputReferences;
 
         // Subpass dependencies for layout transitions
         std::array<VkSubpassDependency, 5> dependencies;
@@ -385,9 +427,7 @@ public:
         dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
         dependencies[0].dstSubpass = 0;
         dependencies[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        ;
         dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        ;
         dependencies[0].srcAccessMask = 0;
         dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         dependencies[0].dependencyFlags = 0;
@@ -434,10 +474,16 @@ public:
         renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
         renderPassInfo.pDependencies = dependencies.data();
 
+        renderPassCreateInfo.addSubpassDependency(dependencies[0]);
+        renderPassCreateInfo.addSubpassDependency(dependencies[1]);
+        renderPassCreateInfo.addSubpassDependency(dependencies[2]);
+        renderPassCreateInfo.addSubpassDependency(dependencies[3]);
+        renderPassCreateInfo.addSubpassDependency(dependencies[4]);
+
         m_renderPassOriginal = vkcpp::RenderPass(renderPassInfo);
     }
 
-    void buildCommandBuffers()
+    void buildCommandBuffers() override
     {
         VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -481,29 +527,32 @@ public:
             // This subpass will use the G-Buffer components that have been filled in the first subpass as input attachment for the final compositing
             {
                 vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 1: Deferred composition", { 0.0f, 0.5f, 1.0f, 1.0f });
-                commandBuffer.cmdNextSubpass();
-                commandBuffer.cmdBindPipeline(m_pipelineComposition);
-                commandBuffer.cmdBindDescriptorSet(m_descriptorSetComposition, m_pipelineLayoutComposition);
-                //	TODO: magic numbers
-                commandBuffer.cmdDraw(3, 1); //	vertexCount, indexCount
+				commandBuffer
+					.cmdNextSubpass()
+					.cmdBindPipeline(m_pipelineComposition)
+					.cmdBindDescriptorSet(m_descriptorSetComposition, m_pipelineLayoutComposition);
+
+					commandBuffer.cmdDraw(3, 1); //	TODO: magic numbers	vertexCount, indexCount
                 vks::debugutils::cmdEndLabel(commandBuffer);
             }
 
             // Third subpass
             // Render transparent geometry using a forward pass that compares against depth generated during G-Buffer fill
             {
-                vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 2: Forward transparency", { 0.5f, 0.76f, 0.34f, 1.0f });
-                commandBuffer.cmdNextSubpass();
-                commandBuffer.cmdBindPipeline(m_pipelineTransparent);
-                commandBuffer.cmdBindDescriptorSet(m_descriptorSetTransparent, m_pipelineLayoutTransparent);
+                vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 2: Forward transparency", { 0.5f, 0.76f, 0.34f, 1.0f });
+                commandBuffer
+                    .cmdNextSubpass()
+                    .cmdBindPipeline(m_pipelineTransparent)
+                    .cmdBindDescriptorSet(m_descriptorSetTransparent, m_pipelineLayoutTransparent);
                 m_modelTransparent.draw(commandBuffer);
                 vks::debugutils::cmdEndLabel(commandBuffer);
             }
 
             drawUI(commandBuffer);
 
-            commandBuffer.cmdEndRenderPass();
-            commandBuffer.end();
+            commandBuffer
+                .cmdEndRenderPass()
+                .end();
         }
     }
 
@@ -525,12 +574,12 @@ public:
     {
         //	Descriptor Pool
         vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
-		descriptorPoolCreateInfo
-			.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4)
-			.addDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
-			.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4)
-			.addDescriptorCount(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 4)
-			.setMaxSets(4);
+        descriptorPoolCreateInfo
+            .addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4)
+            .addDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
+            .addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4)
+            .addDescriptorCount(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 4)
+            .setMaxSets(4);
 
         m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolCreateInfo);
 
@@ -611,63 +660,62 @@ public:
     void prepareCompositionPass()
     {
         //	Descriptor Set Layout
-		constexpr int positionInputAttachmentBindingIndex = 0;
-		constexpr int normalInputAttachmentBindingIndex = 1;
-		constexpr int albedoInputAttachmentBindingIndex = 2;
-		constexpr int lightPositionsBindingIndex = 3;
+        constexpr int positionInputAttachmentBindingIndex = 0;
+        constexpr int normalInputAttachmentBindingIndex = 1;
+        constexpr int albedoInputAttachmentBindingIndex = 2;
+        constexpr int lightPositionsBindingIndex = 3;
 
-		{
-			vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
-			descriptorSetLayoutCreateInfo
-				.addDescriptorSetLayoutBinding(
-					positionInputAttachmentBindingIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					vkcpp::SHADER_STAGE_FRAGMENT)
-				.addDescriptorSetLayoutBinding(
-					normalInputAttachmentBindingIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					vkcpp::SHADER_STAGE_FRAGMENT)
-				.addDescriptorSetLayoutBinding(
-					albedoInputAttachmentBindingIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					vkcpp::SHADER_STAGE_FRAGMENT)
-				.addDescriptorSetLayoutBinding(
-					lightPositionsBindingIndex,
-					VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-					vkcpp::SHADER_STAGE_FRAGMENT);
-			m_descriptorSetLayoutComposition = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
+        {
+            vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+            descriptorSetLayoutCreateInfo
+                .addDescriptorSetLayoutBinding(
+                    positionInputAttachmentBindingIndex,
+                    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    vkcpp::SHADER_STAGE_FRAGMENT)
+                .addDescriptorSetLayoutBinding(
+                    normalInputAttachmentBindingIndex,
+                    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    vkcpp::SHADER_STAGE_FRAGMENT)
+                .addDescriptorSetLayoutBinding(
+                    albedoInputAttachmentBindingIndex,
+                    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    vkcpp::SHADER_STAGE_FRAGMENT)
+                .addDescriptorSetLayoutBinding(
+                    lightPositionsBindingIndex,
+                    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    vkcpp::SHADER_STAGE_FRAGMENT);
+            m_descriptorSetLayoutComposition = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
 
-			// Descriptor Sets
-			m_descriptorSetComposition = vkcpp::DescriptorSet(m_descriptorSetLayoutComposition, m_descriptorPool);
-		}
-        //	Update Descriptor Sets
-		{
-			vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetComposition);
-			descriptorSetUpdater
-				.addImageWriteDescriptor(
-					positionInputAttachmentBindingIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					m_attachments.m_position.m_vkImageView,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_NULL_HANDLE)
-				.addImageWriteDescriptor(
-					normalInputAttachmentBindingIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					m_attachments.m_normal.m_vkImageView,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_NULL_HANDLE)
-				.addImageWriteDescriptor(
-					albedoInputAttachmentBindingIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					m_attachments.m_albedo.m_vkImageView,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_NULL_HANDLE)
-				.addBufferWriteDescriptor(
-					lightPositionsBindingIndex,
-					VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-					m_bufferLights.m_vkDescriptorBufferInfo);
-			descriptorSetUpdater.updateDescriptorSets();
-		}
+            // Descriptor Sets
+            m_descriptorSetComposition = vkcpp::DescriptorSet(m_descriptorSetLayoutComposition, m_descriptorPool);
+
+            //	Update Descriptor Sets
+            vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetComposition);
+            descriptorSetUpdater
+                .addImageWriteDescriptor(
+                    positionInputAttachmentBindingIndex,
+                    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    m_attachments.m_position.m_vkImageView,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_NULL_HANDLE)
+                .addImageWriteDescriptor(
+                    normalInputAttachmentBindingIndex,
+                    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    m_attachments.m_normal.m_vkImageView,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_NULL_HANDLE)
+                .addImageWriteDescriptor(
+                    albedoInputAttachmentBindingIndex,
+                    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    m_attachments.m_albedo.m_vkImageView,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_NULL_HANDLE)
+                .addBufferWriteDescriptor(
+                    lightPositionsBindingIndex,
+                    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    m_bufferLights.m_vkDescriptorBufferInfo);
+            descriptorSetUpdater.updateDescriptorSets();
+        }
         // Pipeline Layout
         {
             vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
@@ -712,61 +760,58 @@ public:
         depthStencilState.depthWriteEnable = VK_FALSE;
         m_pipelineComposition = vkcpp::GraphicsPipeline(pipelineCI);
 
-
         // Descriptor Set layout
-		constexpr int uniformBufferDescriptorIndexG = 0;
-		constexpr int inputAttachmentPositionDescriptorIndex = 1;
-		constexpr int combinedImageDescriptorIndex = 2;
+        constexpr int uniformBufferDescriptorIndexG = 0;
+        constexpr int inputAttachmentPositionDescriptorIndex = 1;
+        constexpr int combinedImageDescriptorIndex = 2;
 
-		{
-			vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
-			descriptorSetLayoutCreateInfo
-				.addDescriptorSetLayoutBinding(
-					uniformBufferDescriptorIndexG,
-					VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-					vkcpp::SHADER_STAGE_VERTEX)
-				.addDescriptorSetLayoutBinding(
-					inputAttachmentPositionDescriptorIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					vkcpp::SHADER_STAGE_FRAGMENT)
-				.addDescriptorSetLayoutBinding(
-					combinedImageDescriptorIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					vkcpp::SHADER_STAGE_FRAGMENT);
+        {
+            vkcpp::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+            descriptorSetLayoutCreateInfo
+                .addDescriptorSetLayoutBinding(
+                    uniformBufferDescriptorIndexG,
+                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    vkcpp::SHADER_STAGE_VERTEX)
+                .addDescriptorSetLayoutBinding(
+                    inputAttachmentPositionDescriptorIndex,
+                    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    vkcpp::SHADER_STAGE_FRAGMENT)
+                .addDescriptorSetLayoutBinding(
+                    combinedImageDescriptorIndex,
+                    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    vkcpp::SHADER_STAGE_FRAGMENT);
 
-			m_descriptorSetLayoutTransparent = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
-		}
+            m_descriptorSetLayoutTransparent = vkcpp::DescriptorSetLayout(descriptorSetLayoutCreateInfo);
 
-        // Descriptor Set
-		m_descriptorSetTransparent = vkcpp::DescriptorSet(m_descriptorSetLayoutTransparent, m_descriptorPool);
+            // Descriptor Set
+            m_descriptorSetTransparent = vkcpp::DescriptorSet(m_descriptorSetLayoutTransparent, m_descriptorPool);
 
-		//	Update Descriptor Set
-		{
-			vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetTransparent);
-			descriptorSetUpdater
-				.addBufferWriteDescriptor(
-					uniformBufferDescriptorIndexG,
-					VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-					m_bufferGBuffer.m_vkDescriptorBufferInfo)
-				.addImageWriteDescriptor(
-					inputAttachmentPositionDescriptorIndex,
-					VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-					m_attachments.m_position.m_vkImageView,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_NULL_HANDLE)
-				.addImageWriteDescriptor(
-					combinedImageDescriptorIndex,
-					VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-					m_textureGlass.m_vkDescriptorImageInfo);
+            //	Update Descriptor Set
+            vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetTransparent);
+            descriptorSetUpdater
+                .addBufferWriteDescriptor(
+                    uniformBufferDescriptorIndexG,
+                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    m_bufferGBuffer.m_vkDescriptorBufferInfo)
+                .addImageWriteDescriptor(
+                    inputAttachmentPositionDescriptorIndex,
+                    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    m_attachments.m_position.m_vkImageView,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_NULL_HANDLE)
+                .addImageWriteDescriptor(
+                    combinedImageDescriptorIndex,
+                    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    m_textureGlass.m_vkDescriptorImageInfo);
+			descriptorSetUpdater.updateDescriptorSets();
+        }
 
-		}
-
-		// Pipeline Layout
-		{
-			vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
-			pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayoutTransparent);
-			m_pipelineLayoutTransparent = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
-		}
+        // Pipeline Layout
+        {
+            vkcpp::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+            pipelineLayoutCreateInfo.addDescriptorSetLayout(m_descriptorSetLayoutTransparent);
+            m_pipelineLayoutTransparent = vkcpp::PipelineLayout(pipelineLayoutCreateInfo);
+        }
 
         // Enable blending
         blendAttachmentState.blendEnable = VK_TRUE;

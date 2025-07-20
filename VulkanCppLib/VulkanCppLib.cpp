@@ -139,7 +139,7 @@ void VulkanContext::init(const VulkanContextCreateInfo& vulkanContextCreateInfo)
 
 void initVulkanContext(const VulkanContextCreateInfo& vulkanContextCreateInfo)
 {
-	s_vulkanContext.init(vulkanContextCreateInfo);
+    s_vulkanContext.init(vulkanContextCreateInfo);
 }
 
 const VulkanInstance& vulkanInstance()
@@ -162,14 +162,14 @@ VkDevice vkDevice()
     return s_vulkanContext.deviceContext();
 }
 
-VkPhysicalDeviceProperties& vkPhysicalDeviceProperties() {
-	return s_vulkanContext.vkPhysicalDeviceProperties();
+VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
+{
+    return s_vulkanContext.vkPhysicalDeviceProperties();
 }
 
-VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures() {
-	return s_vulkanContext.vkPhysicalDeviceFeatures();
+VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
+{
+    return s_vulkanContext.vkPhysicalDeviceFeatures();
 }
-
-
 
 };

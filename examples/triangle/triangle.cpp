@@ -373,7 +373,7 @@ public:
 
         VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
 
-        // Create a m_vkImageView for the depth stencil m_vkImage
+        // Create a vkImageView for the depth stencil m_vkImage
         // Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
         // This allows for multiple views of one m_vkImage with differing ranges (e.g. for different layers)
         VkImageViewCreateInfo vkImageViewCreateInfo {};
@@ -435,7 +435,7 @@ public:
 		constexpr int subpassCount = 1;
         constexpr int subpassNumber = 0;
 
-        vkcpp::RenderPassCreateInfo renderPassCreateInfo(attachmentCount, subpassCount);
+        vkcpp::RenderPassCreateInfo renderPassCreateInfo(subpassCount, attachmentCount);
         renderPassCreateInfo.attachmentDescription(colorAttachmentIndex)
             .setFormat(m_swapChain.colorFormat)
             .setSamples(VK_SAMPLE_COUNT_1_BIT)
