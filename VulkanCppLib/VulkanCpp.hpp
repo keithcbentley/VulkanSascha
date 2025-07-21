@@ -1983,8 +1983,8 @@ public:
 		};
 
 		m_inputAttachmentReferences.emplace_back(vkAttachmentReference);
-		m_vkSubpassDescription.inputAttachmentCount = static_cast<uint32_t>(m_colorAttachmentReferences.size());
-		m_vkSubpassDescription.pInputAttachments = m_colorAttachmentReferences.data();
+		m_vkSubpassDescription.inputAttachmentCount = static_cast<uint32_t>(m_inputAttachmentReferences.size());
+		m_vkSubpassDescription.pInputAttachments = m_inputAttachmentReferences.data();
 		return *this;
 	}
 

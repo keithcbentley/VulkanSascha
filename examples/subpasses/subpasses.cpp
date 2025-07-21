@@ -300,71 +300,15 @@ public:
         renderPassCreateInfo.attachmentDescription(depthAttachmentIndex)
             = vkcpp::AttachmentDescription::simpleDepth(m_vkFormatDepth);
 
-        std::array<VkAttachmentDescription, attachmentCount> attachments {};
-        // Color attachment
-        attachments[colorPresentAttachmentIndex].format = m_swapChain.colorFormat;
-        attachments[colorPresentAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[colorPresentAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[colorPresentAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachments[colorPresentAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[colorPresentAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[colorPresentAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[colorPresentAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-        // Deferred attachments
-        // Position
-        attachments[positionAttachmentIndex].format = m_attachments.m_position.m_vkFormat;
-        attachments[positionAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[positionAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[positionAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[positionAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[positionAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[positionAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[positionAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        // Normals
-        attachments[normalAttachmentIndex].format = m_attachments.m_normal.m_vkFormat;
-        attachments[normalAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[normalAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[normalAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[normalAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[normalAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[normalAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[normalAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        // Albedo
-        attachments[albedoAttachmentIndex].format = m_attachments.m_albedo.m_vkFormat;
-        attachments[albedoAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[albedoAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[albedoAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[albedoAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[albedoAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[albedoAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[albedoAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        // Depth attachment
-        attachments[depthAttachmentIndex].format = m_vkFormatDepth;
-        attachments[depthAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[depthAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[depthAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[depthAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[depthAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[depthAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[depthAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
         constexpr VkAttachmentReference colorPresentAttachmentReference
             = { colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
         constexpr VkAttachmentReference depthAttachmentReference
             = { depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
-        // Three subpasses
-        std::array<VkSubpassDescription, subpassCount> subpassDescriptions {};
 
         // First subpass: Fill G-Buffer components
         // ----------------------------------------------------------------------------------------
 
-        VkAttachmentReference colorReferences[4];
-        colorReferences[0] = { colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-        colorReferences[1] = { positionAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-        colorReferences[2] = { normalAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-        colorReferences[3] = { albedoAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
         renderPassCreateInfo.subpassDescription(subpassFillG)
             .addColorAttachmentReference(colorPresentAttachmentReference)
@@ -373,18 +317,9 @@ public:
             .addColorAttachmentReference(normalAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
             .addColorAttachmentReference(albedoAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-        subpassDescriptions[subpassFillG].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpassDescriptions[subpassFillG].colorAttachmentCount = 4;
-        subpassDescriptions[subpassFillG].pColorAttachments = colorReferences;
-        subpassDescriptions[subpassFillG].pDepthStencilAttachment = &depthAttachmentReference;
 
         // Second subpass: Final composition (using G-Buffer components)
         // ----------------------------------------------------------------------------------------
-
-        VkAttachmentReference inputReferences[3];
-        inputReferences[0] = { positionAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
-        inputReferences[1] = { normalAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
-        inputReferences[2] = { albedoAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 
         //	Note that the "extra" attachments now become input attachments.
         renderPassCreateInfo.subpassDescription(subpassFinalComposition)
@@ -394,31 +329,14 @@ public:
             .addInputAttachmentReference(normalAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
             .addInputAttachmentReference(albedoAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-        subpassDescriptions[subpassFinalComposition].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpassDescriptions[subpassFinalComposition].colorAttachmentCount = 1;
-        subpassDescriptions[subpassFinalComposition].pColorAttachments = &colorPresentAttachmentReference;
-        subpassDescriptions[subpassFinalComposition].pDepthStencilAttachment = &depthAttachmentReference;
-        // Use the color attachments filled in the first pass as input attachments
-        subpassDescriptions[subpassFinalComposition].inputAttachmentCount = 3;
-        subpassDescriptions[subpassFinalComposition].pInputAttachments = inputReferences;
-
         // Third subpass: Forward transparency
         // ----------------------------------------------------------------------------------------
 
-        inputReferences[0] = { positionAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 
         renderPassCreateInfo.subpassDescription(subpassForwardTransparency)
             .addColorAttachmentReference(colorPresentAttachmentReference)
             .setDepthStencilAttachmentReference(depthAttachmentReference)
             .addInputAttachmentReference(positionAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        subpassDescriptions[subpassForwardTransparency].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpassDescriptions[subpassForwardTransparency].colorAttachmentCount = 1;
-        subpassDescriptions[subpassForwardTransparency].pColorAttachments = &colorPresentAttachmentReference;
-        subpassDescriptions[subpassForwardTransparency].pDepthStencilAttachment = &depthAttachmentReference;
-        // Use the color/depth attachments filled in the first pass as input attachments
-        subpassDescriptions[subpassForwardTransparency].inputAttachmentCount = 1;
-        subpassDescriptions[subpassForwardTransparency].pInputAttachments = inputReferences;
 
         // Subpass dependencies for layout transitions
         std::array<VkSubpassDependency, 5> dependencies;
@@ -465,22 +383,13 @@ public:
         dependencies[4].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
         dependencies[4].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-        VkRenderPassCreateInfo renderPassInfo = {};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        renderPassInfo.pAttachments = attachments.data();
-        renderPassInfo.subpassCount = static_cast<uint32_t>(subpassDescriptions.size());
-        renderPassInfo.pSubpasses = subpassDescriptions.data();
-        renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
-        renderPassInfo.pDependencies = dependencies.data();
-
         renderPassCreateInfo.addSubpassDependency(dependencies[0]);
         renderPassCreateInfo.addSubpassDependency(dependencies[1]);
         renderPassCreateInfo.addSubpassDependency(dependencies[2]);
         renderPassCreateInfo.addSubpassDependency(dependencies[3]);
         renderPassCreateInfo.addSubpassDependency(dependencies[4]);
 
-        m_renderPassOriginal = vkcpp::RenderPass(renderPassInfo);
+        m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo);
     }
 
     void buildCommandBuffers() override
@@ -527,12 +436,12 @@ public:
             // This subpass will use the G-Buffer components that have been filled in the first subpass as input attachment for the final compositing
             {
                 vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 1: Deferred composition", { 0.0f, 0.5f, 1.0f, 1.0f });
-				commandBuffer
-					.cmdNextSubpass()
-					.cmdBindPipeline(m_pipelineComposition)
-					.cmdBindDescriptorSet(m_descriptorSetComposition, m_pipelineLayoutComposition);
+                commandBuffer
+                    .cmdNextSubpass()
+                    .cmdBindPipeline(m_pipelineComposition)
+                    .cmdBindDescriptorSet(m_descriptorSetComposition, m_pipelineLayoutComposition);
 
-					commandBuffer.cmdDraw(3, 1); //	TODO: magic numbers	vertexCount, indexCount
+                commandBuffer.cmdDraw(3, 1); //	TODO: magic numbers	vertexCount, indexCount
                 vks::debugutils::cmdEndLabel(commandBuffer);
             }
 
@@ -803,7 +712,7 @@ public:
                     combinedImageDescriptorIndex,
                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                     m_textureGlass.m_vkDescriptorImageInfo);
-			descriptorSetUpdater.updateDescriptorSets();
+            descriptorSetUpdater.updateDescriptorSets();
         }
 
         // Pipeline Layout
