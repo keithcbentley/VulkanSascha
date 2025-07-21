@@ -14,7 +14,6 @@
 
 vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
-
 // Vertex layout for this example
 struct Vertex {
     float pos[3];
@@ -47,10 +46,10 @@ public:
         glm::vec4 viewPos;
         // This is used to change the bias for the level-of-detail (mips) in the fragment shader
         float lodBias = 0.0f;
-    } uniformData;
-    vks::Buffer uniformBuffer;
+    } m_uniformData;
+    vks::Buffer m_uniformBuffer;
 
-    VkPipeline m_vkPipeline { VK_NULL_HANDLE };
+    vkcpp::GraphicsPipeline m_pipeline;
     vkcpp::PipelineLayout m_pipelineLayout;
     vkcpp::DescriptorSet m_descriptorSet;
     vkcpp::DescriptorSetLayout m_descriptorSetLayout;
@@ -68,20 +67,11 @@ public:
     ~VulkanExample()
     {
         if (m_device) {
-            vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
+            //            vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
             vertexBuffer.destroy();
             indexBuffer.destroy();
-            uniformBuffer.destroy();
+            m_uniformBuffer.destroy();
         }
-    }
-
-    // Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
-    virtual void getEnabledFeatures()
-    {
-        // Enable anisotropic filtering if supported
-        //if (m_physicalDeviceFeatures.m_features2.features.samplerAnisotropy) {
-        //    m_vkPhysicalDeviceFeatures10.samplerAnisotropy = VK_TRUE;
-        //};
     }
 
     /*
@@ -137,16 +127,16 @@ public:
             useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
         }
 
-//		useStaging = false;
+        //		useStaging = false;
         if (useStaging) {
 
-			vkcpp::Buffer_DeviceMemory stagingBufferAndMemory
-				= vkcpp::Buffer_DeviceMemory::withCopy(
-					VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-					ktxTextureSize,
-					0, //	Queue family index.  Does this matter?
-					vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-					ktxTextureData);
+            vkcpp::Buffer_DeviceMemory stagingBufferAndMemory
+                = vkcpp::Buffer_DeviceMemory::withCopy(
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    ktxTextureSize,
+                    0, //	Queue family index.  Does this matter?
+                    vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+                    ktxTextureData);
             stagingBufferAndMemory.unmapMemory();
 
             //	Setup buffer copy regions for each mip level.
@@ -276,7 +266,7 @@ public:
                 vkMemoryRequirementsImage, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
             mappableImage.bindImageMemory(mappableMemory);
-			mappableMemory.mapCopyUnmap(ktxTextureData, vkMemoryRequirementsImage.size);
+            mappableMemory.mapCopyUnmap(ktxTextureData, vkMemoryRequirementsImage.size);
 
             // Linear tiled images don't need to be staged and can be directly used as textures
             m_texture.m_image = std::move(mappableImage);
@@ -337,7 +327,7 @@ public:
         vkSamplerCreateInfo.maxLod = (useStaging) ? (float)m_texture.m_mipLevels : 0.0f;
         // Enable anisotropic filtering
         // This feature is optional, so we must check if it's supported on the m_vkDevice
-        if ( vkcpp::vkPhysicalDeviceFeatures().samplerAnisotropy) {
+        if (vkcpp::vkPhysicalDeviceFeatures().samplerAnisotropy) {
             // Use max. level of anisotropy for this example
             vkSamplerCreateInfo.maxAnisotropy = vkcpp::vkPhysicalDeviceProperties().limits.maxSamplerAnisotropy;
             vkSamplerCreateInfo.anisotropyEnable = VK_TRUE;
@@ -396,18 +386,20 @@ public:
             // Set target frame buffer
             renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-            commandBuffer.begin(cmdBufInfo);
-            commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
-            commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
-            commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
-            commandBuffer.cmdBindPipeline(m_vkPipeline);
-            commandBuffer.cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout);
-            commandBuffer.cmdBindVertexBuffer(vertexBuffer.m_vkBuffer);
-            commandBuffer.cmdBindIndexBuffer(indexBuffer.m_vkBuffer, VK_INDEX_TYPE_UINT32);
-            commandBuffer.cmdDrawIndexed(m_indexCount);
+            commandBuffer
+				.begin(cmdBufInfo)
+				.cmdBeginRenderPass(renderPassBeginInfo)
+				.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
+				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
+				.cmdBindPipeline(m_pipeline)
+				.cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout)
+				.cmdBindVertexBuffer(vertexBuffer.m_vkBuffer)
+				.cmdBindIndexBuffer(indexBuffer.m_vkBuffer, VK_INDEX_TYPE_UINT32)
+				.cmdDrawIndexed(m_indexCount);
             drawUI(commandBuffer);
-            commandBuffer.cmdEndRenderPass();
-            commandBuffer.end();
+            commandBuffer
+				.cmdEndRenderPass()
+				.end();
         }
     }
 
@@ -485,7 +477,7 @@ public:
         descriptorSetUpdater.addBufferWriteDescriptor(
             uniformBufferIndex,
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            uniformBuffer.m_vkDescriptorBufferInfo);
+            m_uniformBuffer.m_vkDescriptorBufferInfo);
 
         descriptorSetUpdater.addImageWriteDescriptor(
             combinedImageSamplerIndex,
@@ -545,23 +537,26 @@ public:
         pipelineCreateInfo.pDynamicState = &dynamicState;
         pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
         pipelineCreateInfo.pStages = shaderStages.data();
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &m_vkPipeline));
+        m_pipeline = vkcpp::GraphicsPipeline(pipelineCreateInfo);
     }
 
     // Prepare and initialize uniform buffer containing shader uniforms
     void prepareUniformBuffers()
     {
         // Vertex shader uniform buffer block
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(uniformData), &uniformData));
-        VK_CHECK_RESULT(uniformBuffer.map());
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &m_uniformBuffer, sizeof(m_uniformData), &m_uniformData));
+        VK_CHECK_RESULT(m_uniformBuffer.map());
     }
 
     void updateUniformBuffers()
     {
-        uniformData.projection = camera.matrices.perspective;
-        uniformData.modelView = camera.matrices.view;
-        uniformData.viewPos = camera.viewPos;
-        memcpy(uniformBuffer.m_pMapped, &uniformData, sizeof(uniformData));
+        m_uniformData.projection = camera.matrices.perspective;
+        m_uniformData.modelView = camera.matrices.view;
+        m_uniformData.viewPos = camera.viewPos;
+        memcpy(m_uniformBuffer.m_pMapped, &m_uniformData, sizeof(m_uniformData));
     }
 
     void prepare()
@@ -580,8 +575,8 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+        VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
         VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
     }
@@ -597,7 +592,7 @@ public:
     virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay)
     {
         if (overlay->header("Settings")) {
-            if (overlay->sliderFloat("LOD bias", &uniformData.lodBias, 0.0f, (float)m_texture.m_mipLevels)) {
+            if (overlay->sliderFloat("LOD bias", &m_uniformData.lodBias, 0.0f, (float)m_texture.m_mipLevels)) {
                 updateUniformBuffers();
             }
         }
