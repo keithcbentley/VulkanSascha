@@ -285,6 +285,7 @@ public:
 
         vkcpp::RenderPassCreateInfo renderPassCreateInfo(subpassCount, attachmentCount);
 
+        //	Attach attachments.
         renderPassCreateInfo.attachmentDescription(colorPresentAttachmentIndex)
             = vkcpp::AttachmentDescription::simpleColorPresent(m_swapChain.colorFormat);
 
@@ -305,11 +306,8 @@ public:
         constexpr VkAttachmentReference depthAttachmentReference
             = { depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
-
         // First subpass: Fill G-Buffer components
         // ----------------------------------------------------------------------------------------
-
-
         renderPassCreateInfo.subpassDescription(subpassFillG)
             .addColorAttachmentReference(colorPresentAttachmentReference)
             .setDepthStencilAttachmentReference(depthAttachmentReference)
@@ -317,10 +315,8 @@ public:
             .addColorAttachmentReference(normalAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
             .addColorAttachmentReference(albedoAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-
         // Second subpass: Final composition (using G-Buffer components)
         // ----------------------------------------------------------------------------------------
-
         //	Note that the "extra" attachments now become input attachments.
         renderPassCreateInfo.subpassDescription(subpassFinalComposition)
             .addColorAttachmentReference(colorPresentAttachmentReference)
@@ -331,63 +327,40 @@ public:
 
         // Third subpass: Forward transparency
         // ----------------------------------------------------------------------------------------
-
-
         renderPassCreateInfo.subpassDescription(subpassForwardTransparency)
             .addColorAttachmentReference(colorPresentAttachmentReference)
+            .setDepthStencilAttachmentReference(depthAttachmentReference)
             .setDepthStencilAttachmentReference(depthAttachmentReference)
             .addInputAttachmentReference(positionAttachmentIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         // Subpass dependencies for layout transitions
-        std::array<VkSubpassDependency, 5> dependencies;
+        auto fragmentTests
+            = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 
-        // This makes sure that writes to the depth m_vkImage are done before we try to write to it again
-        dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependencies[0].dstSubpass = 0;
-        dependencies[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dependencies[0].srcAccessMask = 0;
-        dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        dependencies[0].dependencyFlags = 0;
+        renderPassCreateInfo.addSubpassDependency(VK_SUBPASS_EXTERNAL, subpassFillG)
+            .setSrc(fragmentTests, 0)
+            .setDst(fragmentTests, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
-        dependencies[1].srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependencies[1].dstSubpass = 0;
-        dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependencies[1].srcAccessMask = 0;
-        dependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        dependencies[1].dependencyFlags = 0;
+        renderPassCreateInfo.addSubpassDependency(VK_SUBPASS_EXTERNAL, subpassFillG)
+            .setSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0)
+            .setDst(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-        // This dependency transitions the input attachment from color attachment to input attachment read
-        dependencies[2].srcSubpass = 0;
-        dependencies[2].dstSubpass = 1;
-        dependencies[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependencies[2].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        dependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        dependencies[2].dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-        dependencies[2].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+        renderPassCreateInfo.addSubpassDependency(subpassFillG, subpassFinalComposition)
+            .setSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+            .setDst(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_INPUT_ATTACHMENT_READ_BIT)
+            .setDependencyFlags(VK_DEPENDENCY_BY_REGION_BIT);
 
-        dependencies[3].srcSubpass = 1;
-        dependencies[3].dstSubpass = 2;
-        dependencies[3].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependencies[3].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        dependencies[3].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        dependencies[3].dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-        dependencies[3].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+        renderPassCreateInfo.addSubpassDependency(subpassFinalComposition, subpassForwardTransparency)
+            .setSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+            .setDst(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_INPUT_ATTACHMENT_READ_BIT)
+            .setDependencyFlags(VK_DEPENDENCY_BY_REGION_BIT);
 
-        dependencies[4].srcSubpass = 2;
-        dependencies[4].dstSubpass = VK_SUBPASS_EXTERNAL;
-        dependencies[4].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependencies[4].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-        dependencies[4].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        dependencies[4].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-        dependencies[4].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-        renderPassCreateInfo.addSubpassDependency(dependencies[0]);
-        renderPassCreateInfo.addSubpassDependency(dependencies[1]);
-        renderPassCreateInfo.addSubpassDependency(dependencies[2]);
-        renderPassCreateInfo.addSubpassDependency(dependencies[3]);
-        renderPassCreateInfo.addSubpassDependency(dependencies[4]);
+        renderPassCreateInfo.addSubpassDependency(subpassForwardTransparency, VK_SUBPASS_EXTERNAL)
+            .setSrc(
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+            .setDst(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_MEMORY_READ_BIT)
+            .setDependencyFlags(VK_DEPENDENCY_BY_REGION_BIT);
 
         m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo);
     }

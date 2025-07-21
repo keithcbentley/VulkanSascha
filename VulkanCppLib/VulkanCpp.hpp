@@ -1974,20 +1974,20 @@ public:
         return *this;
     }
 
-	SubpassDescription& addInputAttachmentReference(
-		uint32_t attachmentIndexArg,
-		VkImageLayout vkImageLayoutArg) {
-		VkAttachmentReference vkAttachmentReference{
-			.attachment = attachmentIndexArg,
-			.layout = vkImageLayoutArg
-		};
+    SubpassDescription& addInputAttachmentReference(
+        uint32_t attachmentIndexArg,
+        VkImageLayout vkImageLayoutArg)
+    {
+        VkAttachmentReference vkAttachmentReference {
+            .attachment = attachmentIndexArg,
+            .layout = vkImageLayoutArg
+        };
 
-		m_inputAttachmentReferences.emplace_back(vkAttachmentReference);
-		m_vkSubpassDescription.inputAttachmentCount = static_cast<uint32_t>(m_inputAttachmentReferences.size());
-		m_vkSubpassDescription.pInputAttachments = m_inputAttachmentReferences.data();
-		return *this;
-	}
-
+        m_inputAttachmentReferences.emplace_back(vkAttachmentReference);
+        m_vkSubpassDescription.inputAttachmentCount = static_cast<uint32_t>(m_inputAttachmentReferences.size());
+        m_vkSubpassDescription.pInputAttachments = m_inputAttachmentReferences.data();
+        return *this;
+    }
 
     SubpassDescription& addColorAttachmentReference(const VkAttachmentReference& vkAttachmentReference)
     {
@@ -2023,11 +2023,11 @@ public:
         uint32_t attachmentIndexArg,
         VkImageLayout vkImageLayoutArg)
     {
-		VkAttachmentReference vkAttachmentReference{
-			.attachment = attachmentIndexArg,
-			.layout = vkImageLayoutArg
-		};
-		//	TODO: error check for multiple calls. Only one depth/stencil allowed.
+        VkAttachmentReference vkAttachmentReference {
+            .attachment = attachmentIndexArg,
+            .layout = vkImageLayoutArg
+        };
+        //	TODO: error check for multiple calls. Only one depth/stencil allowed.
         m_depthStencilAttachmentReferences.emplace_back(vkAttachmentReference);
         m_vkSubpassDescription.pDepthStencilAttachment = m_depthStencilAttachmentReferences.data();
         return *this;
@@ -2058,7 +2058,7 @@ public:
     {
     }
 
-    SubpassDependency& setDependency(
+    SubpassDependency& setSubpassDependency(
         uint32_t srcSubpassArg,
         uint32_t dstSubpassArg)
     {
@@ -2102,6 +2102,13 @@ public:
         dstAccessMask |= dstAccessMaskArg;
         return *this;
     }
+
+    SubpassDependency& setDependencyFlags(
+        VkDependencyFlags dependencyFlagsArg)
+    {
+        dependencyFlags = dependencyFlagsArg;
+        return *this;
+    }
 };
 //	We use arrays of SubpassDependency to be arrays of VkSubpassDependency
 //	in RenderPassCreateInfo, so they need to be the same size.
@@ -2131,13 +2138,12 @@ class RenderPassCreateInfo {
     std::vector<SubpassDependency> m_subpassDependencies;
 
 public:
+    ~RenderPassCreateInfo() = default;
 
-	~RenderPassCreateInfo() = default;
-
-	RenderPassCreateInfo(const RenderPassCreateInfo&) = delete;
-	RenderPassCreateInfo& operator=(const RenderPassCreateInfo&) = delete;
-	RenderPassCreateInfo(RenderPassCreateInfo&&) noexcept = delete;
-	RenderPassCreateInfo& operator=(RenderPassCreateInfo&&) noexcept = delete;
+    RenderPassCreateInfo(const RenderPassCreateInfo&) = delete;
+    RenderPassCreateInfo& operator=(const RenderPassCreateInfo&) = delete;
+    RenderPassCreateInfo(RenderPassCreateInfo&&) noexcept = delete;
+    RenderPassCreateInfo& operator=(RenderPassCreateInfo&&) noexcept = delete;
 
     RenderPassCreateInfo(int subpassCountArg, int attachmentCountArg)
     {
@@ -2149,7 +2155,6 @@ public:
         m_vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(m_attachmentDescriptions.size());
         m_vkRenderPassCreateInfo.pAttachments = m_attachmentDescriptions.data();
     }
-
 
     const VkRenderPassCreateInfo* operator&() = delete;
 
@@ -2171,9 +2176,9 @@ public:
         return subpassDescription;
     }
 
-	//	Useful for migrating existing code.  This is a shallow copy
-	//	so the RenderPassCreateInfo is only valid as long as the original
-	//	VkSubpassDependency is valid.
+    //	Useful for migrating existing code.  This is a shallow copy
+    //	so the RenderPassCreateInfo is only valid as long as the original
+    //	VkSubpassDependency is valid.
     void addSubpassDependency(const VkSubpassDependency& vkSubpassDependency)
     {
         m_subpassDependencies.emplace_back(vkSubpassDependency);
@@ -2181,11 +2186,10 @@ public:
         m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
     }
 
-
-	//	Note that this returns a reference to the newly created
-	//	subpass dependency, not the RenderPassCreateInfo.  This
-	//	allows adding the dependency and then adding the rest of
-	//	the dependency data.
+    //	Note that this returns a reference to the newly created
+    //	subpass dependency, not the RenderPassCreateInfo.  This
+    //	allows adding the dependency and then adding the rest of
+    //	the dependency data.
     SubpassDependency& addSubpassDependency(
         uint32_t srcSubpassArg,
         uint32_t dstSubpassArg)
@@ -2193,7 +2197,7 @@ public:
         SubpassDependency& subpassDependency = m_subpassDependencies.emplace_back();
         m_vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(m_subpassDependencies.size());
         m_vkRenderPassCreateInfo.pDependencies = m_subpassDependencies.data();
-        subpassDependency.setDependency(srcSubpassArg, dstSubpassArg);
+        subpassDependency.setSubpassDependency(srcSubpassArg, dstSubpassArg);
         return subpassDependency;
     }
 
@@ -3020,7 +3024,6 @@ public:
         return *this;
     }
 
-	
     const CommandBuffer& cmdDraw(uint32_t vertexCount, uint32_t indexCount) const
     {
         vkCmdDraw(*this, vertexCount, indexCount, 0, 0);
@@ -3599,8 +3602,8 @@ class DescriptorSetUpdater {
     //	Use vector for each type of info, and then set pointer
     //	after saving info.  Does it matter?
 
-	//	TODO: add a check to see if the destructor is called without
-	//	a call to 
+    //	TODO: add a check to see if the destructor is called without
+    //	a call to
 
     //	Union to hold each type of info that can be updated/written.
     union WriteDescriptorInfo {
@@ -3630,15 +3633,16 @@ class DescriptorSetUpdater {
 
     VkDescriptorSet m_preboundDescriptorSet = VK_NULL_HANDLE;
 
-	bool	m_updateCalled = false;
+    bool m_updateCalled = false;
 
 public:
     DescriptorSetUpdater() = default;
-	~DescriptorSetUpdater() noexcept(false) {
-		if (!m_updateCalled) {
-			throw Exception("DescriptorSetUpdater destroyed before calling update.");
-		}
-	}
+    ~DescriptorSetUpdater() noexcept(false)
+    {
+        if (!m_updateCalled) {
+            throw Exception("DescriptorSetUpdater destroyed before calling update.");
+        }
+    }
     DescriptorSetUpdater(const DescriptorSetUpdater&) = delete;
     DescriptorSetUpdater& operator=(const DescriptorSetUpdater&) = delete;
     DescriptorSetUpdater(DescriptorSetUpdater&&) noexcept = delete;
@@ -3786,7 +3790,7 @@ public:
             static_cast<uint32_t>(m_vkWriteDescriptorSets.size()),
             m_vkWriteDescriptorSets.data(),
             0, nullptr);
-		m_updateCalled = true;
+        m_updateCalled = true;
         //	TODO: should the update info be cleared after this?
         //	is it ever reused?
     }
