@@ -330,30 +330,28 @@ public:
         renderPassBeginInfo.pClearValues = clearValues;
 
         for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
-            renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-            VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
+			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
 
-            vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-            VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-            vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
-
-            VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
-            vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
+			commandBuffer
+				.begin(cmdBufInfo)
+				.cmdBeginRenderPass(renderPassBeginInfo)
+				.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
+				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
 
             /*
                     First sub pass
                     Fills the attachments
             */
             {
-                vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 0: Writing attachments", { 1.0f, 0.78f, 0.05f, 1.0f });
-
-                vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.attachmentWrite);
-                vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.attachmentWrite, 0, 1, &descriptorSets.attachmentWrite, 0, NULL);
-                scene.draw(m_drawCommandBuffers[i]);
-
-                vks::debugutils::cmdEndLabel(m_drawCommandBuffers[i]);
+                vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 0: Writing attachments", { 1.0f, 0.78f, 0.05f, 1.0f });
+				commandBuffer
+					.cmdBindPipeline(pipelines.attachmentWrite)
+					.cmdBindDescriptorSet(descriptorSets.attachmentWrite, pipelineLayouts.attachmentWrite);
+                scene.draw(commandBuffer);
+                vks::debugutils::cmdEndLabel(commandBuffer);
             }
 
             /*
@@ -361,22 +359,20 @@ public:
                     Render a full screen quad, reading from the previously written attachments via input attachments
             */
             {
-                vks::debugutils::cmdBeginLabel(m_drawCommandBuffers[i], "Subpass 1: Reading attachments", { 0.0f, 0.5f, 1.0f, 1.0f });
-
-                vkCmdNextSubpass(m_drawCommandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
-
-                vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.attachmentRead);
-                vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.attachmentRead, 0, 1, &descriptorSets.attachmentRead[i], 0, NULL);
-                vkCmdDraw(m_drawCommandBuffers[i], 3, 1, 0, 0);
-
-                vks::debugutils::cmdEndLabel(m_drawCommandBuffers[i]);
+                vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 1: Reading attachments", { 0.0f, 0.5f, 1.0f, 1.0f });
+				commandBuffer.cmdNextSubpass();
+				commandBuffer
+					.cmdBindPipeline(pipelines.attachmentRead)
+					.cmdBindDescriptorSet(descriptorSets.attachmentRead[i], pipelineLayouts.attachmentRead);
+                commandBuffer.cmdDraw(3, 1);
+                vks::debugutils::cmdEndLabel(commandBuffer);
             }
 
-            drawUI(m_drawCommandBuffers[i]);
+            drawUI(commandBuffer);
 
-            vkCmdEndRenderPass(m_drawCommandBuffers[i]);
-
-            VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
+            commandBuffer
+				.cmdEndRenderPass()
+				.end();
         }
     }
 
