@@ -331,15 +331,15 @@ public:
 
         for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
 
-			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
+            vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
 
-			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
+            renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-			commandBuffer
-				.begin(cmdBufInfo)
-				.cmdBeginRenderPass(renderPassBeginInfo)
-				.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
-				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
+            commandBuffer
+                .begin(cmdBufInfo)
+                .cmdBeginRenderPass(renderPassBeginInfo)
+                .cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
+                .cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
 
             /*
                     First sub pass
@@ -347,9 +347,9 @@ public:
             */
             {
                 vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 0: Writing attachments", { 1.0f, 0.78f, 0.05f, 1.0f });
-				commandBuffer
-					.cmdBindPipeline(pipelines.attachmentWrite)
-					.cmdBindDescriptorSet(descriptorSets.attachmentWrite, pipelineLayouts.attachmentWrite);
+                commandBuffer
+                    .cmdBindPipeline(pipelines.attachmentWrite)
+                    .cmdBindDescriptorSet(descriptorSets.attachmentWrite, pipelineLayouts.attachmentWrite);
                 scene.draw(commandBuffer);
                 vks::debugutils::cmdEndLabel(commandBuffer);
             }
@@ -360,10 +360,10 @@ public:
             */
             {
                 vks::debugutils::cmdBeginLabel(commandBuffer, "Subpass 1: Reading attachments", { 0.0f, 0.5f, 1.0f, 1.0f });
-				commandBuffer.cmdNextSubpass();
-				commandBuffer
-					.cmdBindPipeline(pipelines.attachmentRead)
-					.cmdBindDescriptorSet(descriptorSets.attachmentRead[i], pipelineLayouts.attachmentRead);
+                commandBuffer.cmdNextSubpass();
+                commandBuffer
+                    .cmdBindPipeline(pipelines.attachmentRead)
+                    .cmdBindDescriptorSet(descriptorSets.attachmentRead[i], pipelineLayouts.attachmentRead);
                 commandBuffer.cmdDraw(3, 1);
                 vks::debugutils::cmdEndLabel(commandBuffer);
             }
@@ -371,8 +371,8 @@ public:
             drawUI(commandBuffer);
 
             commandBuffer
-				.cmdEndRenderPass()
-				.end();
+                .cmdEndRenderPass()
+                .end();
         }
     }
 
@@ -384,20 +384,28 @@ public:
 
     void updateAttachmentReadDescriptors(uint32_t index)
     {
-        // Image descriptors for the input attachments read by the shader
-        std::vector<VkDescriptorImageInfo> descriptors = {
-            vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, attachments[index].color.m_imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-            vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, attachments[index].depth.m_imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        };
-        std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-            // Binding 0: Color input attachment
-            vks::initializers::writeDescriptorSet(descriptorSets.attachmentRead[index], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 0, &descriptors[0]),
-            // Binding 1: Depth input attachment
-            vks::initializers::writeDescriptorSet(descriptorSets.attachmentRead[index], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &descriptors[1]),
-            // Binding 2: Display parameters uniform buffer
-            vks::initializers::writeDescriptorSet(descriptorSets.attachmentRead[index], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers.params.m_vkDescriptorBufferInfo),
-        };
-        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+
+        constexpr int colorAttachmentIndex = 0;
+        constexpr int depthAttachmentIndex = 1;
+        constexpr int displayParametersUniformBufferIndex = 2;
+
+        vkcpp::DescriptorSetUpdater descriptorSetUpdater(descriptorSets.attachmentRead[index]);
+
+        descriptorSetUpdater.addImageWriteDescriptor(
+            colorAttachmentIndex,
+            VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+            attachments[index].color.m_imageView,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptorSetUpdater.addImageWriteDescriptor(
+            depthAttachmentIndex,
+            VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+            attachments[index].depth.m_imageView,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        descriptorSetUpdater.addBufferWriteDescriptor(
+            displayParametersUniformBufferIndex,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            uniformBuffers.params.m_vkDescriptorBufferInfo);
+        descriptorSetUpdater.updateDescriptorSets();
     }
 
     void setupDescriptors()
@@ -542,8 +550,8 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+        VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
         VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
     }

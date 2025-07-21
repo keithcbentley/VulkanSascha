@@ -2806,8 +2806,8 @@ public:
         }
         return *this;
     }
-	
-	CommandBuffer& begin()
+
+    CommandBuffer& begin()
     {
         VkCommandBufferBeginInfo vkCommandBufferBeginInfo {};
         vkCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -3737,6 +3737,15 @@ public:
         m_writeDescriptorInfos.emplace_back(vkDescriptorImageInfo);
         return *this;
     }
+
+	DescriptorSetUpdater& addImageWriteDescriptor(
+		uint32_t bindingIndex,
+		VkDescriptorType vkDescriptorType,
+		VkImageView vkImageViewArg,
+		VkImageLayout vkImageLayout) {
+		return addImageWriteDescriptor(
+			bindingIndex, vkDescriptorType, vkImageViewArg, vkImageLayout, VK_NULL_HANDLE);
+	}
 
     DescriptorSetUpdater& addImageWriteDescriptor(
         uint32_t bindingIndex,
