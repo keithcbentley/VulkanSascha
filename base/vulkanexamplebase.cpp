@@ -13,18 +13,18 @@ std::vector<const char*> VulkanExampleBase::args;
 void VulkanExampleBase::renderFrame()
 {
     VulkanExampleBase::prepareFrame();
-	//	TODO: use smarter submit info.
+    //	TODO: use smarter submit info.
     m_vkSubmitInfo.commandBufferCount = 1;
-	VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-	m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
-	m_queue.submit(m_vkSubmitInfo, VK_NULL_HANDLE);
+    VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+    m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+    m_queue.submit(m_vkSubmitInfo, VK_NULL_HANDLE);
     VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
     VulkanExampleBase::submitFrame();
 }
 
 std::string VulkanExampleBase::getWindowTitle() const
 {
-	std::string windowTitle{title + " - " + vkcpp::vkPhysicalDeviceProperties().deviceName};
+    std::string windowTitle { title + " - " + vkcpp::vkPhysicalDeviceProperties().deviceName };
     if (!m_exampleSettings.m_showUIOverlay) {
         windowTitle += " - " + std::to_string(m_frameCounter) + " fps";
     }
@@ -34,23 +34,22 @@ std::string VulkanExampleBase::getWindowTitle() const
 void VulkanExampleBase::createCommandBuffers()
 {
     // Create one command buffer for each swap chain m_vkImage
-	//	TODO: need a better way to communicate the number of swapchain images being used.
-	//	This is kind of dicey since it requires that the swapchain already be created.
-	//	This creates an arbitrary dependency on initialization order.
-	m_drawCommandBuffers.clear();
-	for (uint32_t i = 0; i < m_swapChain.images.size(); i++) {
-		m_drawCommandBuffers.emplace_back(vkcpp::CommandBuffer(m_commandPool));
-	}
-
+    //	TODO: need a better way to communicate the number of swapchain images being used.
+    //	This is kind of dicey since it requires that the swapchain already be created.
+    //	This creates an arbitrary dependency on initialization order.
+    m_drawCommandBuffers.clear();
+    for (uint32_t i = 0; i < m_swapChain.images.size(); i++) {
+        m_drawCommandBuffers.emplace_back(vkcpp::CommandBuffer(m_commandPool));
+    }
 }
 
 void VulkanExampleBase::destroyCommandBuffers()
 {
-    //vkFreeCommandBuffers(
-    //    m_device,
-    //    m_commandPool,
-    //    static_cast<uint32_t>(drawCmdBuffers.size()),
-    //    drawCmdBuffers.data());
+    // vkFreeCommandBuffers(
+    //     m_device,
+    //     m_commandPool,
+    //     static_cast<uint32_t>(drawCmdBuffers.size()),
+    //     drawCmdBuffers.data());
 }
 
 std::string VulkanExampleBase::getShadersPath() const
@@ -401,7 +400,7 @@ VulkanExampleBase::~VulkanExampleBase()
 
     vkDestroyPipelineCache(m_device, m_vkPipelineCache, nullptr);
 
-//    vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
+    //    vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
 
     vkDestroySemaphore(m_device, semaphores.m_vkSemaphorePresentComplete, nullptr);
     vkDestroySemaphore(m_device, semaphores.m_vkSemaphoreRenderComplete, nullptr);
@@ -446,8 +445,8 @@ bool VulkanExampleBase::initVulkan()
     getEnabledExtensions();
 
     // Get a graphics m_vkQueue from the m_vkDevice
-	m_queue = m_device.getDeviceQueue(m_pVulkanDevice->m_queueFamilyIndices.m_graphics,0);
-    //vkGetDeviceQueue(m_device, m_pVulkanDevice->m_queueFamilyIndices.m_graphics, 0, &m_queue);
+    m_queue = m_device.getDeviceQueue(m_pVulkanDevice->m_queueFamilyIndices.m_graphics, 0);
+    // vkGetDeviceQueue(m_device, m_pVulkanDevice->m_queueFamilyIndices.m_graphics, 0, &m_queue);
 
     // Find a suitable depth and/or stencil format
     VkBool32 validFormat { false };
@@ -764,13 +763,13 @@ void VulkanExampleBase::createSynchronizationPrimitives()
 
 void VulkanExampleBase::createCommandPool()
 {
-	//	TODO: another arbitrary initialization dependency.
-	vkcpp::CommandPoolCreateInfo commandPoolCreateInfo;
-	commandPoolCreateInfo
-		.setFlags(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
-		.setQueueFamilyIndex(m_swapChain.queueNodeIndex);
+    //	TODO: another arbitrary initialization dependency.
+    vkcpp::CommandPoolCreateInfo commandPoolCreateInfo;
+    commandPoolCreateInfo
+        .setFlags(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
+        .setQueueFamilyIndex(m_swapChain.queueNodeIndex);
 
-	m_commandPool = vkcpp::CommandPool(commandPoolCreateInfo);
+    m_commandPool = vkcpp::CommandPool(commandPoolCreateInfo);
 }
 
 void VulkanExampleBase::setupDepthStencil()
@@ -843,74 +842,41 @@ void VulkanExampleBase::setupFrameBuffer()
 
 void VulkanExampleBase::setupRenderPass()
 {
-    std::array<VkAttachmentDescription, 2> attachments = {};
-    // Color attachment
-    attachments[0].format = m_swapChain.colorFormat;
-    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    // Depth attachment
-    attachments[1].format = m_vkFormatDepth;
-    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    constexpr int subpassCount = 1;
+    constexpr int theOnlySubpassIndex = 0;
+    constexpr int attachmentCount = 2;
+    constexpr int colorPresentAttachmentIndex = 0;
+    constexpr int depthAttachmentIndex = 1;
 
-    VkAttachmentReference colorReference = {};
-    colorReference.attachment = 0;
-    colorReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    vkcpp::RenderPassCreateInfo renderPassCreateInfo(subpassCount, attachmentCount);
 
-    VkAttachmentReference depthReference = {};
-    depthReference.attachment = 1;
-    depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    //	Color present and depth attachments.
+    renderPassCreateInfo.attachmentDescription(colorPresentAttachmentIndex)
+        = vkcpp::AttachmentDescription::simpleColorPresent(m_swapChain.colorFormat);
 
-    VkSubpassDescription subpassDescription = {};
-    subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpassDescription.colorAttachmentCount = 1;
-    subpassDescription.pColorAttachments = &colorReference;
-    subpassDescription.pDepthStencilAttachment = &depthReference;
-    subpassDescription.inputAttachmentCount = 0;
-    subpassDescription.pInputAttachments = nullptr;
-    subpassDescription.preserveAttachmentCount = 0;
-    subpassDescription.pPreserveAttachments = nullptr;
-    subpassDescription.pResolveAttachments = nullptr;
+    renderPassCreateInfo.attachmentDescription(depthAttachmentIndex)
+        = vkcpp::AttachmentDescription::simpleDepth(m_vkFormatDepth);
+
+    //	One subpass
+    renderPassCreateInfo.subpassDescription(theOnlySubpassIndex)
+        .addColorAttachmentReference(colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+        .setDepthStencilAttachmentReference(depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     // Subpass dependencies for layout transitions
-    std::array<VkSubpassDependency, 2> dependencies {};
+    renderPassCreateInfo.addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
+        .addSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0)
+        .addDst(
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
 
-    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependencies[0].dstSubpass = 0;
-    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    dependencies[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-    dependencies[0].dependencyFlags = 0;
+    auto fragmentTests = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    renderPassCreateInfo.addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
+        .addSrc(fragmentTests, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
+        .addDst(
+            fragmentTests,
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT);
 
-    dependencies[1].srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependencies[1].dstSubpass = 0;
-    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependencies[1].srcAccessMask = 0;
-    dependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-    dependencies[1].dependencyFlags = 0;
-
-    VkRenderPassCreateInfo vkRenderPassCreateInfo = {};
-    vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    vkRenderPassCreateInfo.pAttachments = attachments.data();
-    vkRenderPassCreateInfo.subpassCount = 1;
-    vkRenderPassCreateInfo.pSubpasses = &subpassDescription;
-    vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
-    vkRenderPassCreateInfo.pDependencies = dependencies.data();
-
-    m_renderPassOriginal = vkcpp::RenderPass(vkRenderPassCreateInfo);
+    m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo);
 }
 
 void VulkanExampleBase::getEnabledFeatures() { }
