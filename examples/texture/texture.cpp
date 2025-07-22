@@ -23,6 +23,7 @@ struct Vertex {
 
 class VulkanExample : public VulkanExampleBase {
 public:
+
     // Contains all Vulkan objects that are required to store and use a texture
     // Note that this repository contains a texture class (VulkanTexture.hpp) that encapsulates texture loading functionality in a class that is used in subsequent demos
     struct Texture {
@@ -36,8 +37,8 @@ public:
         uint32_t m_mipLevels { 0 };
     } m_texture;
 
-    vks::Buffer vertexBuffer;
-    vks::Buffer indexBuffer;
+    vks::Buffer m_vertexBuffer;
+    vks::Buffer m_indexBuffer;
     uint32_t m_indexCount { 0 };
 
     struct UniformData {
@@ -67,12 +68,6 @@ public:
 
     ~VulkanExample()
     {
-        if (m_device) {
-            //            vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
-            vertexBuffer.destroy();
-            indexBuffer.destroy();
-            m_uniformBuffer.destroy();
-        }
     }
 
     /*
@@ -159,7 +154,8 @@ public:
                 bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                 bufferCopyRegion.imageSubresource.layerCount = 1;
                 bufferCopyRegion.imageSubresource.mipLevel = mipLevel;
-                //	TODO: this is screwy.  Is this some magic value stuff with widths and heights?
+
+				//	Image size shrinks by a factor of 2 for each mip level.
                 bufferCopyRegion.imageExtent.width = ktxTexture->baseWidth >> mipLevel;
                 bufferCopyRegion.imageExtent.height = ktxTexture->baseHeight >> mipLevel;
                 bufferCopyRegion.imageExtent.depth = 1;
@@ -339,7 +335,6 @@ public:
         }
         vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
         m_texture.m_sampler = vkcpp::Sampler(vkSamplerCreateInfo);
-        // VK_CHECK_RESULT(vkCreateSampler(m_deviceOriginal, &sampler, nullptr, &m_texture.m_vkSampler));
 
         // Create m_vkImage m_vkImageView
         // Textures are not directly accessed by the shaders and
@@ -360,7 +355,6 @@ public:
         // The m_vkImageView will be based on the texture's m_vkImage
         vkImageViewCreateInfo.image = m_texture.m_image;
         m_texture.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo);
-        // VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &view, nullptr, &m_texture.m_vkImageView));
     }
 
     void buildCommandBuffers()
@@ -394,8 +388,8 @@ public:
 				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
 				.cmdBindPipeline(m_pipeline)
 				.cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout)
-				.cmdBindVertexBuffer(vertexBuffer.m_buffer)
-				.cmdBindIndexBuffer(indexBuffer.m_buffer, VK_INDEX_TYPE_UINT32)
+				.cmdBindVertexBuffer(m_vertexBuffer.m_buffer)
+				.cmdBindIndexBuffer(m_indexBuffer.m_buffer, VK_INDEX_TYPE_UINT32)
 				.cmdDrawIndexed(m_indexCount);
             drawUI(commandBuffer);
             commandBuffer
@@ -422,37 +416,33 @@ public:
 
         // Create buffers and upload data to the GPU
         struct StagingBuffers {
-            vks::Buffer vertices;
-            vks::Buffer indices;
+            vks::Buffer m_vertices;
+            vks::Buffer m_indices;
         } stagingBuffers;
 
         // Host visible source buffers (staging)
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-			&stagingBuffers.vertices, vertices.size() * sizeof(Vertex), vertices.data()));
+			&stagingBuffers.m_vertices, vertices.size() * sizeof(Vertex), vertices.data()));
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-			&stagingBuffers.indices, indices.size() * sizeof(uint32_t), indices.data()));
+			&stagingBuffers.m_indices, indices.size() * sizeof(uint32_t), indices.data()));
 
         // Device local destination buffers
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
-			&vertexBuffer, vertices.size() * sizeof(Vertex)));
+			&m_vertexBuffer, vertices.size() * sizeof(Vertex)));
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
-			&indexBuffer, indices.size() * sizeof(uint32_t)));
+			&m_indexBuffer, indices.size() * sizeof(uint32_t)));
 
         // Copy from host do m_vkDevice
-        m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_queue);
-        m_pVulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, m_queue);
-
-        // Clean up
-        stagingBuffers.vertices.destroy();
-        stagingBuffers.indices.destroy();
+        m_pVulkanDevice->copyBuffer(&stagingBuffers.m_vertices, &m_vertexBuffer, m_queue);
+        m_pVulkanDevice->copyBuffer(&stagingBuffers.m_indices, &m_indexBuffer, m_queue);
     }
 
     void setupDescriptors()

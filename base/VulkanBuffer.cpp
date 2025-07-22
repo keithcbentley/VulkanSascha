@@ -118,12 +118,4 @@ namespace vks
 		return vkInvalidateMappedMemoryRanges(m_buffer.getVkDevice(), 1, &mappedRange);
 	}
 
-	/** 
-	* Release all Vulkan resources held by this buffer
-	*/
-	void Buffer::destroy()
-	{
-		m_buffer = vkcpp::Buffer();
-		m_deviceMemory = vkcpp::DeviceMemory();
-	}
 };

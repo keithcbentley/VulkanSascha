@@ -175,8 +175,6 @@ void UIOverlay::prepareResources()
 
     device->flushCommandBuffer(copyCmd, queue, true);
 
-    stagingBuffer.destroy();
-
     // Font texture Sampler
     VkSamplerCreateInfo samplerInfo = vks::initializers::samplerCreateInfo();
     samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -324,7 +322,6 @@ bool UIOverlay::update()
     // Vertex buffer
     if (!vertexBuffer.m_buffer || (vertexCount != imDrawData->TotalVtxCount)) {
         vertexBuffer.unmap();
-        vertexBuffer.destroy();
         VK_CHECK_RESULT(device->createBuffer(
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE, &vertexBuffer, vertexBufferSize));
         vertexCount = imDrawData->TotalVtxCount;
@@ -336,7 +333,6 @@ bool UIOverlay::update()
     // Index buffer
     if (!indexBuffer.m_buffer || (indexCount < imDrawData->TotalIdxCount)) {
         indexBuffer.unmap();
-        indexBuffer.destroy();
         VK_CHECK_RESULT(device->createBuffer(
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE, &indexBuffer, indexBufferSize));
         indexCount = imDrawData->TotalIdxCount;
@@ -418,8 +414,6 @@ void UIOverlay::resize(uint32_t width, uint32_t height)
 
 void UIOverlay::freeResources()
 {
-    vertexBuffer.destroy();
-    indexBuffer.destroy();
     vkDestroyImageView(device->m_device, fontView, nullptr);
     vkDestroyImage(device->m_device, fontImage, nullptr);
     vkFreeMemory(device->m_device, fontMemory, nullptr);

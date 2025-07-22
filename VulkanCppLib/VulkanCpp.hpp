@@ -2860,6 +2860,7 @@ static_assert(sizeof(BufferImageCopy) == sizeof(VkBufferImageCopy));
 
 class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
 
+	//	TODO: can we simplify this now that we are using VulkanContext?
     //	We need a smart command pool for the destroy work.
     //	We need both the command pool and the device for the destroy call.
     //	We grab the device from the command pool so that we don't have to store
