@@ -14,6 +14,7 @@
 
 #include "vulkan/vulkan.h"
 #include "VulkanTools.h"
+#include <VulkanCpp.hpp>
 
 namespace vks
 {	
@@ -28,17 +29,15 @@ namespace vks
 
 		VkDevice m_vkDevice;
 
-		VkBuffer m_vkBuffer = VK_NULL_HANDLE;
-		VkDeviceMemory m_vkMemory = VK_NULL_HANDLE;
+		vkcpp::Buffer m_buffer;
+		vkcpp::DeviceMemory m_deviceMemory;
 
 		VkDescriptorBufferInfo m_vkDescriptorBufferInfo;
+
 		VkDeviceSize m_size = 0;
 		VkDeviceSize m_alignment = 0;
+
 		void* m_pMapped = nullptr;
-		/** @brief Usage flags to be filled by external source at buffer creation (to query at some later point) */
-		VkBufferUsageFlags m_vkBufferUsageFlags;
-		/** @brief Memory property flags to be filled by external source at buffer creation (to query at some later point) */
-		VkMemoryPropertyFlags m_vkMemoryPropertyFlags;
 
 
 		VkResult map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);

@@ -114,7 +114,10 @@ public:
         vkGetBufferMemoryRequirements(m_device, stagingBuffer, &memReqs);
         memAllocInfo.allocationSize = memReqs.size;
         // Get m_vkDeviceMemory type index for a host visible buffer
-        memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(
+				memReqs.memoryTypeBits,
+				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
         VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &stagingMemory));
         VK_CHECK_RESULT(vkBindBufferMemory(m_device, stagingBuffer, stagingMemory, 0));
 
@@ -148,7 +151,8 @@ public:
         vkGetImageMemoryRequirements(m_device, cubeMap.m_vkImage, &memReqs);
 
         memAllocInfo.allocationSize = memReqs.size;
-        memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
         VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &cubeMap.m_vkDeviceMemory));
         VK_CHECK_RESULT(vkBindImageMemory(m_device, cubeMap.m_vkImage, cubeMap.m_vkDeviceMemory, 0));
@@ -410,7 +414,10 @@ public:
     // Prepare and initialize uniform buffer containing shader uniforms
     void prepareUniformBuffers()
     {
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(uboVS)));
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&uniformBuffer, sizeof(uboVS)));
         VK_CHECK_RESULT(uniformBuffer.map());
     }
 

@@ -22,7 +22,7 @@ namespace vks
 	*/
 	VkResult Buffer::map(VkDeviceSize size, VkDeviceSize offset)
 	{
-		return vkMapMemory(m_vkDevice, m_vkMemory, offset, size, 0, &m_pMapped);
+		return vkMapMemory(m_vkDevice, m_deviceMemory, offset, size, 0, &m_pMapped);
 	}
 
 	/**
@@ -34,7 +34,7 @@ namespace vks
 	{
 		if (m_pMapped)
 		{
-			vkUnmapMemory(m_vkDevice, m_vkMemory);
+			vkUnmapMemory(m_vkDevice, m_deviceMemory);
 			m_pMapped = nullptr;
 		}
 	}
@@ -48,7 +48,7 @@ namespace vks
 	*/
 	VkResult Buffer::bind(VkDeviceSize offset)
 	{
-		return vkBindBufferMemory(m_vkDevice, m_vkBuffer, m_vkMemory, offset);
+		return vkBindBufferMemory(m_vkDevice, m_buffer, m_deviceMemory, offset);
 	}
 
 	/**
@@ -61,7 +61,7 @@ namespace vks
 	void Buffer::setupDescriptor(VkDeviceSize size, VkDeviceSize offset)
 	{
 		m_vkDescriptorBufferInfo.offset = offset;
-		m_vkDescriptorBufferInfo.buffer = m_vkBuffer;
+		m_vkDescriptorBufferInfo.buffer = m_buffer;
 		m_vkDescriptorBufferInfo.range = size;
 	}
 
@@ -92,7 +92,7 @@ namespace vks
 	{
 		VkMappedMemoryRange mappedRange = {};
 		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-		mappedRange.memory = m_vkMemory;
+		mappedRange.memory = m_deviceMemory;
 		mappedRange.offset = offset;
 		mappedRange.size = size;
 		return vkFlushMappedMemoryRanges(m_vkDevice, 1, &mappedRange);
@@ -112,7 +112,7 @@ namespace vks
 	{
 		VkMappedMemoryRange mappedRange = {};
 		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-		mappedRange.memory = m_vkMemory;
+		mappedRange.memory = m_deviceMemory;
 		mappedRange.offset = offset;
 		mappedRange.size = size;
 		return vkInvalidateMappedMemoryRanges(m_vkDevice, 1, &mappedRange);
@@ -123,13 +123,7 @@ namespace vks
 	*/
 	void Buffer::destroy()
 	{
-		if (m_vkBuffer)
-		{
-			vkDestroyBuffer(m_vkDevice, m_vkBuffer, nullptr);
-		}
-		if (m_vkMemory)
-		{
-			vkFreeMemory(m_vkDevice, m_vkMemory, nullptr);
-		}
+		m_buffer = vkcpp::Buffer();
+		m_deviceMemory = vkcpp::DeviceMemory();
 	}
 };

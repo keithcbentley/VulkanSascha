@@ -131,23 +131,27 @@ public:
         bufferCreateInfo.size = ktxTextureSize;
         bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
         bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &sourceData.m_vkBuffer));
+		sourceData.m_buffer = vkcpp::Buffer(bufferCreateInfo);
+        //VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &sourceData.m_vkBuffer));
 
         // Get m_vkDeviceMemory requirements for the source buffer (alignment, m_vkDeviceMemory type bits)
         VkMemoryRequirements memReqs;
-        vkGetBufferMemoryRequirements(m_device, sourceData.m_vkBuffer, &memReqs);
+        vkGetBufferMemoryRequirements(m_device, sourceData.m_buffer, &memReqs);
         VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
         memAllocInfo.allocationSize = memReqs.size;
         // Get m_vkDeviceMemory type index for a host visible buffer
-        memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &sourceData.m_vkMemory));
-        VK_CHECK_RESULT(vkBindBufferMemory(m_device, sourceData.m_vkBuffer, sourceData.m_vkMemory, 0));
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(
+				memReqs.memoryTypeBits,
+				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
+		sourceData.m_deviceMemory = vkcpp::DeviceMemory(memAllocInfo);
+        VK_CHECK_RESULT(vkBindBufferMemory(m_device, sourceData.m_buffer, sourceData.m_deviceMemory, 0));
 
         // Copy the ktx m_vkImage data into the source buffer
         uint8_t* data;
-        VK_CHECK_RESULT(vkMapMemory(m_device, sourceData.m_vkMemory, 0, memReqs.size, 0, (void**)&data));
+        VK_CHECK_RESULT(vkMapMemory(m_device, sourceData.m_deviceMemory, 0, memReqs.size, 0, (void**)&data));
         memcpy(data, ktxTextureData, ktxTextureSize);
-        vkUnmapMemory(m_device, sourceData.m_vkMemory);
+        vkUnmapMemory(m_device, sourceData.m_deviceMemory);
 
         // Create optimal tiled target m_vkImage
         // VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
@@ -172,7 +176,8 @@ public:
         // Allocate m_vkDeviceMemory for the cube map array m_vkImage
         vkGetImageMemoryRequirements(m_device, cubeMapArray.m_vkImage, &memReqs);
         memAllocInfo.allocationSize = memReqs.size;
-        memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
         VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &cubeMapArray.m_vkDeviceMemory));
         VK_CHECK_RESULT(vkBindImageMemory(m_device, cubeMapArray.m_vkImage, cubeMapArray.m_vkDeviceMemory, 0));
 
@@ -236,7 +241,7 @@ public:
         // Copy the cube map array buffer parts from the staging buffer to the optimal tiled m_vkImage
         vkCmdCopyBufferToImage(
             copyCmd,
-            sourceData.m_vkBuffer,
+            sourceData.m_buffer,
             cubeMapArray.m_vkImage,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             static_cast<uint32_t>(bufferCopyRegions.size()),
@@ -280,8 +285,8 @@ public:
         VK_CHECK_RESULT(vkCreateImageView(m_device, &view, nullptr, &cubeMapArray.m_vkImageView));
 
         // Clean up staging resources
-        vkFreeMemory(m_device, sourceData.m_vkMemory, nullptr);
-        vkDestroyBuffer(m_device, sourceData.m_vkBuffer, nullptr);
+        //vkFreeMemory(m_device, sourceData.m_vkMemory, nullptr);
+        //vkDestroyBuffer(m_device, sourceData.m_vkBuffer, nullptr);
         ktxTexture_Destroy(ktxTexture);
     }
 
@@ -443,7 +448,10 @@ public:
     void prepareUniformBuffers()
     {
         // Object vertex shader uniform buffer
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&uniformBuffer, sizeof(UniformData)));
         // Map persistent
         VK_CHECK_RESULT(uniformBuffer.map());
     }

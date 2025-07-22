@@ -141,7 +141,9 @@ public:
 
 		memAllocInfo.allocationSize = memReqs.size;
 		// Get m_vkDeviceMemory type index for a host visible buffer
-		memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(
+				memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
 		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &stagingMemory));
 		VK_CHECK_RESULT(vkBindBufferMemory(m_device, stagingBuffer, stagingMemory, 0));
@@ -195,7 +197,8 @@ public:
 		vkGetImageMemoryRequirements(m_device, textureArray.m_vkImage, &memReqs);
 
 		memAllocInfo.allocationSize = memReqs.size;
-		memAllocInfo.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
 		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &textureArray.m_vkDeviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(m_device, textureArray.m_vkImage, textureArray.m_vkDeviceMemory, 0));
@@ -293,33 +296,26 @@ public:
 
 		for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i)
 		{
+			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
+
 			// Set target frame buffer
 			renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-			VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
+			commandBuffer.begin(cmdBufInfo);
+			commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
+			commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
+			commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
+			commandBuffer.cmdBindPipeline(m_vkPipeline);
+			commandBuffer.cmdBindDescriptorSet(descriptorSet, m_vkPipelineLayout);
 
-			vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+			commandBuffer.cmdBindVertexBuffer(vertexBuffer.m_buffer);
+			commandBuffer.cmdBindIndexBuffer(indexBuffer.m_buffer, VK_INDEX_TYPE_UINT32);
+			commandBuffer.cmdDrawIndexed(m_indexCount, layerCount);
 
-			VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-			vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
+			drawUI(commandBuffer);
 
-			VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
-			vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
-
-			vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-			vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline);
-
-			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindVertexBuffers(m_drawCommandBuffers[i], 0, 1, &vertexBuffer.m_vkBuffer, offsets);
-			vkCmdBindIndexBuffer(m_drawCommandBuffers[i], indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-			vkCmdDrawIndexed(m_drawCommandBuffers[i], m_indexCount, layerCount, 0, 0, 0);
-
-			drawUI(m_drawCommandBuffers[i]);
-
-			vkCmdEndRenderPass(m_drawCommandBuffers[i]);
-
-			VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
+			commandBuffer.cmdEndRenderPass();
+			commandBuffer.end();
 		}
 	}
 
@@ -371,12 +367,24 @@ public:
 		} stagingBuffers;
 
 		// Host visible source buffers (staging)
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffers.vertices, vertices.size() * sizeof(Vertex), vertices.data()));
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffers.indices, indices.size() * sizeof(uint32_t), indices.data()));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&stagingBuffers.vertices, vertices.size() * sizeof(Vertex), vertices.data()));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&stagingBuffers.indices, indices.size() * sizeof(uint32_t), indices.data()));
 
 		// Device local destination buffers
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &vertexBuffer, vertices.size() * sizeof(Vertex)));
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &indexBuffer, indices.size() * sizeof(uint32_t)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+			&vertexBuffer, vertices.size() * sizeof(Vertex)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+			&indexBuffer, indices.size() * sizeof(uint32_t)));
 
 		// Copy from host do m_vkDevice
 		m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_queue);
@@ -483,7 +491,10 @@ public:
 		uint32_t uboSize = sizeof(uniformData.matrices) + (MAX_LAYERS * sizeof(PerInstanceData));
 
 		// Vertex shader uniform buffer block
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, uboSize));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&uniformBuffer, uboSize));
 
 		// Array indices and model matrices are fixed
 		float offset = -1.5f;
@@ -500,9 +511,9 @@ public:
 		uint8_t *pData;
 		uint32_t dataOffset = sizeof(uniformData.matrices);
 		uint32_t dataSize = layerCount * sizeof(PerInstanceData);
-		VK_CHECK_RESULT(vkMapMemory(m_device, uniformBuffer.m_vkMemory, dataOffset, dataSize, 0, (void **)&pData));
+		VK_CHECK_RESULT(vkMapMemory(m_device, uniformBuffer.m_deviceMemory, dataOffset, dataSize, 0, (void **)&pData));
 		memcpy(pData, uniformData.instance, dataSize);
-		vkUnmapMemory(m_device, uniformBuffer.m_vkMemory);
+		vkUnmapMemory(m_device, uniformBuffer.m_deviceMemory);
 
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffer.map());

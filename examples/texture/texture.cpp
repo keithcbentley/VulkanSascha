@@ -394,8 +394,8 @@ public:
 				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
 				.cmdBindPipeline(m_pipeline)
 				.cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout)
-				.cmdBindVertexBuffer(vertexBuffer.m_vkBuffer)
-				.cmdBindIndexBuffer(indexBuffer.m_vkBuffer, VK_INDEX_TYPE_UINT32)
+				.cmdBindVertexBuffer(vertexBuffer.m_buffer)
+				.cmdBindIndexBuffer(indexBuffer.m_buffer, VK_INDEX_TYPE_UINT32)
 				.cmdDrawIndexed(m_indexCount);
             drawUI(commandBuffer);
             commandBuffer

@@ -233,12 +233,13 @@ VkResult VulkanDevice::createBuffer(
     bufferCreateInfo.usage = usageFlags;
     bufferCreateInfo.size = size;
 
-    VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer->m_vkBuffer));
+	buffer->m_buffer = vkcpp::Buffer(bufferCreateInfo);
+    //VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer->m_vkBuffer));
 
     // Create the memory backing up the buffer handle
     VkMemoryRequirements memReqs;
     VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
-    vkGetBufferMemoryRequirements(m_device, buffer->m_vkBuffer, &memReqs);
+    vkGetBufferMemoryRequirements(m_device, buffer->m_buffer, &memReqs);
     memAlloc.allocationSize = memReqs.size;
     // Find a memory type index that fits the m_vkPhysicalDeviceProperties of the buffer
     memAlloc.memoryTypeIndex = vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, memoryPropertyFlags);
@@ -249,12 +250,10 @@ VkResult VulkanDevice::createBuffer(
         allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
         memAlloc.pNext = &allocFlagsInfo;
     }
-    VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &buffer->m_vkMemory));
+	buffer->m_deviceMemory = vkcpp::DeviceMemory(memAlloc);
 
     buffer->m_alignment = memReqs.alignment;
     buffer->m_size = size;
-    buffer->m_vkBufferUsageFlags = usageFlags;
-    buffer->m_vkMemoryPropertyFlags = static_cast<VkMemoryPropertyFlags>(memoryPropertyFlags);
 
     // If a pointer to the buffer data has been passed, map the buffer and copy over the data
     if (data != nullptr) {
@@ -286,7 +285,7 @@ VkResult VulkanDevice::createBuffer(
 void VulkanDevice::copyBuffer(vks::Buffer* src, vks::Buffer* dst, VkQueue queue, VkBufferCopy* copyRegion)
 {
     assert(dst->m_size >= src->m_size);
-    assert(src->m_vkBuffer);
+//    assert(src->m_vkBuffer);
     VkCommandBuffer copyCmd = createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
     VkBufferCopy bufferCopy {};
     if (copyRegion == nullptr) {
@@ -295,7 +294,7 @@ void VulkanDevice::copyBuffer(vks::Buffer* src, vks::Buffer* dst, VkQueue queue,
         bufferCopy = *copyRegion;
     }
 
-    vkCmdCopyBuffer(copyCmd, src->m_vkBuffer, dst->m_vkBuffer, 1, &bufferCopy);
+    vkCmdCopyBuffer(copyCmd, src->m_buffer, dst->m_buffer, 1, &bufferCopy);
 
     flushCommandBuffer(copyCmd, queue);
 }

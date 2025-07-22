@@ -348,7 +348,8 @@ void VulkanRaytracingSample::createShaderBindingTable(ShaderBindingTable& shader
         &shaderBindingTable,
         rayTracingPipelineProperties.shaderGroupHandleSize * handleCount));
     // Get the strided address to be used when dispatching the rays
-    shaderBindingTable.stridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(shaderBindingTable.m_vkBuffer, handleCount);
+    shaderBindingTable.stridedDeviceAddressRegion
+		= getSbtEntryStridedDeviceAddressRegion(shaderBindingTable.m_buffer, handleCount);
     // Map persistent
     shaderBindingTable.map();
 }

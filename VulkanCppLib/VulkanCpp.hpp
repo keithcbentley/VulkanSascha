@@ -3122,6 +3122,11 @@ public:
         return *this;
     }
 
+	CommandBuffer& cmdDrawIndexed(uint32_t indexCount, uint32_t instanceCount) {
+		vkCmdDrawIndexed(*this, indexCount, instanceCount, 0, 0, 0);
+		return *this;
+	}
+
     CommandBuffer& cmdDraw(uint32_t vertexCount, uint32_t indexCount)
     {
         vkCmdDraw(*this, vertexCount, indexCount, 0, 0);
