@@ -53,11 +53,7 @@ public:
     ~VulkanExample()
     {
         if (m_device) {
-//            vkDestroyPipeline(m_device, m_vkPipelinePhong, nullptr);
-//            vkDestroyPipeline(m_device, m_vkPipelineTextured, nullptr);
-//            vkDestroyPipeline(m_device, m_vkPipelineToon, nullptr);
             colormap.destroy();
-            uniformBuffer.destroy();
         }
     }
 
@@ -257,7 +253,10 @@ public:
     void prepareUniformBuffers()
     {
         // Create the vertex shader uniform buffer block
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&uniformBuffer, sizeof(UniformData)));
         VK_CHECK_RESULT(uniformBuffer.map());
     }
 

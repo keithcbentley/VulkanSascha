@@ -93,9 +93,10 @@ public:
         return (allBits & requiredBits.m_value) == requiredBits.m_value;
     }
 
-	bool bitsSet(Bitset requiredBits) {
-		return m_value & requiredBits.m_value;
-	}
+    bool bitsSet(Bitset requiredBits)
+    {
+        return m_value & requiredBits.m_value;
+    }
 
     Bitset& operator&=(const Bitset& rhs)
     {
@@ -279,6 +280,8 @@ MemoryPropertyFlagsValue(MEMORY_PROPERTY_HOST_COHERENT);
 MemoryPropertyFlagsValue(MEMORY_PROPERTY_HOST_CACHED);
 MemoryPropertyFlagsValue(MEMORY_PROPERTY_LAZILY_ALLOCATED);
 MemoryPropertyFlagsValue(MEMORY_PROPERTY_PROTECTED);
+static const MemoryPropertyFlags MEMORY_PROPERTY_HOST_VISIBLE_COHERENT
+    = vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT;
 
 using ShaderStageFlags = Bitset<VkShaderStageFlagBits, VkShaderStageFlags>;
 #define ShaderStageFlagsValue(BARE_VK_VALUE) \
@@ -316,7 +319,7 @@ static const ShaderStageFlags SHADER_STAGE_ALL_GRAPHICS(VK_SHADER_STAGE_ALL_GRAP
 class Device;
 
 template <typename Handle_t, typename Owner_t = VkDevice>
-class HandleWithOwner {
+class InteropHandle3 {
 
 public:
     using DestroyFunc_t = void (*)(Handle_t, Owner_t);
@@ -326,9 +329,9 @@ protected:
     Owner_t m_owner {};
     DestroyFunc_t m_pfnDestroy = nullptr;
 
-    HandleWithOwner() = default;
+    InteropHandle3() = default;
 
-    ~HandleWithOwner()
+    ~InteropHandle3()
     {
         //  Call the handled specific destroy function.
         if (m_pfnDestroy && m_handle) {
@@ -337,38 +340,38 @@ protected:
         m_handle = Handle_t {};
     }
 
-    HandleWithOwner(Handle_t handle, Owner_t owner, DestroyFunc_t pfnDestroy)
+    InteropHandle3(Handle_t handle, Owner_t owner, DestroyFunc_t pfnDestroy)
         : m_handle(std::move(handle))
         , m_owner(std::move(owner))
         , m_pfnDestroy(pfnDestroy)
     {
     }
 
-    HandleWithOwner(Handle_t handle, Owner_t owner)
+    InteropHandle3(Handle_t handle, Owner_t owner)
         : m_handle(std::move(handle))
         , m_owner(std::move(owner))
         , m_pfnDestroy(nullptr)
     {
     }
 
-    HandleWithOwner(const HandleWithOwner& other)
+    InteropHandle3(const InteropHandle3& other)
         : m_handle(other.m_handle)
         , m_owner(other.m_owner)
         , m_pfnDestroy(nullptr)
     {
     }
 
-    HandleWithOwner& operator=(const HandleWithOwner& other)
+    InteropHandle3& operator=(const InteropHandle3& other)
     {
         if (this == &other) {
             return *this;
         }
-        this->~HandleWithOwner();
-        new (this) HandleWithOwner(other);
+        this->~InteropHandle3();
+        new (this) InteropHandle3(other);
         return *this;
     }
 
-    HandleWithOwner(HandleWithOwner&& other) noexcept
+    InteropHandle3(InteropHandle3&& other) noexcept
         : m_handle(std::move(other.m_handle))
         , m_owner(std::move(other.m_owner))
         , m_pfnDestroy(std::move(other.m_pfnDestroy))
@@ -378,13 +381,13 @@ protected:
         other.m_pfnDestroy = nullptr;
     }
 
-    HandleWithOwner& operator=(HandleWithOwner&& other) noexcept
+    InteropHandle3& operator=(InteropHandle3&& other) noexcept
     {
         if (this == &other) {
             return *this;
         }
-        this->~HandleWithOwner();
-        new (this) HandleWithOwner(std::move(other));
+        this->~InteropHandle3();
+        new (this) InteropHandle3(std::move(other));
         return *this;
     }
 
@@ -606,54 +609,54 @@ class PhysicalDeviceMemoryProperties : public VkPhysicalDeviceMemoryProperties {
     //	Conceptually, there are a few memory heaps, and each heap supports
     //	some combination of memory properties.  The Vulkan Device Capability Viewer
     //	program included with the Vulkan SDK shows this view of memory.
-	//	In practice, things are done backwards.  Not all heaps support all memory
-	//	properties.  In particular, some heaps (memory) are on the GPU device.
-	//	When memory is needed, instead of searching through every heap for the
-	//	required features, the existing feature/heap combinations are predetermined
-	//	and made available in the VkPhysicalDeviceMemoryProperties structure.
-	//	This is the VkMemoryTypes array in the structure.  The memory type contains
-	//	the combination of memory properties, and the corresponding heap that supports it.
-	//	Each VkMemoryType is a single combination of properties and heap.  If there
-	//	are multiple heaps that support the same properties, there will be an entry
-	//	for each heap.  In practice, there aren't that many combinations that are
-	//	necessary or even make sense.  The biggest split you'll see is whether the
-	//	memory is on the device (GPU), aka DEVICE_LOCAL_BIT, whether the memory is (also)
-	//	visible on the host, aka HOST_VISIBLE_BIT, and whether the host visible memory
-	//	is coherent, aka HOST_COHERENT_BIT.  Vulkan seems to expose host memory
-	//	as a heap, but I'm not sure that is available for allocation using Vulkan.
-	// 
-	//	The other part of the process is figuring out the memory required for a given
-	//	use, for example, a buffer.  Vulkan objects like buffers and images will tell
-	//	you what kind of memory is necessary for their use.  For example,
-	//	vkGetImageMemoryRequirements will tell you the memory requirements for an
-	//	image created for a particular use.  In addition to the size information,
-	//	the VkMemoryRequirements structure gives you an index, or multiple indices,
-	//  of the physical device memory properties that can support the requirement.
-	//  The screwy part is that this information is encoded in a bit field.  Since
-	//	it's possible that multiple memory/heap combinations might work, rather
-	//  than have an arbitrary list of indices, the indices are encoded in a bit field.
-	//	Bit 0 corresponds to memoryTypes[0], bit 1 to memoryTypes[1], and so on.
-	//	If the bit is set, then the memory index could work for the allocation.
-	//	The final step is to determine if there are any additional requirements from
-	//	the application.  This is done by checking the application requirements
-	//	against the physical memory type properties.  This requires shifting through
-	//	the bit field to find the memory index, and then checking the required properites
-	//	against the available properties.
-	// 
-	//	In practice, the whole process proceeds "backwards."  For example, suppose we
-	//	want a staging buffer to transfer information from host memory to device memory,
-	//	so that we can later transfer it to another "better" part of device memory.
-	//	We first create a buffer with VK_BUFFER_USAGE_TRANSFER_SRC_BIT since we are
-	//	going to use it to transfer data to the "better" memory.  Once we have the
-	//	buffer object, we ask for its memory requirements.  In addition to the size,
-	//	the memory requirements tell us which memory indices can be used.  This is
-	//	encoded in the bit field.  Since we want to use it as a staging buffer, we
-	//  have additional requirements.  The memory must be host visible, and for convenience,
-	//	we want the memory to be host coherent so we don't have to worry about explicitly
-	//	flushing it.  Now we shift through the available bits in the bit field and
-	//	check the full memory properties against the required memory properties.
-	//	If the memory doesn't support the additional requirements, we move on to the
-	//  next potential memory index.
+    //	In practice, things are done backwards.  Not all heaps support all memory
+    //	properties.  In particular, some heaps (memory) are on the GPU device.
+    //	When memory is needed, instead of searching through every heap for the
+    //	required features, the existing feature/heap combinations are predetermined
+    //	and made available in the VkPhysicalDeviceMemoryProperties structure.
+    //	This is the VkMemoryTypes array in the structure.  The memory type contains
+    //	the combination of memory properties, and the corresponding heap that supports it.
+    //	Each VkMemoryType is a single combination of properties and heap.  If there
+    //	are multiple heaps that support the same properties, there will be an entry
+    //	for each heap.  In practice, there aren't that many combinations that are
+    //	necessary or even make sense.  The biggest split you'll see is whether the
+    //	memory is on the device (GPU), aka DEVICE_LOCAL_BIT, whether the memory is (also)
+    //	visible on the host, aka HOST_VISIBLE_BIT, and whether the host visible memory
+    //	is coherent, aka HOST_COHERENT_BIT.  Vulkan seems to expose host memory
+    //	as a heap, but I'm not sure that is available for allocation using Vulkan.
+    //
+    //	The other part of the process is figuring out the memory required for a given
+    //	use, for example, a buffer.  Vulkan objects like buffers and images will tell
+    //	you what kind of memory is necessary for their use.  For example,
+    //	vkGetImageMemoryRequirements will tell you the memory requirements for an
+    //	image created for a particular use.  In addition to the size information,
+    //	the VkMemoryRequirements structure gives you an index, or multiple indices,
+    //  of the physical device memory properties that can support the requirement.
+    //  The screwy part is that this information is encoded in a bit field.  Since
+    //	it's possible that multiple memory/heap combinations might work, rather
+    //  than have an arbitrary list of indices, the indices are encoded in a bit field.
+    //	Bit 0 corresponds to memoryTypes[0], bit 1 to memoryTypes[1], and so on.
+    //	If the bit is set, then the memory index could work for the allocation.
+    //	The final step is to determine if there are any additional requirements from
+    //	the application.  This is done by checking the application requirements
+    //	against the physical memory type properties.  This requires shifting through
+    //	the bit field to find the memory index, and then checking the required properites
+    //	against the available properties.
+    //
+    //	In practice, the whole process proceeds "backwards."  For example, suppose we
+    //	want a staging buffer to transfer information from host memory to device memory,
+    //	so that we can later transfer it to another "better" part of device memory.
+    //	We first create a buffer with VK_BUFFER_USAGE_TRANSFER_SRC_BIT since we are
+    //	going to use it to transfer data to the "better" memory.  Once we have the
+    //	buffer object, we ask for its memory requirements.  In addition to the size,
+    //	the memory requirements tell us which memory indices can be used.  This is
+    //	encoded in the bit field.  Since we want to use it as a staging buffer, we
+    //  have additional requirements.  The memory must be host visible, and for convenience,
+    //	we want the memory to be host coherent so we don't have to worry about explicitly
+    //	flushing it.  Now we shift through the available bits in the bit field and
+    //	check the full memory properties against the required memory properties.
+    //	If the memory doesn't support the additional requirements, we move on to the
+    //  next potential memory index.
 
 public:
     PhysicalDeviceMemoryProperties()
@@ -667,21 +670,20 @@ public:
     {
     }
 
-	uint32_t findMemoryTypeIndex(
-		uint32_t usableMemoryIndexBits,
-		MemoryPropertyFlags requiredProperties) {
+    uint32_t findMemoryTypeIndex(
+        uint32_t usableMemoryIndexBits,
+        MemoryPropertyFlags requiredProperties)
+    {
 
-		for (uint32_t index = 0; index < memoryTypeCount; index++) {
-			if ((usableMemoryIndexBits & (1 << index))
-				&& bitsSet(memoryTypes[index].propertyFlags, requiredProperties)) {
-				return index;
-			}
-		}
-		throw std::runtime_error("failed to find suitable memory type!");
-	}
-
+        for (uint32_t index = 0; index < memoryTypeCount; index++) {
+            if ((usableMemoryIndexBits & (1 << index))
+                && bitsSet(memoryTypes[index].propertyFlags, requiredProperties)) {
+                return index;
+            }
+        }
+        throw std::runtime_error("failed to find suitable memory type!");
+    }
 };
-
 
 class PhysicalDeviceFeatures {
 
@@ -991,12 +993,12 @@ public:
     }
 };
 
-class VulkanInstance : public HandleWithOwner<VkInstance, VkInstance> {
+class VulkanInstance : public InteropHandle3<VkInstance, VkInstance> {
 
     VkDebugUtilsMessengerEXT m_messenger = nullptr;
 
     VulkanInstance(VkInstance vkInstance, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkInstance, vkInstance, pfnDestroy)
+        : InteropHandle3(vkInstance, vkInstance, pfnDestroy)
     {
     }
 
@@ -1010,7 +1012,7 @@ public:
 
     //  Don't copy the messenger if making a copy.
     VulkanInstance(const VulkanInstance& other)
-        : HandleWithOwner(other)
+        : InteropHandle3(other)
     {
     }
 
@@ -1026,7 +1028,7 @@ public:
 
     //	In the move constructor, we do move the messenger.
     VulkanInstance(VulkanInstance&& other) noexcept
-        : HandleWithOwner(std::move(other))
+        : InteropHandle3(std::move(other))
         , m_messenger(other.m_messenger)
     {
         other.m_messenger = nullptr;
@@ -1140,7 +1142,7 @@ public:
     }
 };
 
-class Surface : public HandleWithOwner<VkSurfaceKHR, VkInstance> {
+class Surface : public InteropHandle3<VkSurfaceKHR, VkInstance> {
 
     PhysicalDevice m_physicalDevice;
 
@@ -1154,7 +1156,7 @@ class Surface : public HandleWithOwner<VkSurfaceKHR, VkInstance> {
         VkInstance vkInstance,
         PhysicalDevice physicalDevice,
         DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkSurface, vkInstance, pfnDestroy)
+        : InteropHandle3(vkSurface, vkInstance, pfnDestroy)
         , m_physicalDevice(physicalDevice)
     {
     }
@@ -1331,10 +1333,10 @@ public:
 };
 
 class Queue;
-class Device : public HandleWithOwner<VkDevice, VkPhysicalDevice> {
+class Device : public InteropHandle3<VkDevice, VkPhysicalDevice> {
 
     Device(VkDevice vkDevice, VkPhysicalDevice vkPhysicalDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkDevice, vkPhysicalDevice, pfnDestroy)
+        : InteropHandle3(vkDevice, vkPhysicalDevice, pfnDestroy)
     {
     }
 
@@ -1389,7 +1391,7 @@ class VulkanContext {
 
     PhysicalDeviceFeatures m_physicalDeviceFeatures;
     PhysicalDeviceProperties m_physicalDeviceProperties;
-	PhysicalDeviceMemoryProperties m_physicalDeviceMemoryProperties;
+    PhysicalDeviceMemoryProperties m_physicalDeviceMemoryProperties;
 
 public:
     VulkanContext() = default;
@@ -1425,15 +1427,17 @@ public:
         return m_physicalDeviceFeatures.vkPhysicalDeviceFeatures();
     }
 
-	PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties() {
-		return m_physicalDeviceMemoryProperties;
-	}
+    PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties()
+    {
+        return m_physicalDeviceMemoryProperties;
+    }
 
-	uint32_t findMemoryTypeIndex(
-		uint32_t usableMemoryIndexBits,
-		MemoryPropertyFlags requiredProperties) {
-		return m_physicalDeviceMemoryProperties.findMemoryTypeIndex(usableMemoryIndexBits, requiredProperties);
-	}
+    uint32_t findMemoryTypeIndex(
+        uint32_t usableMemoryIndexBits,
+        MemoryPropertyFlags requiredProperties)
+    {
+        return m_physicalDeviceMemoryProperties.findMemoryTypeIndex(usableMemoryIndexBits, requiredProperties);
+    }
 
     void init(const VulkanContextCreateInfo& vulkanContextCreateInfo);
 };
@@ -1456,10 +1460,10 @@ VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
 PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties();
 uint32_t findMemoryTypeIndex(uint32_t usableMemoryIndexBits, MemoryPropertyFlags requiredPropertiesArg);
 
-class Semaphore : public HandleWithOwner<VkSemaphore> {
+class Semaphore : public InteropHandle3<VkSemaphore> {
 
     Semaphore(VkSemaphore vkSemaphore, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkSemaphore, vkDevice, pfnDestroy)
+        : InteropHandle3(vkSemaphore, vkDevice, pfnDestroy)
     {
     }
 
@@ -1489,13 +1493,13 @@ public:
     }
 };
 
-class Fence : public HandleWithOwner<VkFence> {
+class Fence : public InteropHandle3<VkFence> {
     //	Vulkan set/reset/signaled names are not really clear when it comes to fences.
     //	Use better open/closed terminology.
 #define VKCPP_FENCE_CREATE_OPENED VK_FENCE_CREATE_SIGNALED_BIT
 
     Fence(VkFence vkFence, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkFence, vkDevice, pfnDestroy)
+        : InteropHandle3(vkFence, vkDevice, pfnDestroy)
     {
     }
 
@@ -1544,7 +1548,7 @@ public:
     }
 };
 
-class DeviceMemory : public HandleWithOwner<VkDeviceMemory> {
+class DeviceMemory : public InteropHandle3<VkDeviceMemory> {
 
     static void destroy(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice)
     {
@@ -1552,7 +1556,7 @@ class DeviceMemory : public HandleWithOwner<VkDeviceMemory> {
     }
 
     DeviceMemory(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice, VkDeviceSize size, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkDeviceMemory, vkDevice, pfnDestroy)
+        : InteropHandle3(vkDeviceMemory, vkDevice, pfnDestroy)
         , m_size(size)
     {
     }
@@ -1617,7 +1621,7 @@ public:
     }
 };
 
-class Buffer : public HandleWithOwner<VkBuffer, Device> {
+class Buffer : public InteropHandle3<VkBuffer, Device> {
 
     static void destroy(VkBuffer vkBuffer, Device device)
     {
@@ -1625,7 +1629,7 @@ class Buffer : public HandleWithOwner<VkBuffer, Device> {
     }
 
     Buffer(VkBuffer vkBuffer, const Device& device, VkDeviceSize size, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkBuffer, device, pfnDestroy)
+        : InteropHandle3(vkBuffer, device, pfnDestroy)
         , m_size(size)
     {
     }
@@ -1804,7 +1808,7 @@ public:
     }
 };
 
-class ShaderModule : public HandleWithOwner<VkShaderModule> {
+class ShaderModule : public InteropHandle3<VkShaderModule> {
 
     static std::vector<char> readFile(const std::string& filename)
     {
@@ -1828,7 +1832,7 @@ class ShaderModule : public HandleWithOwner<VkShaderModule> {
     }
 
     ShaderModule(VkShaderModule vkShaderModule, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner<VkShaderModule>(vkShaderModule, vkDevice, pfnDestroy)
+        : InteropHandle3<VkShaderModule>(vkShaderModule, vkDevice, pfnDestroy)
     {
     }
 
@@ -2321,10 +2325,10 @@ public:
     }
 };
 
-class RenderPass : public HandleWithOwner<VkRenderPass> {
+class RenderPass : public InteropHandle3<VkRenderPass> {
 
     RenderPass(VkRenderPass vkRenderPass, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkRenderPass, vkDevice, pfnDestroy)
+        : InteropHandle3(vkRenderPass, vkDevice, pfnDestroy)
     {
     }
 
@@ -2388,10 +2392,10 @@ public:
     }
 };
 
-class Image : public HandleWithOwner<VkImage, Device> {
+class Image : public InteropHandle3<VkImage, Device> {
 
     Image(VkImage vkImage, Device device, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkImage, device, pfnDestroy)
+        : InteropHandle3(vkImage, device, pfnDestroy)
     {
     }
 
@@ -2404,7 +2408,7 @@ public:
     Image() = default;
     ~Image() = default;
     Image(const Image& other)
-        : HandleWithOwner(other)
+        : InteropHandle3(other)
     {
     }
 
@@ -2419,7 +2423,7 @@ public:
     }
 
     Image(Image&& other) noexcept
-        : HandleWithOwner(std::move(other))
+        : InteropHandle3(std::move(other))
     {
     }
 
@@ -2505,10 +2509,10 @@ public:
     }
 };
 
-class ImageView : public HandleWithOwner<VkImageView> {
+class ImageView : public InteropHandle3<VkImageView> {
 
     ImageView(VkImageView vkImageView, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkImageView, vkDevice, pfnDestroy)
+        : InteropHandle3(vkImageView, vkDevice, pfnDestroy)
     {
     }
 
@@ -2574,10 +2578,10 @@ public:
     }
 };
 
-class Sampler : public HandleWithOwner<VkSampler, Device> {
+class Sampler : public InteropHandle3<VkSampler, Device> {
 
     Sampler(VkSampler sampler, Device device, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(sampler, device, pfnDestroy)
+        : InteropHandle3(sampler, device, pfnDestroy)
     {
     }
 
@@ -2591,7 +2595,7 @@ public:
     ~Sampler() = default;
 
     Sampler(const Sampler& other)
-        : HandleWithOwner(other)
+        : InteropHandle3(other)
     {
     }
 
@@ -2603,7 +2607,7 @@ public:
     }
 
     Sampler(Sampler&& other) noexcept
-        : HandleWithOwner(std::move(other))
+        : InteropHandle3(std::move(other))
     {
     }
 
@@ -2741,10 +2745,10 @@ public:
 
 //	TODO: should we make some object that has contains a m_vkQueue and command pool
 //	and whatever else needed so we don't have to pass the info around as pairs?
-class CommandPool : public HandleWithOwner<VkCommandPool> {
+class CommandPool : public InteropHandle3<VkCommandPool> {
 
     CommandPool(VkCommandPool vkCommandPool, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkCommandPool, vkDevice, pfnDestroy)
+        : InteropHandle3(vkCommandPool, vkDevice, pfnDestroy)
     {
     }
 
@@ -2858,9 +2862,9 @@ public:
 
 static_assert(sizeof(BufferImageCopy) == sizeof(VkBufferImageCopy));
 
-class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
+class CommandBuffer : public InteropHandle3<VkCommandBuffer, CommandPool> {
 
-	//	TODO: can we simplify this now that we are using VulkanContext?
+    //	TODO: can we simplify this now that we are using VulkanContext?
     //	We need a smart command pool for the destroy work.
     //	We need both the command pool and the device for the destroy call.
     //	We grab the device from the command pool so that we don't have to store
@@ -2874,7 +2878,7 @@ class CommandBuffer : public HandleWithOwner<VkCommandBuffer, CommandPool> {
         VkCommandBuffer vkCommandBuffer,
         const CommandPool& commandPool,
         DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkCommandBuffer, commandPool, pfnDestroy)
+        : InteropHandle3(vkCommandBuffer, commandPool, pfnDestroy)
     {
     }
 
@@ -3123,10 +3127,11 @@ public:
         return *this;
     }
 
-	CommandBuffer& cmdDrawIndexed(uint32_t indexCount, uint32_t instanceCount) {
-		vkCmdDrawIndexed(*this, indexCount, instanceCount, 0, 0, 0);
-		return *this;
-	}
+    CommandBuffer& cmdDrawIndexed(uint32_t indexCount, uint32_t instanceCount)
+    {
+        vkCmdDrawIndexed(*this, indexCount, instanceCount, 0, 0, 0);
+        return *this;
+    }
 
     CommandBuffer& cmdDraw(uint32_t vertexCount, uint32_t indexCount)
     {
@@ -3335,7 +3340,7 @@ public:
     }
 };
 
-class Queue : public HandleWithOwner<VkQueue, Device> {
+class Queue : public InteropHandle3<VkQueue, Device> {
 
 public:
     uint32_t m_queueFamilyIndex = 0;
@@ -3344,7 +3349,7 @@ public:
 
     //	Queues always come from the m_vkDevice and are never (explicitly) destroyed
     Queue(VkQueue vkQueue, uint32_t queueFamilyIndex)
-        : HandleWithOwner(vkQueue, device(), nullptr)
+        : InteropHandle3(vkQueue, device(), nullptr)
         , m_queueFamilyIndex(queueFamilyIndex)
     {
     }
@@ -3480,10 +3485,10 @@ public:
     }
 };
 
-class DescriptorPool : public HandleWithOwner<VkDescriptorPool> {
+class DescriptorPool : public InteropHandle3<VkDescriptorPool> {
 
     DescriptorPool(VkDescriptorPool vkDescriptorPool, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkDescriptorPool, vkDevice, pfnDestroy)
+        : InteropHandle3(vkDescriptorPool, vkDevice, pfnDestroy)
     {
     }
 
@@ -3582,13 +3587,13 @@ public:
     }
 };
 
-class DescriptorSetLayout : public HandleWithOwner<VkDescriptorSetLayout> {
+class DescriptorSetLayout : public InteropHandle3<VkDescriptorSetLayout> {
 
     DescriptorSetLayout(
         VkDescriptorSetLayout vkDescriptorSetLayout,
         VkDevice vkDevice,
         DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkDescriptorSetLayout, vkDevice, pfnDestroy)
+        : InteropHandle3(vkDescriptorSetLayout, vkDevice, pfnDestroy)
     {
     }
 
@@ -3602,7 +3607,7 @@ public:
     ~DescriptorSetLayout() = default;
 
     DescriptorSetLayout(const DescriptorSetLayout& other)
-        : HandleWithOwner(other)
+        : InteropHandle3(other)
     {
     }
 
@@ -3614,7 +3619,7 @@ public:
     }
 
     DescriptorSetLayout(DescriptorSetLayout&& other) noexcept
-        : HandleWithOwner(std::move(other))
+        : InteropHandle3(std::move(other))
     {
     }
 
@@ -3909,14 +3914,14 @@ public:
     }
 };
 
-class DescriptorSet : public HandleWithOwner<VkDescriptorSet, DescriptorPool> {
+class DescriptorSet : public InteropHandle3<VkDescriptorSet, DescriptorPool> {
 
     DescriptorSet(
         VkDescriptorSet vkDescriptorSet,
         DescriptorPool descriptorPool,
         DestroyFunc_t pfnDestroy,
         const DescriptorSetLayout& descriptorSetLayout)
-        : HandleWithOwner(vkDescriptorSet, descriptorPool, pfnDestroy)
+        : InteropHandle3(vkDescriptorSet, descriptorPool, pfnDestroy)
     {
     }
 
@@ -3930,7 +3935,7 @@ public:
     ~DescriptorSet() = default;
 
     DescriptorSet(const DescriptorSet& other)
-        : HandleWithOwner(other)
+        : InteropHandle3(other)
     {
     }
 
@@ -3942,7 +3947,7 @@ public:
     }
 
     DescriptorSet(DescriptorSet&& other) noexcept
-        : HandleWithOwner(std::move(other))
+        : InteropHandle3(std::move(other))
     {
     }
 
@@ -4020,10 +4025,10 @@ public:
     }
 };
 
-class PipelineLayout : public HandleWithOwner<VkPipelineLayout> {
+class PipelineLayout : public InteropHandle3<VkPipelineLayout> {
 
     PipelineLayout(VkPipelineLayout vkPipelineLayout, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkPipelineLayout, vkDevice, pfnDestroy)
+        : InteropHandle3(vkPipelineLayout, vkDevice, pfnDestroy)
     {
     }
 
@@ -4564,10 +4569,10 @@ public:
     }
 };
 
-class GraphicsPipeline : public HandleWithOwner<VkPipeline> {
+class GraphicsPipeline : public InteropHandle3<VkPipeline> {
 
     GraphicsPipeline(VkPipeline vkPipeline, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkPipeline, vkDevice, pfnDestroy)
+        : InteropHandle3(vkPipeline, vkDevice, pfnDestroy)
     {
     }
 
@@ -4633,10 +4638,10 @@ public:
     }
 };
 
-class Swapchain : public HandleWithOwner<VkSwapchainKHR, Device> {
+class Swapchain : public InteropHandle3<VkSwapchainKHR, Device> {
 
     Swapchain(VkSwapchainKHR vkSwapchain, Device device, DestroyFunc_t pfnDestroy, VkExtent2D vkSwapchainImageExtent)
-        : HandleWithOwner(vkSwapchain, device, pfnDestroy)
+        : InteropHandle3(vkSwapchain, device, pfnDestroy)
         , m_vkSwapchainImageExtent(vkSwapchainImageExtent)
     {
     }
@@ -4814,10 +4819,10 @@ public:
     }
 };
 
-class Framebuffer : public HandleWithOwner<VkFramebuffer, Device> {
+class Framebuffer : public InteropHandle3<VkFramebuffer, Device> {
 
     Framebuffer(VkFramebuffer vkFramebuffer, Device device, DestroyFunc_t pfnDestroy)
-        : HandleWithOwner(vkFramebuffer, device, pfnDestroy)
+        : InteropHandle3(vkFramebuffer, device, pfnDestroy)
     {
     }
 

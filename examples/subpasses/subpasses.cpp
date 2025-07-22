@@ -105,8 +105,6 @@ public:
         clearAttachment(&m_attachments.m_albedo);
 
         m_textureGlass.destroy();
-        m_bufferGBuffer.destroy();
-        m_bufferLights.destroy();
     }
 
     void clearAttachment(FrameBufferAttachment* attachment)
@@ -156,7 +154,9 @@ public:
         VK_CHECK_RESULT(vkCreateImage(m_device, &image, nullptr, &attachment->m_vkImage));
         vkGetImageMemoryRequirements(m_device, attachment->m_vkImage, &memReqs);
         memAlloc.allocationSize = memReqs.size;
-        memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        memAlloc.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(
+				memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
         VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &attachment->m_vkDeviceMemory));
         VK_CHECK_RESULT(vkBindImageMemory(m_device, attachment->m_vkImage, attachment->m_vkDeviceMemory, 0));
 
@@ -720,7 +720,7 @@ public:
         // Matrices
         m_pVulkanDevice->createBuffer(
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
             &m_bufferGBuffer,
             sizeof(m_uboGBuffer));
         VK_CHECK_RESULT(m_bufferGBuffer.map());
@@ -728,7 +728,7 @@ public:
         // Lights
         m_pVulkanDevice->createBuffer(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
             &m_bufferLights,
             m_lights.size() * sizeof(Light));
         VK_CHECK_RESULT(m_bufferLights.map());

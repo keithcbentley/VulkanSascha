@@ -65,11 +65,6 @@ public:
             vkDestroyImage(m_device, cubeMapArray.m_vkImage, nullptr);
             vkDestroySampler(m_device, cubeMapArray.m_vkSampler, nullptr);
             vkFreeMemory(m_device, cubeMapArray.m_vkDeviceMemory, nullptr);
-//            vkDestroyPipeline(m_device, m_vkPipelineSkybox, nullptr);
-//            vkDestroyPipeline(m_device, m_vkPipelineReflect, nullptr);
-//            vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
-//            vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
-            uniformBuffer.destroy();
         }
     }
 

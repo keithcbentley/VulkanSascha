@@ -50,7 +50,6 @@ public:
     ~VulkanExample()
     {
         for (auto cube : m_cubes) {
-            cube.uniformBuffer.destroy();
             cube.texture.destroy();
         }
     }
@@ -263,7 +262,7 @@ public:
         for (auto& cube : m_cubes) {
             VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
                 &cube.uniformBuffer,
                 sizeof(Cube::Matrices)));
             VK_CHECK_RESULT(cube.uniformBuffer.map());

@@ -95,8 +95,6 @@ public:
             vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.attachmentWrite, nullptr);
             vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.attachmentRead, nullptr);
 
-            uniformBuffers.matrices.destroy();
-            uniformBuffers.params.destroy();
         }
     }
 

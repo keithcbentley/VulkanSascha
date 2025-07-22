@@ -176,9 +176,6 @@ public:
             vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
             vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
             vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
-            vertexBuffer.destroy();
-            indexBuffer.destroy();
-            uniformBuffer.destroy();
         }
     }
 
@@ -495,9 +492,6 @@ public:
         m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_queue);
         m_pVulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, m_queue);
 
-        // Clean up
-        stagingBuffers.vertices.destroy();
-        stagingBuffers.indices.destroy();
     }
 
     void setupDescriptors()

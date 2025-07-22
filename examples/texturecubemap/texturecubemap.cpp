@@ -64,7 +64,6 @@ public:
             vkDestroyImage(m_device, cubeMap.m_vkImage, nullptr);
             vkDestroySampler(m_device, cubeMap.m_vkSampler, nullptr);
             vkFreeMemory(m_device, cubeMap.m_vkDeviceMemory, nullptr);
-            uniformBuffer.destroy();
         }
     }
 

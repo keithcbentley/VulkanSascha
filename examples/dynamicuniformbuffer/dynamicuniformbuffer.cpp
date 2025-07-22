@@ -104,12 +104,6 @@ public:
 				alignedFree(uboDataDynamic.model);
 			}
 			vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
-//			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
-//			vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
-			vertexBuffer.destroy();
-			indexBuffer.destroy();
-			uniformBuffers.view.destroy();
-			uniformBuffers.dynamic.destroy();
 		}
 	}
 
@@ -142,8 +136,8 @@ public:
 				.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
 				.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
 				.cmdBindPipeline(m_vkPipeline)
-				.cmdBindVertexBuffer(vertexBuffer.m_vkBuffer)
-				.cmdBindIndexBuffer(indexBuffer.m_vkBuffer, VK_INDEX_TYPE_UINT32);
+				.cmdBindVertexBuffer(vertexBuffer.m_buffer)
+				.cmdBindIndexBuffer(indexBuffer.m_buffer, VK_INDEX_TYPE_UINT32);
 
 			// Render multiple objects using different model matrices by dynamically offsetting into one uniform buffer
 			for (uint32_t j = 0; j < OBJECT_INSTANCES; j++)
@@ -189,14 +183,14 @@ public:
 		// Vertex buffer
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
 			&vertexBuffer,
 			vertices.size() * sizeof(Vertex),
 			vertices.data()));
 		// Index buffer
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
 			&indexBuffer,
 			indices.size() * sizeof(uint32_t),
 			indices.data()));
@@ -320,14 +314,14 @@ public:
 		// Static shared uniform buffer object with projection and m_vkImageView matrix
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
 			&uniformBuffers.view,
 			sizeof(uboVS)));
 
 		// Uniform buffer object with per-object matrices
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE,
 			&uniformBuffers.dynamic,
 			bufferSize));
 
@@ -400,7 +394,7 @@ public:
 		memcpy(uniformBuffers.dynamic.m_pMapped, uboDataDynamic.model, uniformBuffers.dynamic.m_size);
 		// Flush to make changes visible to the host
 		VkMappedMemoryRange memoryRange = vks::initializers::mappedMemoryRange();
-		memoryRange.memory = uniformBuffers.dynamic.m_vkMemory;
+		memoryRange.memory = uniformBuffers.dynamic.m_deviceMemory;
 		memoryRange.size = uniformBuffers.dynamic.m_size;
 		vkFlushMappedMemoryRanges(m_device, 1, &memoryRange);
 	}

@@ -126,10 +126,6 @@ public:
 			vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.shaded, nullptr);
 			vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.textured, nullptr);
 
-			// Uniform buffers
-			uniformBuffers.vsShared.destroy();
-			uniformBuffers.vsMirror.destroy();
-			uniformBuffers.vsOffScreen.destroy();
 		}
 	}
 
@@ -165,7 +161,8 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(m_device, &image, nullptr, &offscreenPass.color.image));
 		vkGetImageMemoryRequirements(m_device, offscreenPass.color.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex =
+			vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &offscreenPass.color.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(m_device, offscreenPass.color.image, offscreenPass.color.mem, 0));
 
@@ -203,7 +200,8 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(m_device, &image, nullptr, &offscreenPass.depth.image));
 		vkGetImageMemoryRequirements(m_device, offscreenPass.depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex =
+			vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &offscreenPass.depth.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(m_device, offscreenPass.depth.image, offscreenPass.depth.mem, 0));
 
@@ -542,11 +540,20 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Mesh vertex shader uniform buffer block
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffers.vsShared, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&uniformBuffers.vsShared, sizeof(UniformData)));
 		// Mirror plane vertex shader uniform buffer block
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffers.vsMirror, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&uniformBuffers.vsMirror, sizeof(UniformData)));
 		// Offscreen vertex shader uniform buffer block
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffers.vsOffScreen, sizeof(UniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&uniformBuffers.vsOffScreen, sizeof(UniformData)));
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffers.vsShared.map());
 		VK_CHECK_RESULT(uniformBuffers.vsMirror.map());
