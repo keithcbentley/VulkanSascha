@@ -27,7 +27,7 @@ namespace vks
 
 	public:
 
-		VkDevice m_vkDevice;
+//		VkDevice m_vkDevice;
 
 		vkcpp::Buffer m_buffer;
 		vkcpp::DeviceMemory m_deviceMemory;

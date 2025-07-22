@@ -226,8 +226,6 @@ VkResult VulkanDevice::createBuffer(
     VkDeviceSize size,
     void* data)
 {
-    buffer->m_vkDevice = m_device;
-
     // Create the buffer handle
     vkcpp::BufferCreateInfo bufferCreateInfo;
     bufferCreateInfo.usage = usageFlags;
