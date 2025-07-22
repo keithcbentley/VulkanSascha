@@ -108,7 +108,8 @@ namespace vks
 		vkGetImageMemoryRequirements(device->m_device, fontImage, &memReqs);
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
 		memAllocInfo.allocationSize = memReqs.size;
-		memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 		VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &fontMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device->m_device, fontImage, fontMemory, 0));
 
@@ -127,7 +128,7 @@ namespace vks
 
 		VK_CHECK_RESULT(device->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
 			&stagingBuffer,
 			uploadSize));
 
@@ -333,7 +334,8 @@ namespace vks
 		if ((vertexBuffer.m_vkBuffer == VK_NULL_HANDLE) || (vertexCount != imDrawData->TotalVtxCount)) {
 			vertexBuffer.unmap();
 			vertexBuffer.destroy();
-			VK_CHECK_RESULT(device->createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &vertexBuffer, vertexBufferSize));
+			VK_CHECK_RESULT(device->createBuffer(
+				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE, &vertexBuffer, vertexBufferSize));
 			vertexCount = imDrawData->TotalVtxCount;
 			vertexBuffer.unmap();
 			vertexBuffer.map();
@@ -344,7 +346,8 @@ namespace vks
 		if ((indexBuffer.m_vkBuffer == VK_NULL_HANDLE) || (indexCount < imDrawData->TotalIdxCount)) {
 			indexBuffer.unmap();
 			indexBuffer.destroy();
-			VK_CHECK_RESULT(device->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &indexBuffer, indexBufferSize));
+			VK_CHECK_RESULT(device->createBuffer(
+				VK_BUFFER_USAGE_INDEX_BUFFER_BIT, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE, &indexBuffer, indexBufferSize));
 			indexCount = imDrawData->TotalIdxCount;
 			indexBuffer.map();
 			updateCmdBuffers = true;

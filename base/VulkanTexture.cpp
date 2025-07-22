@@ -111,7 +111,9 @@ void Texture2D::loadFromFile(std::string filename, VkFormat format, vks::VulkanD
 
         memAllocInfo.allocationSize = memReqs.size;
         // Get memory type index for a host visible buffer
-        memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(
+				memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
         VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &stagingMemory));
         VK_CHECK_RESULT(vkBindBufferMemory(device->m_device, stagingBuffer, stagingMemory, 0));
@@ -168,7 +170,8 @@ void Texture2D::loadFromFile(std::string filename, VkFormat format, vks::VulkanD
 
         memAllocInfo.allocationSize = memReqs.size;
 
-        memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
         VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &m_vkDeviceMemory));
         VK_CHECK_RESULT(vkBindImageMemory(device->m_device, m_vkImage, m_vkDeviceMemory, 0));
 
@@ -245,7 +248,9 @@ void Texture2D::loadFromFile(std::string filename, VkFormat format, vks::VulkanD
         memAllocInfo.allocationSize = memReqs.size;
 
         // Get memory type that can be mapped to host memory
-        memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(
+				memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
         // Allocate host memory
         VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &mappableMemory));
@@ -377,7 +382,9 @@ void Texture2D::fromBuffer(void* buffer, VkDeviceSize bufferSize, VkFormat forma
 
     memAllocInfo.allocationSize = memReqs.size;
     // Get memory type index for a host visible buffer
-    memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    memAllocInfo.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(
+			memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
     VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &stagingMemory));
     VK_CHECK_RESULT(vkBindBufferMemory(device->m_device, stagingBuffer, stagingMemory, 0));
@@ -423,7 +430,8 @@ void Texture2D::fromBuffer(void* buffer, VkDeviceSize bufferSize, VkFormat forma
 
     memAllocInfo.allocationSize = memReqs.size;
 
-    memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    memAllocInfo.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
     VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &m_vkDeviceMemory));
     VK_CHECK_RESULT(vkBindImageMemory(device->m_device, m_vkImage, m_vkDeviceMemory, 0));
 
@@ -543,7 +551,9 @@ void Texture2DArray::loadFromFile(std::string filename, VkFormat format, vks::Vu
 
     memAllocInfo.allocationSize = memReqs.size;
     // Get memory type index for a host visible buffer
-    memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    memAllocInfo.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(
+			memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
     VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &stagingMemory));
     VK_CHECK_RESULT(vkBindBufferMemory(device->m_device, stagingBuffer, stagingMemory, 0));
@@ -601,7 +611,8 @@ void Texture2DArray::loadFromFile(std::string filename, VkFormat format, vks::Vu
     vkGetImageMemoryRequirements(device->m_device, m_vkImage, &memReqs);
 
     memAllocInfo.allocationSize = memReqs.size;
-    memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    memAllocInfo.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
     VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &m_vkDeviceMemory));
     VK_CHECK_RESULT(vkBindImageMemory(device->m_device, m_vkImage, m_vkDeviceMemory, 0));
@@ -729,7 +740,9 @@ void TextureCubeMap::loadFromFile(std::string filename, VkFormat format, vks::Vu
 
     memAllocInfo.allocationSize = memReqs.size;
     // Get memory type index for a host visible buffer
-    memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    memAllocInfo.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(
+			memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
 
     VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &stagingMemory));
     VK_CHECK_RESULT(vkBindBufferMemory(device->m_device, stagingBuffer, stagingMemory, 0));
@@ -790,7 +803,8 @@ void TextureCubeMap::loadFromFile(std::string filename, VkFormat format, vks::Vu
     vkGetImageMemoryRequirements(device->m_device, m_vkImage, &memReqs);
 
     memAllocInfo.allocationSize = memReqs.size;
-    memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    memAllocInfo.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
     VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &m_vkDeviceMemory));
     VK_CHECK_RESULT(vkBindImageMemory(device->m_device, m_vkImage, m_vkDeviceMemory, 0));

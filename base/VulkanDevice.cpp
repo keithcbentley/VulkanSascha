@@ -33,10 +33,9 @@ VulkanDevice::VulkanDevice(
     m_vkQueueFamilyProperties.resize(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, m_vkQueueFamilyProperties.data());
 
-	m_graphicsCommandPoolOriginal = vkcpp::CommandPool(
-		m_queueFamilyIndices.m_graphics,
-		VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-
+    m_graphicsCommandPoolOriginal = vkcpp::CommandPool(
+        m_queueFamilyIndices.m_graphics,
+        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     // Get list of supported extensions
     uint32_t extCount = 0;
@@ -71,27 +70,27 @@ VulkanDevice::~VulkanDevice()
  *
  * @throw Throws an exception if memTypeFound is null and no memory type could be found that supports the requested properties
  */
-uint32_t VulkanDevice::getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound) const
-{
-    for (uint32_t i = 0; i < m_vkPhysicalDeviceMemoryProperties.memoryTypeCount; i++) {
-        if ((typeBits & 1) == 1) {
-            if ((m_vkPhysicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-                if (memTypeFound) {
-                    *memTypeFound = true;
-                }
-                return i;
-            }
-        }
-        typeBits >>= 1;
-    }
-
-    if (memTypeFound) {
-        *memTypeFound = false;
-        return 0;
-    } else {
-        throw std::runtime_error("Could not find a matching memory type");
-    }
-}
+// uint32_t VulkanDevice::getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound) const
+//{
+//     for (uint32_t i = 0; i < m_vkPhysicalDeviceMemoryProperties.memoryTypeCount; i++) {
+//         if ((typeBits & 1) == 1) {
+//             if ((m_vkPhysicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+//                 if (memTypeFound) {
+//                     *memTypeFound = true;
+//                 }
+//                 return i;
+//             }
+//         }
+//         typeBits >>= 1;
+//     }
+//
+//     if (memTypeFound) {
+//         *memTypeFound = false;
+//         return 0;
+//     } else {
+//         throw std::runtime_error("Could not find a matching memory type");
+//     }
+// }
 
 /**
  * Get the index of a queue family that supports the requested queue flags
@@ -158,7 +157,13 @@ uint32_t VulkanDevice::getQueueFamilyIndex(VkQueueFlags queueFlags) const
  *
  * @return VK_SUCCESS if buffer handle and memory have been created and (optionally passed) data has been copied
  */
-VkResult VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory* memory, void* data)
+VkResult VulkanDevice::createBuffer(
+    VkBufferUsageFlags usageFlags,
+    vkcpp::MemoryPropertyFlags memoryPropertyFlags,
+    VkDeviceSize size,
+    VkBuffer* buffer,
+    VkDeviceMemory* memory,
+    void* data)
 {
     // Create the buffer handle
     VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo(usageFlags, size);
@@ -171,7 +176,7 @@ VkResult VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPrope
     vkGetBufferMemoryRequirements(m_device, *buffer, &memReqs);
     memAlloc.allocationSize = memReqs.size;
     // Find a memory type index that fits the m_vkPhysicalDeviceProperties of the buffer
-    memAlloc.memoryTypeIndex = getMemoryType(memReqs.memoryTypeBits, memoryPropertyFlags);
+    memAlloc.memoryTypeIndex = vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, memoryPropertyFlags);
     // If the buffer has VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT set we also need to enable the appropriate flag during allocation
     VkMemoryAllocateFlagsInfoKHR allocFlagsInfo {};
     if (usageFlags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
@@ -187,7 +192,7 @@ VkResult VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPrope
         VK_CHECK_RESULT(vkMapMemory(m_device, *memory, 0, size, 0, &mapped));
         memcpy(mapped, data, size);
         // If host coherency hasn't been requested, do a manual flush to make writes visible
-        if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
+        if (!memoryPropertyFlags.bitsSet(vkcpp::MEMORY_PROPERTY_HOST_COHERENT)) {
             VkMappedMemoryRange mappedRange = vks::initializers::mappedMemoryRange();
             mappedRange.memory = *memory;
             mappedRange.offset = 0;
@@ -215,18 +220,18 @@ VkResult VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPrope
  * @return VK_SUCCESS if buffer handle and memory have been created and (optionally passed) data has been copied
  */
 VkResult VulkanDevice::createBuffer(
-	VkBufferUsageFlags usageFlags,
-	VkMemoryPropertyFlags memoryPropertyFlags,
-	vks::Buffer* buffer,
-	VkDeviceSize size,
-	void* data)
+    VkBufferUsageFlags usageFlags,
+    vkcpp::MemoryPropertyFlags memoryPropertyFlags,
+    vks::Buffer* buffer,
+    VkDeviceSize size,
+    void* data)
 {
     buffer->m_vkDevice = m_device;
 
     // Create the buffer handle
-	vkcpp::BufferCreateInfo bufferCreateInfo;
-	bufferCreateInfo.usage = usageFlags;
-	bufferCreateInfo.size = size;
+    vkcpp::BufferCreateInfo bufferCreateInfo;
+    bufferCreateInfo.usage = usageFlags;
+    bufferCreateInfo.size = size;
 
     VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer->m_vkBuffer));
 
@@ -236,7 +241,7 @@ VkResult VulkanDevice::createBuffer(
     vkGetBufferMemoryRequirements(m_device, buffer->m_vkBuffer, &memReqs);
     memAlloc.allocationSize = memReqs.size;
     // Find a memory type index that fits the m_vkPhysicalDeviceProperties of the buffer
-    memAlloc.memoryTypeIndex = getMemoryType(memReqs.memoryTypeBits, memoryPropertyFlags);
+    memAlloc.memoryTypeIndex = vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, memoryPropertyFlags);
     // If the buffer has VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT set we also need to enable the appropriate flag during allocation
     VkMemoryAllocateFlagsInfoKHR allocFlagsInfo {};
     if (usageFlags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
@@ -249,13 +254,13 @@ VkResult VulkanDevice::createBuffer(
     buffer->m_alignment = memReqs.alignment;
     buffer->m_size = size;
     buffer->m_vkBufferUsageFlags = usageFlags;
-    buffer->m_vkMemoryPropertyFlags = memoryPropertyFlags;
+    buffer->m_vkMemoryPropertyFlags = static_cast<VkMemoryPropertyFlags>(memoryPropertyFlags);
 
     // If a pointer to the buffer data has been passed, map the buffer and copy over the data
     if (data != nullptr) {
         VK_CHECK_RESULT(buffer->map());
         memcpy(buffer->m_pMapped, data, size);
-        if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
+        if ( !memoryPropertyFlags.bitsSet(vkcpp::MEMORY_PROPERTY_HOST_COHERENT))
             buffer->flush();
 
         buffer->unmap();

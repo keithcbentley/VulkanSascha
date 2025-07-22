@@ -59,18 +59,18 @@ public:
 //	In all cases, the combination type will be the type/value
 //	passed to the Vulkan functions or used in the Vulkan structures.
 class DefaultBitsetClassId { };
-template <typename Bit_t, typename Combination_t, typename IdType_t = DefaultBitsetClassId>
+template <typename VkBit_t, typename VkCombination_t, typename IdType_t = DefaultBitsetClassId>
 class Bitset {
 
 public:
-    Combination_t m_value;
+    VkCombination_t m_value;
 
-    explicit Bitset(Bit_t value)
+    explicit Bitset(VkBit_t value)
         : m_value(value)
     {
     }
 
-    explicit operator Combination_t()
+    explicit operator VkCombination_t()
     {
         return m_value;
     }
@@ -88,10 +88,14 @@ public:
         return val;
     }
 
-    friend bool bitsSet(Combination_t allBits, Bitset requiredBits)
+    friend bool bitsSet(VkCombination_t allBits, Bitset requiredBits)
     {
         return (allBits & requiredBits.m_value) == requiredBits.m_value;
     }
+
+	bool bitsSet(Bitset requiredBits) {
+		return m_value & requiredBits.m_value;
+	}
 
     Bitset& operator&=(const Bitset& rhs)
     {
@@ -106,7 +110,7 @@ public:
         return val;
     }
 
-    friend Bitset operator&(const Bitset a, const Combination_t b)
+    friend Bitset operator&(const Bitset a, const VkCombination_t b)
     {
         Bitset val = a;
         val.m_value &= b;
@@ -595,6 +599,90 @@ public:
     }
 };
 
+class PhysicalDeviceMemoryProperties : public VkPhysicalDeviceMemoryProperties {
+
+    //	VkPhysicalDeviceMemoryProperties and VkMemoryRequirements are screwy data types
+    //	and the Vulkan terminology makes things more confusing.
+    //	Conceptually, there are a few memory heaps, and each heap supports
+    //	some combination of memory properties.  The Vulkan Device Capability Viewer
+    //	program included with the Vulkan SDK shows this view of memory.
+	//	In practice, things are done backwards.  Not all heaps support all memory
+	//	properties.  In particular, some heaps (memory) are on the GPU device.
+	//	When memory is needed, instead of searching through every heap for the
+	//	required features, the existing feature/heap combinations are predetermined
+	//	and made available in the VkPhysicalDeviceMemoryProperties structure.
+	//	This is the VkMemoryTypes array in the structure.  The memory type contains
+	//	the combination of memory properties, and the corresponding heap that supports it.
+	//	Each VkMemoryType is a single combination of properties and heap.  If there
+	//	are multiple heaps that support the same properties, there will be an entry
+	//	for each heap.  In practice, there aren't that many combinations that are
+	//	necessary or even make sense.  The biggest split you'll see is whether the
+	//	memory is on the device (GPU), aka DEVICE_LOCAL_BIT, whether the memory is (also)
+	//	visible on the host, aka HOST_VISIBLE_BIT, and whether the host visible memory
+	//	is coherent, aka HOST_COHERENT_BIT.  Vulkan seems to expose host memory
+	//	as a heap, but I'm not sure that is available for allocation using Vulkan.
+	// 
+	//	The other part of the process is figuring out the memory required for a given
+	//	use, for example, a buffer.  Vulkan objects like buffers and images will tell
+	//	you what kind of memory is necessary for their use.  For example,
+	//	vkGetImageMemoryRequirements will tell you the memory requirements for an
+	//	image created for a particular use.  In addition to the size information,
+	//	the VkMemoryRequirements structure gives you an index, or multiple indices,
+	//  of the physical device memory properties that can support the requirement.
+	//  The screwy part is that this information is encoded in a bit field.  Since
+	//	it's possible that multiple memory/heap combinations might work, rather
+	//  than have an arbitrary list of indices, the indices are encoded in a bit field.
+	//	Bit 0 corresponds to memoryTypes[0], bit 1 to memoryTypes[1], and so on.
+	//	If the bit is set, then the memory index could work for the allocation.
+	//	The final step is to determine if there are any additional requirements from
+	//	the application.  This is done by checking the application requirements
+	//	against the physical memory type properties.  This requires shifting through
+	//	the bit field to find the memory index, and then checking the required properites
+	//	against the available properties.
+	// 
+	//	In practice, the whole process proceeds "backwards."  For example, suppose we
+	//	want a staging buffer to transfer information from host memory to device memory,
+	//	so that we can later transfer it to another "better" part of device memory.
+	//	We first create a buffer with VK_BUFFER_USAGE_TRANSFER_SRC_BIT since we are
+	//	going to use it to transfer data to the "better" memory.  Once we have the
+	//	buffer object, we ask for its memory requirements.  In addition to the size,
+	//	the memory requirements tell us which memory indices can be used.  This is
+	//	encoded in the bit field.  Since we want to use it as a staging buffer, we
+	//  have additional requirements.  The memory must be host visible, and for convenience,
+	//	we want the memory to be host coherent so we don't have to worry about explicitly
+	//	flushing it.  Now we shift through the available bits in the bit field and
+	//	check the full memory properties against the required memory properties.
+	//	If the memory doesn't support the additional requirements, we move on to the
+	//  next potential memory index.
+
+public:
+    PhysicalDeviceMemoryProperties()
+        : VkPhysicalDeviceMemoryProperties {}
+    {
+    }
+
+    PhysicalDeviceMemoryProperties(
+        const VkPhysicalDeviceMemoryProperties& vkPhysicalDeviceMemoryProperties)
+        : VkPhysicalDeviceMemoryProperties(vkPhysicalDeviceMemoryProperties)
+    {
+    }
+
+	uint32_t findMemoryTypeIndex(
+		uint32_t usableMemoryIndexBits,
+		MemoryPropertyFlags requiredProperties) {
+
+		for (uint32_t index = 0; index < memoryTypeCount; index++) {
+			if ((usableMemoryIndexBits & (1 << index))
+				&& bitsSet(memoryTypes[index].propertyFlags, requiredProperties)) {
+				return index;
+			}
+		}
+		throw std::runtime_error("failed to find suitable memory type!");
+	}
+
+};
+
+
 class PhysicalDeviceFeatures {
 
     VkPhysicalDeviceFeatures2 m_features2 {};
@@ -808,18 +896,18 @@ public:
 
     operator VkPhysicalDevice() const { return m_vkPhysicalDevice; }
 
-    PhysicalDeviceFeatures getPhysicalDeviceFeatures2() const;
-    PhysicalDeviceProperties getPhysicalDeviceProperties2() const;
+    PhysicalDeviceFeatures getPhysicalDeviceFeatures2();
+    PhysicalDeviceProperties getPhysicalDeviceProperties2();
 
-    std::vector<VkExtensionProperties> EnumerateDeviceExtensionProperties() const;
+    std::vector<VkExtensionProperties> EnumerateDeviceExtensionProperties();
 
-    VkPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties() const;
+    PhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties();
 
     uint32_t findMemoryTypeIndex(
         uint32_t usableMemoryIndexBits,
-        MemoryPropertyFlags requiredProperties) const;
+        MemoryPropertyFlags requiredProperties);
 
-    std::vector<VkQueueFamilyProperties> getAllQueueFamilyProperties() const;
+    std::vector<VkQueueFamilyProperties> getAllQueueFamilyProperties();
 };
 
 class VulkanInstanceCreateInfo : public VkInstanceCreateInfo {
@@ -1268,19 +1356,19 @@ public:
         new (this) Device(vkDevice, physicalDevice, &destroy);
     }
 
-    PhysicalDevice getPhysicalDevice() const
+    PhysicalDevice getPhysicalDevice()
     {
         return PhysicalDevice(getOwner());
     }
 
-    Queue getDeviceQueue(int deviceQueueFamily, int deviceQueueIndex) const;
+    Queue getDeviceQueue(int deviceQueueFamily, int deviceQueueIndex);
 
-    uint32_t findMemoryTypeIndex(uint32_t usableMemoryIndexBits, MemoryPropertyFlags requiredProperties) const
+    uint32_t findMemoryTypeIndex(uint32_t usableMemoryIndexBits, MemoryPropertyFlags requiredProperties)
     {
         return getPhysicalDevice().findMemoryTypeIndex(usableMemoryIndexBits, requiredProperties);
     }
 
-    void waitIdle() const
+    void waitIdle()
     {
         vkDeviceWaitIdle(*this);
     }
@@ -1301,27 +1389,28 @@ class VulkanContext {
 
     PhysicalDeviceFeatures m_physicalDeviceFeatures;
     PhysicalDeviceProperties m_physicalDeviceProperties;
+	PhysicalDeviceMemoryProperties m_physicalDeviceMemoryProperties;
 
 public:
     VulkanContext() = default;
     ~VulkanContext() = default;
 
-    const VulkanInstance& vulkanInstanceContext()
+    VulkanInstance& vulkanInstanceContext()
     {
         return m_vulkanInstanceOriginal;
     }
 
-    const PhysicalDevice& physicalDeviceContext()
+    PhysicalDevice& physicalDeviceContext()
     {
         return m_physicalDeviceOriginal;
     }
 
-    const Device& deviceContext()
+    Device& deviceContext()
     {
         return m_deviceOriginal;
     }
 
-    const VkDevice vkDeviceContext()
+    VkDevice vkDeviceContext()
     {
         return m_vkDeviceOriginal;
     }
@@ -1336,6 +1425,16 @@ public:
         return m_physicalDeviceFeatures.vkPhysicalDeviceFeatures();
     }
 
+	PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties() {
+		return m_physicalDeviceMemoryProperties;
+	}
+
+	uint32_t findMemoryTypeIndex(
+		uint32_t usableMemoryIndexBits,
+		MemoryPropertyFlags requiredProperties) {
+		return m_physicalDeviceMemoryProperties.findMemoryTypeIndex(usableMemoryIndexBits, requiredProperties);
+	}
+
     void init(const VulkanContextCreateInfo& vulkanContextCreateInfo);
 };
 
@@ -1348,12 +1447,14 @@ extern VulkanContext s_vulkanContext;
 //	vkcpp::device,
 //	etc
 void initVulkanContext(const VulkanContextCreateInfo& vulkanContextCreateInfo);
-const VulkanInstance& vulkanInstance();
-const PhysicalDevice& physicalDevice();
-const Device& device();
+VulkanInstance& vulkanInstance();
+PhysicalDevice& physicalDevice();
+Device& device();
 VkDevice vkDevice();
 VkPhysicalDeviceProperties& vkPhysicalDeviceProperties();
 VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
+PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties();
+uint32_t findMemoryTypeIndex(uint32_t usableMemoryIndexBits, MemoryPropertyFlags requiredPropertiesArg);
 
 class Semaphore : public HandleWithOwner<VkSemaphore> {
 
@@ -3738,14 +3839,15 @@ public:
         return *this;
     }
 
-	DescriptorSetUpdater& addImageWriteDescriptor(
-		uint32_t bindingIndex,
-		VkDescriptorType vkDescriptorType,
-		VkImageView vkImageViewArg,
-		VkImageLayout vkImageLayout) {
-		return addImageWriteDescriptor(
-			bindingIndex, vkDescriptorType, vkImageViewArg, vkImageLayout, VK_NULL_HANDLE);
-	}
+    DescriptorSetUpdater& addImageWriteDescriptor(
+        uint32_t bindingIndex,
+        VkDescriptorType vkDescriptorType,
+        VkImageView vkImageViewArg,
+        VkImageLayout vkImageLayout)
+    {
+        return addImageWriteDescriptor(
+            bindingIndex, vkDescriptorType, vkImageViewArg, vkImageLayout, VK_NULL_HANDLE);
+    }
 
     DescriptorSetUpdater& addImageWriteDescriptor(
         uint32_t bindingIndex,

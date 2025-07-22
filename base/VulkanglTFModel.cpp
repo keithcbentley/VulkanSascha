@@ -133,7 +133,9 @@ void vkglTF::Texture::fromglTfImage(tinygltf::Image& gltfimage, std::string path
         VK_CHECK_RESULT(vkCreateBuffer(device->m_device, &bufferCreateInfo, nullptr, &stagingBuffer));
         vkGetBufferMemoryRequirements(device->m_device, stagingBuffer, &memReqs);
         memAllocInfo.allocationSize = memReqs.size;
-        memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(
+				memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
         VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &stagingMemory));
         VK_CHECK_RESULT(vkBindBufferMemory(device->m_device, stagingBuffer, stagingMemory, 0));
 
@@ -158,7 +160,8 @@ void vkglTF::Texture::fromglTfImage(tinygltf::Image& gltfimage, std::string path
         VK_CHECK_RESULT(vkCreateImage(device->m_device, &imageCreateInfo, nullptr, &image));
         vkGetImageMemoryRequirements(device->m_device, image, &memReqs);
         memAllocInfo.allocationSize = memReqs.size;
-        memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
         VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &deviceMemory));
         VK_CHECK_RESULT(vkBindImageMemory(device->m_device, image, deviceMemory, 0));
 
@@ -329,7 +332,9 @@ void vkglTF::Texture::fromglTfImage(tinygltf::Image& gltfimage, std::string path
         VkMemoryRequirements memReqs;
         vkGetBufferMemoryRequirements(device->m_device, stagingBuffer, &memReqs);
         memAllocInfo.allocationSize = memReqs.size;
-        memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(
+				memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
         VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &stagingMemory));
         VK_CHECK_RESULT(vkBindBufferMemory(device->m_device, stagingBuffer, stagingMemory, 0));
 
@@ -373,7 +378,8 @@ void vkglTF::Texture::fromglTfImage(tinygltf::Image& gltfimage, std::string path
 
         vkGetImageMemoryRequirements(device->m_device, image, &memReqs);
         memAllocInfo.allocationSize = memReqs.size;
-        memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        memAllocInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
         VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &deviceMemory));
         VK_CHECK_RESULT(vkBindImageMemory(device->m_device, image, deviceMemory, 0));
 
@@ -486,7 +492,7 @@ vkglTF::Mesh::Mesh(vks::VulkanDevice* device, glm::mat4 matrix)
     this->uniformBlock.matrix = matrix;
     VK_CHECK_RESULT(device->createBuffer(
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
         sizeof(uniformBlock),
         &uniformBuffer.buffer,
         &uniformBuffer.memory,
@@ -674,7 +680,9 @@ void vkglTF::Model::createEmptyTexture(VkQueue transferQueue)
     VkMemoryRequirements memReqs;
     vkGetBufferMemoryRequirements(device->m_device, stagingBuffer, &memReqs);
     memAllocInfo.allocationSize = memReqs.size;
-    memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    memAllocInfo.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(
+			memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
     VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &stagingMemory));
     VK_CHECK_RESULT(vkBindBufferMemory(device->m_device, stagingBuffer, stagingMemory, 0));
 
@@ -709,7 +717,8 @@ void vkglTF::Model::createEmptyTexture(VkQueue transferQueue)
 
     vkGetImageMemoryRequirements(device->m_device, emptyTexture.image, &memReqs);
     memAllocInfo.allocationSize = memReqs.size;
-    memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    memAllocInfo.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
     VK_CHECK_RESULT(vkAllocateMemory(device->m_device, &memAllocInfo, nullptr, &emptyTexture.deviceMemory));
     VK_CHECK_RESULT(vkBindImageMemory(device->m_device, emptyTexture.image, emptyTexture.deviceMemory, 0));
 
@@ -1305,7 +1314,7 @@ void vkglTF::Model::loadFromFile(std::string filename, vks::VulkanDevice* device
     // Vertex data
     VK_CHECK_RESULT(device->createBuffer(
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
         vertexBufferSize,
         &vertexStaging.buffer,
         &vertexStaging.memory,
@@ -1313,7 +1322,7 @@ void vkglTF::Model::loadFromFile(std::string filename, vks::VulkanDevice* device
     // Index data
     VK_CHECK_RESULT(device->createBuffer(
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
         indexBufferSize,
         &indexStaging.buffer,
         &indexStaging.memory,
@@ -1323,14 +1332,14 @@ void vkglTF::Model::loadFromFile(std::string filename, vks::VulkanDevice* device
     // Vertex buffer
     VK_CHECK_RESULT(device->createBuffer(
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | memoryPropertyFlags,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
         vertexBufferSize,
         &vertices.buffer,
         &vertices.memory));
     // Index buffer
     VK_CHECK_RESULT(device->createBuffer(
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | memoryPropertyFlags,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
         indexBufferSize,
         &indices.buffer,
         &indices.memory));

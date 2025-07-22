@@ -47,6 +47,7 @@ public:
         // This is used to change the bias for the level-of-detail (mips) in the fragment shader
         float lodBias = 0.0f;
     } m_uniformData;
+
     vks::Buffer m_uniformBuffer;
 
     vkcpp::GraphicsPipeline m_pipeline;
@@ -426,12 +427,24 @@ public:
         } stagingBuffers;
 
         // Host visible source buffers (staging)
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffers.vertices, vertices.size() * sizeof(Vertex), vertices.data()));
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffers.indices, indices.size() * sizeof(uint32_t), indices.data()));
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&stagingBuffers.vertices, vertices.size() * sizeof(Vertex), vertices.data()));
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+			&stagingBuffers.indices, indices.size() * sizeof(uint32_t), indices.data()));
 
         // Device local destination buffers
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &vertexBuffer, vertices.size() * sizeof(Vertex)));
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &indexBuffer, indices.size() * sizeof(uint32_t)));
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+			&vertexBuffer, vertices.size() * sizeof(Vertex)));
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+			&indexBuffer, indices.size() * sizeof(uint32_t)));
 
         // Copy from host do m_vkDevice
         m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_queue);
@@ -546,7 +559,7 @@ public:
         // Vertex shader uniform buffer block
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
             &m_uniformBuffer, sizeof(m_uniformData), &m_uniformData));
         VK_CHECK_RESULT(m_uniformBuffer.map());
     }

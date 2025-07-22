@@ -12,21 +12,21 @@ VersionNumber VersionNumber::getVersionNumber()
     return { vkVersionNumber };
 }
 
-PhysicalDeviceFeatures PhysicalDevice::getPhysicalDeviceFeatures2() const
+PhysicalDeviceFeatures PhysicalDevice::getPhysicalDeviceFeatures2()
 {
     PhysicalDeviceFeatures physicalDeviceFeatures;
     vkGetPhysicalDeviceFeatures2(m_vkPhysicalDevice, physicalDeviceFeatures);
     return physicalDeviceFeatures;
 }
 
-PhysicalDeviceProperties PhysicalDevice::getPhysicalDeviceProperties2() const
+PhysicalDeviceProperties PhysicalDevice::getPhysicalDeviceProperties2()
 {
     PhysicalDeviceProperties physicalDeviceProperties;
     vkGetPhysicalDeviceProperties2(m_vkPhysicalDevice, physicalDeviceProperties);
     return physicalDeviceProperties;
 }
 
-std::vector<VkExtensionProperties> PhysicalDevice::EnumerateDeviceExtensionProperties() const
+std::vector<VkExtensionProperties> PhysicalDevice::EnumerateDeviceExtensionProperties()
 {
     uint32_t propertyCount;
     vkEnumerateDeviceExtensionProperties(m_vkPhysicalDevice, nullptr, &propertyCount, nullptr);
@@ -38,31 +38,22 @@ std::vector<VkExtensionProperties> PhysicalDevice::EnumerateDeviceExtensionPrope
     return extensions;
 }
 
-VkPhysicalDeviceMemoryProperties PhysicalDevice::getPhysicalDeviceMemoryProperties() const
+PhysicalDeviceMemoryProperties PhysicalDevice::getPhysicalDeviceMemoryProperties()
 {
     VkPhysicalDeviceMemoryProperties vkPhysicalDeviceMemoryProperties;
     vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice, &vkPhysicalDeviceMemoryProperties);
-    return vkPhysicalDeviceMemoryProperties;
+    return PhysicalDeviceMemoryProperties(vkPhysicalDeviceMemoryProperties);
 }
 
 uint32_t PhysicalDevice::findMemoryTypeIndex(
     uint32_t usableMemoryIndexBits,
-    MemoryPropertyFlags requiredPropertiesArg) const
+    MemoryPropertyFlags requiredPropertiesArg)
 {
-    MemoryPropertyFlags requiredProperties(requiredPropertiesArg);
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(m_vkPhysicalDevice, &memProperties);
-
-    for (uint32_t index = 0; index < memProperties.memoryTypeCount; index++) {
-        if ((usableMemoryIndexBits & (1 << index))
-            && bitsSet(memProperties.memoryTypes[index].propertyFlags, requiredProperties)) {
-            return index;
-        }
-    }
-    throw std::runtime_error("failed to find suitable memory type!");
+	return getPhysicalDeviceMemoryProperties().findMemoryTypeIndex(
+		usableMemoryIndexBits, requiredPropertiesArg);
 }
 
-std::vector<VkQueueFamilyProperties> PhysicalDevice::getAllQueueFamilyProperties() const
+std::vector<VkQueueFamilyProperties> PhysicalDevice::getAllQueueFamilyProperties()
 {
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(m_vkPhysicalDevice, &queueFamilyCount, nullptr);
@@ -72,7 +63,7 @@ std::vector<VkQueueFamilyProperties> PhysicalDevice::getAllQueueFamilyProperties
     return allQueueFamilyProperties;
 }
 
-Queue Device::getDeviceQueue(int deviceQueueFamilyIndex, int deviceQueueIndex) const
+Queue Device::getDeviceQueue(int deviceQueueFamilyIndex, int deviceQueueIndex)
 {
     VkQueue vkQueue;
     vkGetDeviceQueue(m_handle, deviceQueueFamilyIndex, deviceQueueIndex, &vkQueue);
@@ -119,6 +110,7 @@ void VulkanContext::init(const VulkanContextCreateInfo& vulkanContextCreateInfo)
     s_vulkanContext.m_physicalDeviceOriginal = PhysicalDevice(allPhysicalDevices[0]);
     m_physicalDeviceFeatures = physicalDevice().getPhysicalDeviceFeatures2();
     m_physicalDeviceProperties = physicalDevice().getPhysicalDeviceProperties2();
+	m_physicalDeviceMemoryProperties = physicalDevice().getPhysicalDeviceMemoryProperties();
 
     DeviceCreateInfo deviceCreateInfo;
     deviceCreateInfo.addExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -142,17 +134,17 @@ void initVulkanContext(const VulkanContextCreateInfo& vulkanContextCreateInfo)
     s_vulkanContext.init(vulkanContextCreateInfo);
 }
 
-const VulkanInstance& vulkanInstance()
+VulkanInstance& vulkanInstance()
 {
     return s_vulkanContext.vulkanInstanceContext();
 }
 
-const PhysicalDevice& physicalDevice()
+PhysicalDevice& physicalDevice()
 {
     return s_vulkanContext.physicalDeviceContext();
 }
 
-const Device& device()
+Device& device()
 {
     return s_vulkanContext.deviceContext();
 }
@@ -171,5 +163,13 @@ VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
 {
     return s_vulkanContext.vkPhysicalDeviceFeatures();
 }
+
+uint32_t findMemoryTypeIndex(
+	uint32_t usableMemoryIndexBits,
+	MemoryPropertyFlags requiredProperties) {
+
+	return s_vulkanContext.findMemoryTypeIndex(usableMemoryIndexBits, requiredProperties);
+}
+
 
 };

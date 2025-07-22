@@ -793,7 +793,8 @@ void VulkanExampleBase::setupDepthStencil()
     VkMemoryAllocateInfo memAlloc {};
     memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    memAlloc.memoryTypeIndex
+		= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
     m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(memAlloc);
 
     // VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllloc, nullptr, &m_defaultDepthStencil.m_deviceMemory));

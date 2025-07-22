@@ -21,11 +21,16 @@ namespace vks
 	* @brief Encapsulates access to a Vulkan buffer backed up by device memory
 	* @note To be filled by an external source like the VulkanDevice
 	*/
-	struct Buffer
+	class Buffer
 	{
+
+	public:
+
 		VkDevice m_vkDevice;
+
 		VkBuffer m_vkBuffer = VK_NULL_HANDLE;
 		VkDeviceMemory m_vkMemory = VK_NULL_HANDLE;
+
 		VkDescriptorBufferInfo m_vkDescriptorBufferInfo;
 		VkDeviceSize m_size = 0;
 		VkDeviceSize m_alignment = 0;
