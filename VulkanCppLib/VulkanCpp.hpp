@@ -316,17 +316,96 @@ static const ShaderStageFlags SHADER_STAGE_ALL_GRAPHICS(VK_SHADER_STAGE_ALL_GRAP
 // VK_SHADER_STAGE_MESH_BIT_NV = VK_SHADER_STAGE_MESH_BIT_EXT,
 // VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
 
-class Device;
-
-template <typename Handle_t, typename Owner_t = VkDevice>
-class InteropHandle3 {
+template <typename Handle_t>
+class InteropHandle2 {
 
 public:
-    using DestroyFunc_t = void (*)(Handle_t, Owner_t);
+    using DestroyFunc_t = void (*)(Handle_t);
 
 protected:
     Handle_t m_handle {};
-    Owner_t m_owner {};
+    DestroyFunc_t m_pfnDestroy = nullptr;
+
+    InteropHandle2() = default;
+
+    ~InteropHandle2()
+    {
+        //  Call the handle specific destroy function.
+        if (m_pfnDestroy) {
+            (*m_pfnDestroy)(m_handle);
+        }
+        m_handle = Handle_t {};
+    }
+
+    //	TODO: is std::move really necessary?
+    //	Creates an original.
+    InteropHandle2(Handle_t handle, DestroyFunc_t pfnDestroy)
+        : m_handle(std::move(handle))
+        , m_pfnDestroy(pfnDestroy)
+    {
+    }
+
+    //	Creates a copy.
+    InteropHandle2(Handle_t handle)
+        : m_handle(handle)
+        , m_pfnDestroy(nullptr)
+    {
+    }
+
+    //	Creates a copy.
+    InteropHandle2(const InteropHandle2& other)
+        : m_handle(other.m_handle)
+        , m_pfnDestroy(nullptr)
+    {
+    }
+
+    // InteropHandle2& operator=(const InteropHandle2& other) {
+    //	if (this == &other) {
+    //		return *this;
+    //	}
+    //	this->~InteropHandle2();
+    //	new (this) InteropHandle2(other);
+    //	return *this;
+    // }
+
+    //	Note that if other is an original, this becomes the original
+    InteropHandle2(InteropHandle2&& other) noexcept
+        : m_handle(std::move(other.m_handle))
+        , m_pfnDestroy(other.m_pfnDestroy)
+    {
+        other.m_handle = Handle_t {};
+        other.m_pfnDestroy = nullptr;
+    }
+
+
+public:
+    operator bool() const
+    {
+        return !!m_handle;
+    }
+
+    //  Handy interoperability type conversion.
+    //  We can pass our objects to Vulkan functions
+    //  and have the Vulkan m_vkBuffer extracted automagically.
+    //  Keeps the code tidier.
+    operator Handle_t() const
+    {
+        if (!m_handle) {
+            throw NullHandleException();
+        }
+        return m_handle;
+    }
+};
+
+template <typename Handle_t, typename Manager_t = VkDevice>
+class InteropHandle3 {
+
+public:
+    using DestroyFunc_t = void (*)(Handle_t, Manager_t);
+
+protected:
+    Handle_t m_handle {};
+    Manager_t m_manager {};
     DestroyFunc_t m_pfnDestroy = nullptr;
 
     InteropHandle3() = default;
@@ -335,61 +414,35 @@ protected:
     {
         //  Call the handled specific destroy function.
         if (m_pfnDestroy && m_handle) {
-            (*m_pfnDestroy)(m_handle, m_owner);
+            (*m_pfnDestroy)(m_handle, m_manager);
         }
         m_handle = Handle_t {};
     }
 
-    InteropHandle3(Handle_t handle, Owner_t owner, DestroyFunc_t pfnDestroy)
+    InteropHandle3(Handle_t handle, Manager_t manager, DestroyFunc_t pfnDestroy)
         : m_handle(std::move(handle))
-        , m_owner(std::move(owner))
+        , m_manager(std::move(manager))
         , m_pfnDestroy(pfnDestroy)
-    {
-    }
-
-    InteropHandle3(Handle_t handle, Owner_t owner)
-        : m_handle(std::move(handle))
-        , m_owner(std::move(owner))
-        , m_pfnDestroy(nullptr)
     {
     }
 
     InteropHandle3(const InteropHandle3& other)
         : m_handle(other.m_handle)
-        , m_owner(other.m_owner)
+        , m_manager(other.m_manager)
         , m_pfnDestroy(nullptr)
     {
     }
 
-    InteropHandle3& operator=(const InteropHandle3& other)
-    {
-        if (this == &other) {
-            return *this;
-        }
-        this->~InteropHandle3();
-        new (this) InteropHandle3(other);
-        return *this;
-    }
-
     InteropHandle3(InteropHandle3&& other) noexcept
         : m_handle(std::move(other.m_handle))
-        , m_owner(std::move(other.m_owner))
+        , m_manager(std::move(other.m_manager))
         , m_pfnDestroy(std::move(other.m_pfnDestroy))
     {
         other.m_handle = Handle_t {};
-        other.m_owner = Owner_t {};
+        other.m_manager = Manager_t {};
         other.m_pfnDestroy = nullptr;
     }
 
-    InteropHandle3& operator=(InteropHandle3&& other) noexcept
-    {
-        if (this == &other) {
-            return *this;
-        }
-        this->~InteropHandle3();
-        new (this) InteropHandle3(std::move(other));
-        return *this;
-    }
 
 public:
     operator bool() const { return !!m_handle; }
@@ -406,25 +459,14 @@ public:
         return m_handle;
     }
 
-    Owner_t getOwner() const
+    Manager_t getManager() const
     {
-        if (!m_owner) {
+        if (!m_manager) {
             throw NullHandleException();
         }
-        return m_owner;
+        return m_manager;
     }
 
-    //  Most of the time, the owner is a VkDevice or Device.
-    //  In those cases, we can have a more descriptive, type-checked name.
-    VkDevice getVkDevice() const
-        requires std::same_as<Owner_t, VkDevice>
-        || std::same_as<Owner_t, Device>
-    {
-        if (!m_owner) {
-            throw NullHandleException();
-        }
-        return m_owner;
-    }
 };
 
 class VersionNumber {
@@ -1347,6 +1389,39 @@ class Device : public InteropHandle3<VkDevice, VkPhysicalDevice> {
 
 public:
     Device() = default;
+	~Device() {
+
+	}
+
+    Device(const Device& other)
+        : InteropHandle3(other)
+    {
+    }
+
+    Device& operator=(const Device& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Device();
+        new (this) Device(other);
+        return *this;
+    }
+
+    Device(Device&& other) noexcept
+        : InteropHandle3(std::move(other))
+    {
+    }
+
+    Device& operator=(Device&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Device();
+        new (this) Device(std::move(other));
+        return *this;
+    }
 
     Device(DeviceCreateInfo& deviceCreateInfo, PhysicalDevice physicalDevice)
     {
@@ -1360,7 +1435,7 @@ public:
 
     PhysicalDevice getPhysicalDevice()
     {
-        return PhysicalDevice(getOwner());
+        return PhysicalDevice(getManager());
     }
 
     Queue getDeviceQueue(int deviceQueueFamily, int deviceQueueIndex);
@@ -1397,17 +1472,17 @@ public:
     VulkanContext() = default;
     ~VulkanContext() = default;
 
-    VulkanInstance& vulkanInstanceContext()
+    VulkanInstance vulkanInstanceFromContext()
     {
         return m_vulkanInstanceOriginal;
     }
 
-    PhysicalDevice& physicalDeviceContext()
+    PhysicalDevice physicalDeviceFromContext()
     {
         return m_physicalDeviceOriginal;
     }
 
-    Device& deviceContext()
+    Device deviceFromContext()
     {
         return m_deviceOriginal;
     }
@@ -1451,9 +1526,9 @@ extern VulkanContext s_vulkanContext;
 //	vkcpp::device,
 //	etc
 void initVulkanContext(const VulkanContextCreateInfo& vulkanContextCreateInfo);
-VulkanInstance& vulkanInstance();
-PhysicalDevice& physicalDevice();
-Device& device();
+VulkanInstance vulkanInstance();
+PhysicalDevice physicalDevice();
+Device device();
 VkDevice vkDevice();
 VkPhysicalDeviceProperties& vkPhysicalDeviceProperties();
 VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
@@ -1528,13 +1603,13 @@ public:
     void close() const
     {
         VkFence vkFence = *this;
-        vkResetFences(m_owner, 1, &vkFence);
+        vkResetFences(vkDevice(), 1, &vkFence);
     }
 
     void wait() const
     {
         VkFence vkFence = *this;
-        vkWaitForFences(m_owner, 1, &vkFence, VK_TRUE, UINT64_MAX);
+        vkWaitForFences(vkDevice(), 1, &vkFence, VK_TRUE, UINT64_MAX);
     }
 };
 
@@ -1565,6 +1640,39 @@ class DeviceMemory : public InteropHandle3<VkDeviceMemory> {
 
 public:
     DeviceMemory() = default;
+    ~DeviceMemory() = default;
+
+    DeviceMemory(const DeviceMemory& other)
+        : InteropHandle3(other)
+        , m_size(other.m_size)
+    {
+    }
+
+    DeviceMemory& operator=(const DeviceMemory& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~DeviceMemory();
+        new (this) DeviceMemory(other);
+        return *this;
+    }
+
+    DeviceMemory(DeviceMemory&& other) noexcept
+        : InteropHandle3(std::move(other))
+        , m_size(other.m_size)
+    {
+    }
+
+    DeviceMemory& operator=(DeviceMemory&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~DeviceMemory();
+        new (this) DeviceMemory(std::move(other));
+        return *this;
+    }
 
     DeviceMemory(const VkMemoryAllocateInfo& vkMemoryAllocateInfo)
     {
@@ -1621,15 +1729,15 @@ public:
     }
 };
 
-class Buffer : public InteropHandle3<VkBuffer, Device> {
+class Buffer : public InteropHandle3<VkBuffer, VkDevice> {
 
-    static void destroy(VkBuffer vkBuffer, Device device)
+    static void destroy(VkBuffer vkBuffer, VkDevice vkDevice)
     {
-        vkDestroyBuffer(device, vkBuffer, nullptr);
+		vkDestroyBuffer(vkDevice, vkBuffer, nullptr);
     }
 
-    Buffer(VkBuffer vkBuffer, const Device& device, VkDeviceSize size, DestroyFunc_t pfnDestroy)
-        : InteropHandle3(vkBuffer, device, pfnDestroy)
+    Buffer(VkBuffer vkBuffer, VkDevice vkDevice, VkDeviceSize size, DestroyFunc_t pfnDestroy)
+        : InteropHandle3(vkBuffer, vkDevice, pfnDestroy)
         , m_size(size)
     {
     }
@@ -1638,6 +1746,43 @@ class Buffer : public InteropHandle3<VkBuffer, Device> {
 
 public:
     Buffer() = default;
+	~Buffer() {
+
+	}
+
+    Buffer(const Buffer& other)
+        : InteropHandle3(other)
+        , m_size(other.m_size)
+    {
+    }
+
+    Buffer& operator=(const Buffer& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+
+        this->~Buffer();
+        new (this) Buffer(other);
+        return *this;
+    }
+
+    Buffer(Buffer&& other) noexcept
+        : InteropHandle3(std::move(other))
+        , m_size(other.m_size)
+    {
+    }
+
+    Buffer& operator=(Buffer&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+
+        this->~Buffer();
+        new (this) Buffer(std::move(other));
+        return *this;
+    }
 
     Buffer(
         VkBufferUsageFlags vkBufferUsageFlags,
@@ -1668,7 +1813,7 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Buffer(vkBuffer, device(), vkBufferCreateInfo.size, &destroy);
+        new (this) Buffer(vkBuffer, vkDevice(), vkBufferCreateInfo.size, &destroy);
     }
 
     VkDeviceSize size() const
@@ -2314,8 +2459,8 @@ public:
         if (m_vkRenderPassCreateInfo.subpassCount > 0) {
             for (SubpassDescription& subpassDescription : m_subpassDescriptions) {
                 //	TODO: investigate.  This is either really clever or really risky.
-                //	We assemble the subpass description and then push back
-                //	a copy of the VkSubpassDescription part of our structure.
+                //	Since the subpass description is always up to date, we just
+                //  copy the vkSubpassDescription part into the array of subpass descriptions.
                 m_vkSubpassDescriptions.emplace_back(subpassDescription.vkSubpassDescription());
             }
             m_vkRenderPassCreateInfo.pSubpasses = m_vkSubpassDescriptions.data();
@@ -2339,6 +2484,33 @@ class RenderPass : public InteropHandle3<VkRenderPass> {
 
 public:
     RenderPass() = default;
+    ~RenderPass() = default;
+    RenderPass(const RenderPass& other)
+        : InteropHandle3(other)
+    {
+    }
+    RenderPass& operator=(const RenderPass& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~RenderPass();
+        new (this) RenderPass(other);
+        return *this;
+    }
+    RenderPass(RenderPass&& other) noexcept
+        : InteropHandle3(std::move(other))
+    {
+    }
+    RenderPass& operator=(RenderPass&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~RenderPass();
+        new (this) RenderPass(std::move(other));
+        return *this;
+    }
 
     RenderPass(RenderPassCreateInfo& renderPassCreateInfo)
     {
@@ -2460,7 +2632,7 @@ public:
     VkMemoryRequirements getMemoryRequirements() const
     {
         VkMemoryRequirements vkMemoryRequirements;
-        vkGetImageMemoryRequirements(getVkDevice(), *this, &vkMemoryRequirements);
+        vkGetImageMemoryRequirements(vkDevice(), *this, &vkMemoryRequirements);
         return vkMemoryRequirements;
     }
 
@@ -2470,7 +2642,7 @@ public:
         VkMemoryAllocateInfo vkMemoryAllocateInfo {};
         vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
-        vkMemoryAllocateInfo.memoryTypeIndex = getOwner().findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, requiredProperties);
+        vkMemoryAllocateInfo.memoryTypeIndex = findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, requiredProperties);
         return vkcpp::DeviceMemory(vkMemoryAllocateInfo);
     }
 
@@ -2525,6 +2697,37 @@ public:
     //	TODO: need to start remembering some info about the m_vkImage and how the
     //	imageview was created to make things easier to use later.
     ImageView() = default;
+    ~ImageView() = default;
+
+    ImageView(const ImageView& other)
+        : InteropHandle3(other)
+    {
+    }
+
+    ImageView& operator=(const ImageView& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~ImageView();
+        new (this) ImageView(other);
+        return *this;
+    }
+
+    ImageView(ImageView&& other) noexcept
+        : InteropHandle3(std::move(other))
+    {
+    }
+
+    ImageView& operator=(ImageView&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~ImageView();
+        new (this) ImageView(std::move(other));
+        return *this;
+    }
 
     ImageView(const VkImageViewCreateInfo& vkImageViewCreateInfo)
     {
@@ -2759,6 +2962,39 @@ class CommandPool : public InteropHandle3<VkCommandPool> {
 
 public:
     CommandPool() = default;
+    ~CommandPool() = default;
+
+    CommandPool(const CommandPool& other)
+        : InteropHandle3(other)
+    {
+    }
+
+    CommandPool& operator=(const CommandPool& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+
+        this->~CommandPool();
+        new (this) CommandPool(other);
+        return *this;
+    }
+
+    CommandPool(CommandPool&& other) noexcept
+        : InteropHandle3(std::move(other))
+    {
+    }
+
+    CommandPool& operator=(CommandPool&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+
+        this->~CommandPool();
+        new (this) CommandPool(std::move(other));
+        return *this;
+    }
 
     CommandPool(const VkCommandPoolCreateInfo& commandPoolCreateInfo)
     {
@@ -2871,7 +3107,7 @@ class CommandBuffer : public InteropHandle3<VkCommandBuffer, CommandPool> {
     //	the device in addition to the regular owner object.
     static void destroy(VkCommandBuffer vkCommandBuffer, CommandPool commandPool)
     {
-        vkFreeCommandBuffers(commandPool.getVkDevice(), commandPool, 1, &vkCommandBuffer);
+        vkFreeCommandBuffers(vkDevice(), commandPool, 1, &vkCommandBuffer);
     }
 
     CommandBuffer(
@@ -2893,7 +3129,7 @@ public:
         allocInfo.commandPool = commandPool;
         allocInfo.commandBufferCount = 1;
         VkCommandBuffer vkCommandBuffer;
-        vkAllocateCommandBuffers(commandPool.getVkDevice(), &allocInfo, &vkCommandBuffer);
+        vkAllocateCommandBuffers(vkDevice(), &allocInfo, &vkCommandBuffer);
         new (this) CommandBuffer(vkCommandBuffer, commandPool, &destroy);
     }
 
@@ -3319,7 +3555,7 @@ public:
     PresentInfo(const PresentInfo&) = delete;
     PresentInfo& operator=(const PresentInfo&) = delete;
     PresentInfo(PresentInfo&&) noexcept = delete;
-    PresentInfo& operator=(PresentInfo&&) = delete;
+    PresentInfo& operator=(PresentInfo&&) noexcept = delete;
 
     void addWaitSemaphore(VkSemaphore vkSemaphore)
     {
@@ -3346,6 +3582,37 @@ public:
     uint32_t m_queueFamilyIndex = 0;
 
     Queue() = default;
+    ~Queue() = default;
+
+    Queue(const Queue& other)
+        : InteropHandle3(other)
+    {
+    }
+
+    Queue& operator=(const Queue& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Queue();
+        new (this) Queue(other);
+        return *this;
+    }
+
+    Queue(Queue&& other) noexcept
+        : InteropHandle3(std::move(other))
+    {
+    }
+
+    Queue& operator=(Queue&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Queue();
+        new (this) Queue(std::move(other));
+        return *this;
+    }
 
     //	Queues always come from the m_vkDevice and are never (explicitly) destroyed
     Queue(VkQueue vkQueue, uint32_t queueFamilyIndex)
@@ -3353,12 +3620,6 @@ public:
         , m_queueFamilyIndex(queueFamilyIndex)
     {
     }
-
-    ~Queue() = default;
-    Queue(const Queue&) = default;
-    Queue& operator=(const Queue&) = default;
-    Queue(Queue&&) noexcept = default;
-    Queue& operator=(Queue&&) noexcept = default;
 
     static Queue makeCopy(VkQueue vkQueue)
     {
@@ -3499,6 +3760,37 @@ class DescriptorPool : public InteropHandle3<VkDescriptorPool> {
 
 public:
     DescriptorPool() = default;
+    ~DescriptorPool() = default;
+
+    DescriptorPool(const DescriptorPool& other)
+        : InteropHandle3(other)
+    {
+    }
+
+    DescriptorPool& operator=(const DescriptorPool& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~DescriptorPool();
+        new (this) DescriptorPool(other);
+        return *this;
+    }
+
+    DescriptorPool(DescriptorPool&& other) noexcept
+        : InteropHandle3(std::move(other))
+    {
+    }
+
+    DescriptorPool& operator=(DescriptorPool&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~DescriptorPool();
+        new (this) DescriptorPool(std::move(other));
+        return *this;
+    }
 
     DescriptorPool(const DescriptorPoolCreateInfo& descriptorPoolCreateInfo)
     {
@@ -3927,7 +4219,7 @@ class DescriptorSet : public InteropHandle3<VkDescriptorSet, DescriptorPool> {
 
     static void destroy(VkDescriptorSet vkDescriptorSet, DescriptorPool descriptorPool)
     {
-        vkFreeDescriptorSets(descriptorPool.getVkDevice(), descriptorPool, 1, &vkDescriptorSet);
+        vkFreeDescriptorSets(vkDevice(), descriptorPool, 1, &vkDescriptorSet);
     }
 
 public:
@@ -3969,7 +4261,7 @@ public:
 
         VkDescriptorSet vkDescriptorSet;
         VkResult vkResult = vkAllocateDescriptorSets(
-            descriptorPool.getVkDevice(),
+            vkDevice(),
             &vkDescriptorSetAllocateInfo,
             &vkDescriptorSet);
         if (vkResult != VK_SUCCESS) {
@@ -4039,6 +4331,37 @@ class PipelineLayout : public InteropHandle3<VkPipelineLayout> {
 
 public:
     PipelineLayout() = default;
+    ~PipelineLayout() = default;
+
+    PipelineLayout(const PipelineLayout& other)
+        : InteropHandle3(other)
+    {
+    }
+
+    PipelineLayout& operator=(const PipelineLayout& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~PipelineLayout();
+        new (this) PipelineLayout(other);
+        return *this;
+    }
+
+    PipelineLayout(PipelineLayout&& other) noexcept
+        : InteropHandle3(std::move(other))
+    {
+    }
+
+    PipelineLayout& operator=(PipelineLayout&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~PipelineLayout();
+        new (this) PipelineLayout(std::move(other));
+        return *this;
+    }
 
     PipelineLayout(const PipelineLayoutCreateInfo& pipelineLayoutCreateInfo)
     {
@@ -4415,8 +4738,8 @@ public:
     ~GraphicsPipelineCreateInfo() = default;
     GraphicsPipelineCreateInfo(const GraphicsPipelineCreateInfo&) = delete;
     GraphicsPipelineCreateInfo& operator=(const GraphicsPipelineCreateInfo&) = delete;
-    GraphicsPipelineCreateInfo(GraphicsPipelineCreateInfo&&) = delete;
-    GraphicsPipelineCreateInfo& operator=(GraphicsPipelineCreateInfo&&) = delete;
+    GraphicsPipelineCreateInfo(GraphicsPipelineCreateInfo&&) noexcept = delete;
+    GraphicsPipelineCreateInfo& operator=(GraphicsPipelineCreateInfo&&) noexcept = delete;
 
     VkGraphicsPipelineCreateInfo* operator&()
     {
@@ -4583,6 +4906,35 @@ class GraphicsPipeline : public InteropHandle3<VkPipeline> {
 
 public:
     GraphicsPipeline() = default;
+    ~GraphicsPipeline() = default;
+
+    GraphicsPipeline(const GraphicsPipeline& other)
+        : InteropHandle3(other)
+    {
+    }
+
+	GraphicsPipeline& operator=(const GraphicsPipeline& other) {
+		if (this == &other) {
+			return *this;
+		}
+		this -> ~GraphicsPipeline();
+		new (this) GraphicsPipeline(other);
+		return *this;
+	}
+
+	GraphicsPipeline(GraphicsPipeline&& other) noexcept
+		: InteropHandle3(std::move(other)) {
+	}
+
+	GraphicsPipeline& operator=(GraphicsPipeline&& other) noexcept {
+		if (this == &other) {
+			return *this;
+		}
+		this -> ~GraphicsPipeline();
+		new (this) GraphicsPipeline(std::move(other));
+		return *this;
+	}
+
 
     GraphicsPipeline(GraphicsPipelineCreateInfo& pipelineCreateInfo)
     {
@@ -4655,6 +5007,39 @@ class Swapchain : public InteropHandle3<VkSwapchainKHR, Device> {
 
 public:
     Swapchain() = default;
+    ~Swapchain() = default;
+
+    Swapchain(const Swapchain& other)
+        : InteropHandle3(other)
+        , m_vkSwapchainImageExtent(other.m_vkSwapchainImageExtent)
+    {
+    }
+
+    Swapchain& operator=(const Swapchain& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Swapchain();
+        new (this) Swapchain(other);
+        return *this;
+    }
+
+    Swapchain(Swapchain&& other) noexcept
+        : InteropHandle3(std::move(other))
+        , m_vkSwapchainImageExtent(other.m_vkSwapchainImageExtent)
+    {
+    }
+
+    Swapchain& operator=(Swapchain&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Swapchain();
+        new (this) Swapchain(std::move(other));
+        return *this;
+    }
 
     Swapchain(const VkSwapchainCreateInfoKHR& vkSwapchainCreateInfo)
     {
@@ -4671,12 +5056,12 @@ public:
     std::vector<VkImage> getImages() const
     {
         uint32_t swapchainImageCount;
-        VkResult vkResult = vkGetSwapchainImagesKHR(getVkDevice(), *this, &swapchainImageCount, nullptr);
+        VkResult vkResult = vkGetSwapchainImagesKHR(vkDevice(), *this, &swapchainImageCount, nullptr);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
         std::vector<VkImage> swapchainImages(swapchainImageCount);
-        vkResult = vkGetSwapchainImagesKHR(getVkDevice(), *this, &swapchainImageCount, swapchainImages.data());
+        vkResult = vkGetSwapchainImagesKHR(vkDevice(), *this, &swapchainImageCount, swapchainImages.data());
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
@@ -5029,7 +5414,7 @@ public:
         destroyFrameBuffers();
         //	TODO: can we set the old swapchain to avoid this?
         //	Explicitly destroy the old swapchain for now.
-        m_swapchain = std::move(Swapchain());
+        m_swapchain = Swapchain();
 
         m_swapchain = std::move(createSwapchain(m_swapchainCreateInfo, m_surface));
         if (!m_swapchain) {

@@ -162,13 +162,6 @@ VulkanExample::~VulkanExample()
 		vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.matrices, nullptr);
 		vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.textures, nullptr);
-		indices.destroy();
-		shaderData.buffer.destroy();
-		separateVertexBuffers.normal.destroy();
-		separateVertexBuffers.pos.destroy();
-		separateVertexBuffers.tangent.destroy();
-		separateVertexBuffers.uv.destroy();
-		interleavedVertexBuffer.destroy();
 		for (Image image : scene.images) {
 			vkDestroyImageView(m_pVulkanDevice->m_device, image.texture.m_vkImageView, nullptr);
 			vkDestroyImage(m_pVulkanDevice->m_device, image.texture.m_vkImage, nullptr);
@@ -228,49 +221,52 @@ void VulkanExample::buildCommandBuffers()
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValues;
 
-	const VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-	const VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
+	//const VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
+	//const VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
 
 	for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i)
 	{
+		vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
+
 		renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
-		VK_CHECK_RESULT(vkBeginCommandBuffer(m_drawCommandBuffers[i], &cmdBufInfo));
-		vkCmdBeginRenderPass(m_drawCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdSetViewport(m_drawCommandBuffers[i], 0, 1, &viewport);
-		vkCmdSetScissor(m_drawCommandBuffers[i], 0, 1, &scissor);
+
+		commandBuffer.begin(cmdBufInfo);
+		commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
+		commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
+		commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
+
 
 		// Select the separate or interleaved vertex binding pipeline
-		vkCmdBindPipeline(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vertexAttributeSettings == VertexAttributeSettings::separate ? pipelines.vertexAttributesSeparate : pipelines.vertexAttributesInterleaved);
+		commandBuffer.cmdBindPipeline(
+			vertexAttributeSettings == VertexAttributeSettings::separate
+			? pipelines.vertexAttributesSeparate
+			: pipelines.vertexAttributesInterleaved);
+		commandBuffer.cmdBindDescriptorSet(descriptorSet, m_vkPipelineLayout);
+		commandBuffer.cmdBindIndexBuffer(indices.m_buffer, VK_INDEX_TYPE_UINT32);
 
-		// Bind scene matrices descriptor to set 0
-		vkCmdBindDescriptorSets(m_drawCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-
-		// Use the same index buffer, no matter how vertex attributes are passed
-		vkCmdBindIndexBuffer(m_drawCommandBuffers[i], indices.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 		if (vertexAttributeSettings == VertexAttributeSettings::separate) {
 			// Using separate vertex attribute bindings requires binding multiple attribute buffers
 			VkDeviceSize offsets[4] = { 0, 0, 0, 0 };
 			std::array<VkBuffer, 4> buffers = {
-				separateVertexBuffers.pos.m_vkBuffer,
-				separateVertexBuffers.normal.m_vkBuffer,
-				separateVertexBuffers.uv.m_vkBuffer,
-				separateVertexBuffers.tangent.m_vkBuffer };
-			vkCmdBindVertexBuffers(m_drawCommandBuffers[i], 0, static_cast<uint32_t>(buffers.size()), buffers.data(), offsets);
+				separateVertexBuffers.pos.m_buffer,
+				separateVertexBuffers.normal.m_buffer,
+				separateVertexBuffers.uv.m_buffer,
+				separateVertexBuffers.tangent.m_buffer };
+			vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(buffers.size()), buffers.data(), offsets);
 		}
 		else {
 			// Using interleaved attribute bindings only requires one buffer to be bound
-			VkDeviceSize offsets[1] = { 0 };
-			vkCmdBindVertexBuffers(m_drawCommandBuffers[i], 0, 1, &interleavedVertexBuffer.m_vkBuffer, offsets);
+			commandBuffer.cmdBindVertexBuffer(interleavedVertexBuffer.m_buffer);
 		}
 		// Render all nodes starting at top-level
 		for (auto& node : nodes) {
-			drawSceneNode(m_drawCommandBuffers[i], node);
+			drawSceneNode(commandBuffer, node);
 		}
 
-		drawUI(m_drawCommandBuffers[i]);
-		vkCmdEndRenderPass(m_drawCommandBuffers[i]);
-		VK_CHECK_RESULT(vkEndCommandBuffer(m_drawCommandBuffers[i]));
+		drawUI(commandBuffer);
+		commandBuffer.cmdEndRenderPass();
+		commandBuffer.end();
 	}
 }
 
@@ -342,14 +338,19 @@ void VulkanExample::uploadVertexData()
 {
 	// Upload vertex and index buffers
 
+	//	TODO: why????
 	// Anonymous functions to simplify buffer creation
 	// Create a staging buffer used as a source for copies
 	auto createStagingBuffer = [this](vks::Buffer& buffer, void* data, VkDeviceSize size) {
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, size, data));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+			&buffer, size, data));
 	};
 	// Create a m_vkDevice local buffer used as a target for copies
 	auto createDeviceBuffer = [this](vks::Buffer& buffer, VkDeviceSize size, VkBufferUsageFlags usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) {
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(usageFlags | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &buffer, size));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			usageFlags | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL, &buffer, size));
 	};
 
 	VkCommandBuffer copyCmd;
@@ -367,9 +368,8 @@ void VulkanExample::uploadVertexData()
 	// Copy data from staging buffer (host) do m_vkDevice local buffer (gpu)
 	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	copyRegion.size = vertexBufferSize;
-	vkCmdCopyBuffer(copyCmd, vertexStaging.m_vkBuffer, interleavedVertexBuffer.m_vkBuffer, 1, &copyRegion);
+	vkCmdCopyBuffer(copyCmd, vertexStaging.m_buffer, interleavedVertexBuffer.m_buffer, 1, &copyRegion);
 	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
-	vertexStaging.destroy();
 
 	/*
 		Separate vertex attributes
@@ -398,13 +398,10 @@ void VulkanExample::uploadVertexData()
 	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	for (size_t i = 0; i < attributeBuffers.size(); i++) {
 		copyRegion.size = attributeBuffers[i].m_size;
-		vkCmdCopyBuffer(copyCmd, stagingBuffers[i].m_vkBuffer, attributeBuffers[i].m_vkBuffer, 1, &copyRegion);
+		vkCmdCopyBuffer(copyCmd, stagingBuffers[i].m_buffer, attributeBuffers[i].m_buffer, 1, &copyRegion);
 	}
 	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
 
-	for (size_t i = 0; i < 4; i++) {
-		stagingBuffers[i].destroy();
-	}
 
 	/*
 		Index buffer
@@ -417,10 +414,8 @@ void VulkanExample::uploadVertexData()
 	// Copy data from staging buffer (host) do m_vkDevice local buffer (gpu)
 	copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	copyRegion.size = indexBufferSize;
-	vkCmdCopyBuffer(copyCmd, indexStaging.m_vkBuffer, indices.m_vkBuffer, 1, &copyRegion);
+	vkCmdCopyBuffer(copyCmd, indexStaging.m_buffer, indices.m_buffer, 1, &copyRegion);
 	m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
-	// Free staging resources
-	indexStaging.destroy();
 }
 
 void VulkanExample::loadAssets()
@@ -557,7 +552,7 @@ void VulkanExample::prepareUniformBuffers()
 {
 	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
 		&shaderData.buffer,
 		sizeof(shaderData.values)));
 	VK_CHECK_RESULT(shaderData.buffer.map());

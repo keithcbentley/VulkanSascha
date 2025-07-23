@@ -134,24 +134,24 @@ void initVulkanContext(const VulkanContextCreateInfo& vulkanContextCreateInfo)
     s_vulkanContext.init(vulkanContextCreateInfo);
 }
 
-VulkanInstance& vulkanInstance()
+VulkanInstance vulkanInstance()
 {
-    return s_vulkanContext.vulkanInstanceContext();
+    return s_vulkanContext.vulkanInstanceFromContext();
 }
 
-PhysicalDevice& physicalDevice()
+PhysicalDevice physicalDevice()
 {
-    return s_vulkanContext.physicalDeviceContext();
+    return s_vulkanContext.physicalDeviceFromContext();
 }
 
-Device& device()
+Device device()
 {
-    return s_vulkanContext.deviceContext();
+    return s_vulkanContext.deviceFromContext();
 }
 
 VkDevice vkDevice()
 {
-    return s_vulkanContext.deviceContext();
+    return s_vulkanContext.deviceFromContext();
 }
 
 VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
