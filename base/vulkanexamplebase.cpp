@@ -857,7 +857,7 @@ void VulkanExampleBase::setupRenderPass()
         = vkcpp::AttachmentDescription::simpleColorPresent(m_swapChain.colorFormat);
 
     renderPassCreateInfo.attachmentDescription(depthAttachmentIndex)
-        = vkcpp::AttachmentDescription::simpleDepth(m_vkFormatDepth);
+        = vkcpp::AttachmentDescription::simpleDepthStencil(m_vkFormatDepth);
 
     //	One subpass
     renderPassCreateInfo.subpassDescription(theOnlySubpassIndex)
@@ -866,7 +866,7 @@ void VulkanExampleBase::setupRenderPass()
 
     // Subpass dependencies for layout transitions
     renderPassCreateInfo.addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
-        .addSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0)
+        .addSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_NONE)
         .addDst(
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);

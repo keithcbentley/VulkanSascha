@@ -140,25 +140,6 @@ public:
         }
     }
 
-    // This function is used to request a m_vkDevice m_vkDeviceMemory type that supports all the property flags we request (e.g. m_vkDevice local, host visible)
-    // Upon success it will return the index of the m_vkDeviceMemory type that fits our requested m_vkDeviceMemory m_vkPhysicalDeviceProperties
-    // This is necessary as implementations can offer an arbitrary number of m_vkDeviceMemory types with different
-    // m_vkDeviceMemory m_vkPhysicalDeviceProperties.
-    // You can check https://vulkan.gpuinfo.org/ for details on different m_vkDeviceMemory configurations
-    uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties)
-    {
-        // Iterate over all m_vkDeviceMemory types available for the m_vkDevice used in this example
-        for (uint32_t i = 0; i < m_vkPhysicalDeviceMemoryProperties.memoryTypeCount; i++) {
-            if ((typeBits & 1) == 1) {
-                if ((m_vkPhysicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-                    return i;
-                }
-            }
-            typeBits >>= 1;
-        }
-
-        throw "Could not find a suitable m_vkDeviceMemory type!";
-    }
 
     // Create the per-frame (in flight) Vulkan synchronization primitives used in this example
     void createSynchronizationPrimitives()
@@ -368,7 +349,8 @@ public:
         VkMemoryRequirements vkMemoryRequirements;
         vkGetImageMemoryRequirements(m_device, m_defaultDepthStencil.m_image, &vkMemoryRequirements);
         vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
-        vkMemoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        vkMemoryAllocateInfo.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
         m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(vkMemoryAllocateInfo);
 
         VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
@@ -430,39 +412,22 @@ public:
     {
         // This example will use a single render pass with one subpass
         constexpr int attachmentCount = 2;
-        constexpr int colorAttachmentIndex = 0;
+        constexpr int colorPresentAttachmentIndex = 0;
         constexpr int depthStencilAttachmentIndex = 1;
+
 		constexpr int subpassCount = 1;
-        constexpr int subpassNumber = 0;
+        constexpr int theOnlySubpassIndex = 0;
 
         vkcpp::RenderPassCreateInfo renderPassCreateInfo(subpassCount, attachmentCount);
-        renderPassCreateInfo.attachmentDescription(colorAttachmentIndex)
-            .setFormat(m_swapChain.colorFormat)
-            .setSamples(VK_SAMPLE_COUNT_1_BIT)
-            .setLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE)
-            .setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
-            .setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		renderPassCreateInfo.attachmentDescription(colorPresentAttachmentIndex)
+			= vkcpp::AttachmentDescription::simpleColorPresent(m_swapChain.colorFormat);
 
-        renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex)
-            .setFormat(m_vkFormatDepth)
-            .setSamples(VK_SAMPLE_COUNT_1_BIT)
-            .setLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE)
-            .setStencilLoadOpStoreOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE)
-            .setInitialLayoutFinalLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+		renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex)
+			= vkcpp::AttachmentDescription::simpleDepthStencil(m_vkFormatDepth);
 
-        // Setup attachment references for use in subpass descriptions.
-        VkAttachmentReference vkAttachmentReferenceColor {};
-		vkAttachmentReferenceColor.attachment = colorAttachmentIndex; // Attachment 0 is color
-		vkAttachmentReferenceColor.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Attachment layout used as color during the subpass
-
-        VkAttachmentReference vkAttachmentReferenceDepth {};
-		vkAttachmentReferenceDepth.attachment = depthStencilAttachmentIndex; // Attachment 1 depth stencil
-		vkAttachmentReferenceDepth.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Attachment used as depth/stencil used during the subpass
-
-		renderPassCreateInfo.subpassDescription(subpassNumber)
-			.setPipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
-			.addColorAttachmentReference(vkAttachmentReferenceColor)
-			.setDepthStencilAttachmentReference(vkAttachmentReferenceDepth);
+		renderPassCreateInfo.subpassDescription(theOnlySubpassIndex)
+			.addColorAttachmentReference(colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+			.setDepthStencilAttachmentReference(depthStencilAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
 
 		// Setup subpass dependencies
@@ -472,20 +437,20 @@ public:
 		// srcStageMask, dstStageMask, srcAccessMask, dstAccessMask (and dependencyFlags is set)
 		// Note: VK_SUBPASS_EXTERNAL is a special constant that refers to all commands executed outside of the actual renderpass)
 		renderPassCreateInfo
-			.addSubpassDependency(VK_SUBPASS_EXTERNAL, subpassNumber)
-			.addSrc(
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
-			.addDst(
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT);
-
-		renderPassCreateInfo
-			.addSubpassDependency(VK_SUBPASS_EXTERNAL, subpassNumber)
-			.addSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,0)
+			.addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
+			.addSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_NONE)
 			.addDst(
 				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
+
+		auto fragmentTests = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		renderPassCreateInfo
+			.addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
+			.addSrc(fragmentTests, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
+			.addDst(
+				fragmentTests,
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT);
+
 
         // Create the actual renderpass
         m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo);
@@ -729,9 +694,7 @@ public:
             // Note: This may affect performance so you might not want to do this in a real world application that updates buffers on a regular base
 
             vkMemoryAllocateInfo.memoryTypeIndex
-                = getMemoryTypeIndex(
-                    vkMemoryRequirements.memoryTypeBits,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                = vkcpp::findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT);
 
             m_uniformBuffers[i].m_deviceMemoryOriginal = vkcpp::DeviceMemory(vkMemoryAllocateInfo);
 
@@ -842,9 +805,7 @@ public:
         submitInfo.addCommandBuffer(commandBuffer);
         submitInfo.addWaitSemaphore(m_vkPresentCompleteSemaphores[m_currentFrameIndex], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
         submitInfo.addSignalSemaphore(m_vkRenderCompleteSemaphores[imageIndex]);
-
-        // Submit to the graphics m_vkQueue passing a wait fence
-        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &submitInfo, m_vkWaitFences[m_currentFrameIndex]));
+		m_queue.submit(submitInfo, m_vkWaitFences[m_currentFrameIndex]);
 
         // Present the current frame buffer to the swap chain
         // Pass the semaphore signaled by the command buffer submission from the submit info as the wait semaphore for swap chain presentation

@@ -2091,7 +2091,6 @@ public:
         VkFormat vkFormatArg)
     {
         AttachmentDescription attachmentDescription;
-        //	Reasonable defaults
         attachmentDescription.format = vkFormatArg;
         attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
 		attachmentDescription.setLoadOpStoreOp(
@@ -2108,7 +2107,6 @@ public:
 		//	Is it necessary for the usual use case?
 		//	Maybe don't care is more efficient for the usual case?
         AttachmentDescription attachmentDescription;
-        //	Reasonable defaults
         attachmentDescription.format = vkFormatArg;
         attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
 		attachmentDescription.setLoadOpStoreOp(
@@ -2118,7 +2116,7 @@ public:
         return attachmentDescription;
     }
 
-    static AttachmentDescription simpleDepth(
+    static AttachmentDescription simpleDepthStencil(
         VkFormat vkFormatArg)
     {
         AttachmentDescription attachmentDescription;
