@@ -430,7 +430,6 @@ public:
 			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.matrices, nullptr);
 			vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.textures, nullptr);
-			shaderData.buffer.destroy();
 		}
 	}
 
@@ -530,7 +529,7 @@ public:
 		// Create host visible staging buffers (source)
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
 			vertexBufferSize,
 			&vertexStaging.buffer,
 			&vertexStaging.memory,
@@ -538,7 +537,7 @@ public:
 		// Index data
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
 			indexBufferSize,
 			&indexStaging.buffer,
 			&indexStaging.memory,
@@ -547,13 +546,13 @@ public:
 		// Create m_vkDevice local buffers (target)
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
 			vertexBufferSize,
 			&glTFModel.vertices.buffer,
 			&glTFModel.vertices.memory));
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
 			indexBufferSize,
 			&glTFModel.indices.buffer,
 			&glTFModel.indices.memory));
@@ -707,7 +706,10 @@ public:
 	void prepareUniformBuffers()
 	{
 		// Vertex shader uniform buffer block
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &shaderData.buffer, sizeof(shaderData.values)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+			&shaderData.buffer, sizeof(shaderData.values)));
 		// Map persistent
 		VK_CHECK_RESULT(shaderData.buffer.map());
 	}

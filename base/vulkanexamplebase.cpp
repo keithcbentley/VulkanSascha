@@ -845,6 +845,7 @@ void VulkanExampleBase::setupRenderPass()
 {
     constexpr int subpassCount = 1;
     constexpr int theOnlySubpassIndex = 0;
+
     constexpr int attachmentCount = 2;
     constexpr int colorPresentAttachmentIndex = 0;
     constexpr int depthAttachmentIndex = 1;

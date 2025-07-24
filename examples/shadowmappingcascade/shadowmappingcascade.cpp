@@ -151,9 +151,6 @@ public:
 
 		vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
 
-		cascadeViewProjMatricesBuffer.destroy();
-		uniformBuffers.VS.destroy();
-		uniformBuffers.FS.destroy();
 	}
 
 	virtual void getEnabledFeatures()
@@ -275,7 +272,8 @@ public:
 		VkMemoryRequirements memReqs;
 		vkGetImageMemoryRequirements(m_device, depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &depth.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(m_device, depth.image, depth.mem, 0));
 		// Full depth map m_vkImageView (all layers)
@@ -586,19 +584,19 @@ public:
 		// Cascade matrices
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
 			&cascadeViewProjMatricesBuffer,
 			sizeof(glm::mat4) * SHADOW_MAP_CASCADE_COUNT));
 
 		// Scene uniform buffer blocks
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
 			&uniformBuffers.VS,
 			sizeof(uboVS)));
 		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
 			&uniformBuffers.FS,
 			sizeof(uboFS)));
 

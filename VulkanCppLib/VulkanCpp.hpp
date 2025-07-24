@@ -2064,10 +2064,6 @@ public:
     AttachmentDescription()
         : VkAttachmentDescription {}
     {
-        //	This almost always the default, but these aren't 0 values
-        //	so they need to be set explicitly.
-        stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     }
 
     ~AttachmentDescription() = default;
@@ -2098,24 +2094,27 @@ public:
         //	Reasonable defaults
         attachmentDescription.format = vkFormatArg;
         attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-        attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		attachmentDescription.setLoadOpStoreOp(
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+		attachmentDescription.setInitialLayoutFinalLayout(
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
         return attachmentDescription;
     }
 
     static AttachmentDescription simpleColor(
         VkFormat vkFormatArg)
     {
+		//	TODO: is store op store the best choice?
+		//	Is it necessary for the usual use case?
+		//	Maybe don't care is more efficient for the usual case?
         AttachmentDescription attachmentDescription;
         //	Reasonable defaults
         attachmentDescription.format = vkFormatArg;
         attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-        attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachmentDescription.setLoadOpStoreOp(
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+		attachmentDescription.setInitialLayoutFinalLayout(
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         return attachmentDescription;
     }
 
@@ -2126,10 +2125,12 @@ public:
         //	Reasonable defaults
         attachmentDescription.format = vkFormatArg;
         attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-        attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		attachmentDescription.setLoadOpStoreOp(
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+		attachmentDescription.setStencilLoadOpStoreOp(
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+		attachmentDescription.setInitialLayoutFinalLayout(
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
         return attachmentDescription;
     }
 

@@ -133,7 +133,6 @@ public:
 			offscreen.color[0].destroy(m_device);
 			offscreen.color[1].destroy(m_device);
 			filterPass.color[0].destroy(m_device);
-			uniformBuffer.destroy();
 			textures.envmap.destroy();
 		}
 	}
@@ -328,7 +327,8 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(m_device, &image, nullptr, &attachment->image));
 		vkGetImageMemoryRequirements(m_device, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &attachment->mem));
 		VK_CHECK_RESULT(vkBindImageMemory(m_device, attachment->image, attachment->mem, 0));
 
@@ -778,7 +778,10 @@ public:
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
-		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(uniformData)));
+		VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+			&uniformBuffer, sizeof(uniformData)));
 		// Map persistent
 		VK_CHECK_RESULT(uniformBuffer.map());
 	}

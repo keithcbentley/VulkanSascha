@@ -54,10 +54,6 @@ VulkanglTFModel::~VulkanglTFModel()
 		vkDestroySampler(vulkanDevice->m_device, image.texture.m_vkSampler, nullptr);
 		vkFreeMemory(vulkanDevice->m_device, image.texture.m_vkDeviceMemory, nullptr);
 	}
-	for (Skin skin : skins)
-	{
-		skin.ssbo.destroy();
-	}
 }
 
 /*
@@ -206,7 +202,7 @@ void VulkanglTFModel::loadSkins(tinygltf::Model &input)
 			// To keep this sample simple, we create a host visible shader storage buffer
 			VK_CHECK_RESULT(vulkanDevice->createBuffer(
 			    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			    vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
 			    &skins[i].ssbo,
 			    sizeof(glm::mat4) * skins[i].inverseBindMatrices.size(),
 			    skins[i].inverseBindMatrices.data()));
@@ -663,7 +659,6 @@ VulkanExample::~VulkanExample()
 	vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.textures, nullptr);
 	vkDestroyDescriptorSetLayout(m_device, descriptorSetLayouts.jointMatrices, nullptr);
 
-	shaderData.buffer.destroy();
 }
 
 void VulkanExample::getEnabledFeatures()
@@ -773,16 +768,16 @@ void VulkanExample::loadglTFFile(std::string filename)
 	// Create host visible staging buffers (source)
 	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 	    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-	    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-	    vertexBufferSize,
+		vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+		vertexBufferSize,
 	    &vertexStaging.buffer,
 	    &vertexStaging.memory,
 	    vertexBuffer.data()));
 	// Index data
 	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 	    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-	    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-	    indexBufferSize,
+		vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+		indexBufferSize,
 	    &indexStaging.buffer,
 	    &indexStaging.memory,
 	    indexBuffer.data()));
@@ -790,13 +785,13 @@ void VulkanExample::loadglTFFile(std::string filename)
 	// Create m_vkDevice local buffers (target)
 	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 	    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-	    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	    vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
 	    vertexBufferSize,
 	    &glTFModel.vertices.buffer,
 	    &glTFModel.vertices.memory));
 	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
 	    VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-	    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	    vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
 	    indexBufferSize,
 	    &glTFModel.indices.buffer,
 	    &glTFModel.indices.memory));
@@ -963,7 +958,10 @@ void VulkanExample::preparePipelines()
 
 void VulkanExample::prepareUniformBuffers()
 {
-	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &shaderData.buffer, sizeof(shaderData.values)));
+	VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+		&shaderData.buffer, sizeof(shaderData.values)));
 	VK_CHECK_RESULT(shaderData.buffer.map());
 	updateUniformBuffers();
 }

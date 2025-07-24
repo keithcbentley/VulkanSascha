@@ -79,8 +79,6 @@ public:
             vkDestroyImage(m_device, multisampleTarget.depth.image, nullptr);
             vkDestroyImageView(m_device, multisampleTarget.depth.view, nullptr);
             vkFreeMemory(m_device, multisampleTarget.depth.memory, nullptr);
-
-            uniformBuffer.destroy();
         }
     }
 
@@ -105,7 +103,7 @@ public:
     setupMultisampleTarget()
     {
         // Check if m_vkDevice supports requested sample count for color and depth frame buffer
-//        assert((m_vkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & sampleCount) && (m_vkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts & sampleCount));
+        //        assert((m_vkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & sampleCount) && (m_vkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts & sampleCount));
 
         // Color target
         VkImageCreateInfo info = vks::initializers::imageCreateInfo();
@@ -129,14 +127,8 @@ public:
         vkGetImageMemoryRequirements(m_device, multisampleTarget.color.image, &memReqs);
         VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
         memAlloc.allocationSize = memReqs.size;
-        // We prefer a lazily allocated m_vkDeviceMemory type
-        // This means that the m_vkDeviceMemory gets allocated when the implementation sees fit, e.g. when first using the images
-        VkBool32 lazyMemTypePresent;
-        memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
-        if (!lazyMemTypePresent) {
-            // If this is not available, fall back to m_vkDevice local m_vkDeviceMemory
-            memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        }
+        memAlloc.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
         VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &multisampleTarget.color.memory));
         vkBindImageMemory(m_device, multisampleTarget.color.image, multisampleTarget.color.memory, 0);
 
@@ -176,10 +168,8 @@ public:
         memAlloc = vks::initializers::memoryAllocateInfo();
         memAlloc.allocationSize = memReqs.size;
 
-        memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
-        if (!lazyMemTypePresent) {
-            memAlloc.memoryTypeIndex = m_pVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        }
+    	memAlloc.memoryTypeIndex
+			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
         VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAlloc, nullptr, &multisampleTarget.depth.memory));
         vkBindImageMemory(m_device, multisampleTarget.depth.image, multisampleTarget.depth.memory, 0);
@@ -291,8 +281,8 @@ public:
         renderPassInfo.dependencyCount = 2;
         renderPassInfo.pDependencies = dependencies.data();
 
-		m_renderPassOriginal = vkcpp::RenderPass(renderPassInfo);
-        //VK_CHECK_RESULT(vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_vkRenderPass));
+        m_renderPassOriginal = vkcpp::RenderPass(renderPassInfo);
+        // VK_CHECK_RESULT(vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_vkRenderPass));
     }
 
     // Frame buffer attachments must match with render pass setup,
@@ -397,8 +387,8 @@ public:
             vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1),
         };
         VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
-        //VK_CHECK_RESULT(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+        m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+        // VK_CHECK_RESULT(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
         // Layout
         const std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
@@ -414,7 +404,7 @@ public:
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             // Binding 0 : Vertex shader uniform buffer
             vks::initializers::writeDescriptorSet(
-				descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo),
+                descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBuffer.m_vkDescriptorBufferInfo),
         };
         vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
     }
@@ -481,7 +471,10 @@ public:
     void prepareUniformBuffers()
     {
         // Vertex shader uniform buffer block
-        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer, sizeof(UniformData)));
+        VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+            &uniformBuffer, sizeof(UniformData)));
         // Map persistent
         VK_CHECK_RESULT(uniformBuffer.map());
     }
@@ -497,10 +490,10 @@ public:
     // In a realworld application, this would be a user setting instead
     VkSampleCountFlagBits getMaxAvailableSampleCount()
     {
-		VkSampleCountFlags supportedSampleCount = 0x0f;
-			//= std::min(
-			//	m_vkPhysicalDeviceProperties.limits.framebufferColorSampleCounts,
-			//	m_vkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts);
+        VkSampleCountFlags supportedSampleCount = 0x0f;
+        //= std::min(
+        //	m_vkPhysicalDeviceProperties.limits.framebufferColorSampleCounts,
+        //	m_vkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts);
         std::vector<VkSampleCountFlagBits> possibleSampleCounts {
             VK_SAMPLE_COUNT_64_BIT, VK_SAMPLE_COUNT_32_BIT, VK_SAMPLE_COUNT_16_BIT, VK_SAMPLE_COUNT_8_BIT, VK_SAMPLE_COUNT_4_BIT, VK_SAMPLE_COUNT_2_BIT
         };
@@ -529,8 +522,8 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-		m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+        VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
         VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
     }
@@ -545,13 +538,13 @@ public:
 
     virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay)
     {
-//        if (m_pVulkanDevice->m_vkPhysicalDeviceFeatures.sampleRateShading) {
-            if (overlay->header("Settings")) {
-                if (overlay->checkBox("Sample rate shading", &useSampleShading)) {
-                    buildCommandBuffers();
-                }
+        //        if (m_pVulkanDevice->m_vkPhysicalDeviceFeatures.sampleRateShading) {
+        if (overlay->header("Settings")) {
+            if (overlay->checkBox("Sample rate shading", &useSampleShading)) {
+                buildCommandBuffers();
             }
-//        }
+        }
+        //        }
     }
 };
 
