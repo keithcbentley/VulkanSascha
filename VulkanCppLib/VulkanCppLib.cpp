@@ -154,12 +154,12 @@ VkDevice vkDevice()
     return s_vulkanContext.deviceFromContext();
 }
 
-VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
+const VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
 {
     return s_vulkanContext.vkPhysicalDeviceProperties();
 }
 
-VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
+const VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
 {
     return s_vulkanContext.vkPhysicalDeviceFeatures();
 }

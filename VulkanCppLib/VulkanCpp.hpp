@@ -797,7 +797,7 @@ public:
         return *this;
     }
 
-    VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
+    const VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
     {
         return m_features2.features;
     }
@@ -883,27 +883,27 @@ public:
         return *this;
     }
 
-    VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
+    const VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
     {
         return m_properties2.properties;
     }
 
-    VkPhysicalDeviceVulkan11Properties& vkPhysicalDeviceVulkan11Properties()
+    const VkPhysicalDeviceVulkan11Properties& vkPhysicalDeviceVulkan11Properties()
     {
         return m_propertiesV11;
     }
 
-    VkPhysicalDeviceVulkan12Properties& vkPhysicalDeviceVulkan12Properties()
+    const VkPhysicalDeviceVulkan12Properties& vkPhysicalDeviceVulkan12Properties()
     {
         return m_propertiesV12;
     }
 
-    VkPhysicalDeviceVulkan13Properties& vkPhysicalDeviceVulkan13Properties()
+    const VkPhysicalDeviceVulkan13Properties& vkPhysicalDeviceVulkan13Properties()
     {
         return m_propertiesV13;
     }
 
-    VkPhysicalDeviceVulkan14Properties& vkPhysicalDeviceVulkan14Properties()
+    const VkPhysicalDeviceVulkan14Properties& vkPhysicalDeviceVulkan14Properties()
     {
         return m_propertiesV14;
     }
@@ -1497,12 +1497,12 @@ public:
         return m_vkDeviceOriginal;
     }
 
-    VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
+    const VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
     {
         return m_physicalDeviceProperties.vkPhysicalDeviceProperties();
     }
 
-    VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
+    const VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
     {
         return m_physicalDeviceFeatures.vkPhysicalDeviceFeatures();
     }
@@ -1535,8 +1535,8 @@ VulkanInstance vulkanInstance();
 PhysicalDevice physicalDevice();
 Device device();
 VkDevice vkDevice();
-VkPhysicalDeviceProperties& vkPhysicalDeviceProperties();
-VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
+const VkPhysicalDeviceProperties& vkPhysicalDeviceProperties();
+const VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
 PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties();
 uint32_t findMemoryTypeIndex(uint32_t usableMemoryIndexBits, MemoryPropertyFlags requiredPropertiesArg);
 
