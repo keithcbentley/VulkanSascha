@@ -1628,6 +1628,7 @@ public:
     }
 };
 
+template <typename T=uint8_t>
 class DeviceMemory : public InteropHandle3<VkDeviceMemory> {
 
     static void destroy(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice)
@@ -1734,6 +1735,7 @@ public:
     }
 };
 
+template<typename T=uint8_t>
 class Buffer : public InteropHandle2<VkBuffer> {
 
     static void destroy(VkBuffer vkBuffer)
@@ -1831,7 +1833,7 @@ public:
         return vkMemoryRequirements;
     }
 
-    DeviceMemory allocateDeviceMemory(MemoryPropertyFlags requiredMemoryPropertyFlags) const
+    DeviceMemory<T> allocateDeviceMemory(MemoryPropertyFlags requiredMemoryPropertyFlags) const
     {
         VkMemoryRequirements vkMemoryRequirements = getMemoryRequirements();
         return DeviceMemory(vkMemoryRequirements, requiredMemoryPropertyFlags);
@@ -1846,10 +1848,11 @@ public:
     }
 };
 
+template<typename T=uint8_t>
 class Buffer_DeviceMemory {
 
     //	Handy constructor.
-    Buffer_DeviceMemory(Buffer&& buffer, DeviceMemory&& deviceMemory)
+    Buffer_DeviceMemory(Buffer<T>&& buffer, DeviceMemory<T>&& deviceMemory)
         : m_buffer(std::move(buffer))
         , m_deviceMemory(std::move(deviceMemory))
         , m_mappedMemory(nullptr)
@@ -1857,8 +1860,8 @@ class Buffer_DeviceMemory {
     }
 
 public:
-    Buffer m_buffer;
-    DeviceMemory m_deviceMemory;
+    Buffer<T> m_buffer;
+    DeviceMemory<T> m_deviceMemory;
     void* m_mappedMemory = nullptr;
 
     Buffer_DeviceMemory() = default;
@@ -2667,7 +2670,7 @@ public:
         return vkMemoryRequirements;
     }
 
-    DeviceMemory allocateDeviceMemory(MemoryPropertyFlags requiredProperties) const
+    DeviceMemory<> allocateDeviceMemory(MemoryPropertyFlags requiredProperties) const
     {
         VkMemoryRequirements vkMemoryRequirements = getMemoryRequirements();
         VkMemoryAllocateInfo vkMemoryAllocateInfo {};
@@ -3227,7 +3230,7 @@ public:
     }
 
     CommandBuffer& cmdCopyBufferToImage(
-        Buffer buffer,
+        Buffer<> buffer,
         Image image,
         uint32_t width,
         uint32_t height)
@@ -3240,7 +3243,7 @@ public:
     }
 
     CommandBuffer& cmdCopyBufferToImage(
-        Buffer buffer,
+        Buffer<> buffer,
         Image image,
         VkImageLayout vkImageLayout,
         uint32_t regionCount,
@@ -3252,8 +3255,8 @@ public:
 
     //	TODO: do we need to implement cmdCopyBuffer2?
     CommandBuffer& cmdCopyBuffer(
-        Buffer srcBuffer,
-        Buffer dstBuffer,
+        Buffer<> srcBuffer,
+        Buffer<> dstBuffer,
         VkDeviceSize size)
     {
         //	TODO: maybe do some size checking on the destination to avoid overwriting.
@@ -3264,8 +3267,8 @@ public:
     }
 
     CommandBuffer& cmdCopyBuffer(
-        Buffer srcBuffer,
-        Buffer dstBuffer)
+        Buffer<> srcBuffer,
+        Buffer<> dstBuffer)
     {
         return cmdCopyBuffer(srcBuffer, dstBuffer, srcBuffer.size());
     }
@@ -5132,7 +5135,7 @@ public:
 
 class Image_Memory {
 
-    Image_Memory(Image&& image, DeviceMemory&& deviceMemory)
+    Image_Memory(Image&& image, DeviceMemory<>&& deviceMemory)
         : m_image(std::move(image))
         , m_deviceMemory(std::move(deviceMemory))
     {
@@ -5140,7 +5143,7 @@ class Image_Memory {
 
 public:
     Image m_image;
-    DeviceMemory m_deviceMemory;
+    DeviceMemory<> m_deviceMemory;
 
     Image_Memory() = default;
     ~Image_Memory() = default;
@@ -5195,7 +5198,7 @@ class Image_Memory_View {
 
 public:
     Image m_image;
-    DeviceMemory m_deviceMemory;
+    DeviceMemory<> m_deviceMemory;
     ImageView m_imageView;
 
     Image_Memory_View() = default;
@@ -5223,7 +5226,7 @@ public:
     //	Handy move constructor.
     Image_Memory_View(
         Image&& image,
-        DeviceMemory&& deviceMemory,
+        DeviceMemory<>&& deviceMemory,
         ImageView&& imageView)
         : m_image(std::move(image))
         , m_deviceMemory(std::move(deviceMemory))

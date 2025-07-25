@@ -45,14 +45,14 @@ public:
         float color[3];
     };
 
-    vkcpp::Buffer_DeviceMemory m_vertices;
-    vkcpp::Buffer_DeviceMemory m_indices;
+    vkcpp::Buffer_DeviceMemory<> m_vertices;
+    vkcpp::Buffer_DeviceMemory<> m_indices;
     uint32_t m_indicesCount { 0 };
 
     // Uniform buffer block object
     struct UniformBuffer {
-        vkcpp::DeviceMemory m_deviceMemoryOriginal;
-        vkcpp::Buffer m_bufferOriginal;
+        vkcpp::DeviceMemory<> m_deviceMemoryOriginal;
+        vkcpp::Buffer<> m_bufferOriginal;
         // The descriptor set stores the resources bound to the binding points in a shader
         // It connects the binding points of the different shaders with the buffers and images used for those bindings
         vkcpp::DescriptorSet m_descriptorSet;
@@ -210,8 +210,8 @@ public:
         // We will do the same thing for the index info.
 
         // Create a host-visible buffer to copy the vertex data to (staging buffer)
-		vkcpp::Buffer_DeviceMemory verticesStagingBuffer
-			= vkcpp::Buffer_DeviceMemory::withCopy(
+		vkcpp::Buffer_DeviceMemory<> verticesStagingBuffer
+			= vkcpp::Buffer_DeviceMemory<>::withCopy(
 				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 				vertexBufferSize,
 				0,
@@ -224,8 +224,8 @@ public:
 			0,
 			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
-		vkcpp::Buffer_DeviceMemory indicesStagingBuffer
-			= vkcpp::Buffer_DeviceMemory::withCopy(
+		vkcpp::Buffer_DeviceMemory<> indicesStagingBuffer
+			= vkcpp::Buffer_DeviceMemory<>::withCopy(
 				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 				indexBufferSize,
 				0,
