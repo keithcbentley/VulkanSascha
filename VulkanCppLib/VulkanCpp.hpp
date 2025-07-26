@@ -1466,6 +1466,7 @@ class VulkanContext {
 
     VulkanInstance m_vulkanInstanceOriginal;
     PhysicalDevice m_physicalDeviceOriginal;
+    VkPhysicalDevice m_vkPhysicalDeviceOriginal;
     Device m_deviceOriginal;
     VkDevice m_vkDeviceOriginal {};
 
@@ -1487,12 +1488,17 @@ public:
         return m_physicalDeviceOriginal;
     }
 
+    VkPhysicalDevice vkPhysicalDeviceFromContext()
+    {
+        return m_vkPhysicalDeviceOriginal;
+    }
+
     Device deviceFromContext()
     {
         return m_deviceOriginal;
     }
 
-    VkDevice vkDeviceContext()
+    VkDevice vkDeviceFromContext()
     {
         return m_vkDeviceOriginal;
     }
@@ -1533,6 +1539,7 @@ extern VulkanContext s_vulkanContext;
 void initVulkanContext(const VulkanContextCreateInfo& vulkanContextCreateInfo);
 VulkanInstance vulkanInstance();
 PhysicalDevice physicalDevice();
+VkPhysicalDevice vkPhysicalDevice();
 Device device();
 VkDevice vkDevice();
 const VkPhysicalDeviceProperties& vkPhysicalDeviceProperties();
@@ -2001,9 +2008,9 @@ public:
         return newbdm;
     }
 
-	//	Useful when porting existing apps.  Make the full Buffer_DeviceMemory
-	//	in steps.  Make the buffer and device memory with explicit bind and map steps
-	//	and then do the full conversion.
+    //	Useful when porting existing apps.  Make the full Buffer_DeviceMemory
+    //	in steps.  Make the buffer and device memory with explicit bind and map steps
+    //	and then do the full conversion.
     void bind()
     {
         VkResult vkResult = vkBindBufferMemory(vkDevice(), m_buffer, m_deviceMemory, 0);
@@ -2012,7 +2019,7 @@ public:
         }
     }
 
-	//	See bind()
+    //	See bind()
     void map()
     {
         void* mappedMemory;
@@ -2020,19 +2027,19 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-		m_pMappedMemory = static_cast<T*>(mappedMemory);
+        m_pMappedMemory = static_cast<T*>(mappedMemory);
     }
 
     T& mappedMemory()
     {
-		//	TODO: do a null check and barf if necessary.
+        //	TODO: do a null check and barf if necessary.
         return *m_pMappedMemory;
     }
 
     void unmapMemory()
     {
         vkUnmapMemory(vkDevice(), m_deviceMemory);
-		m_pMappedMemory = nullptr;
+        m_pMappedMemory = nullptr;
     }
 };
 

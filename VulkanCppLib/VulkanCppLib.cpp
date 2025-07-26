@@ -108,6 +108,7 @@ void VulkanContext::init(const VulkanContextCreateInfo& vulkanContextCreateInfo)
 
     //	Create the physical device.  After this, use physicalDevice().
     s_vulkanContext.m_physicalDeviceOriginal = PhysicalDevice(allPhysicalDevices[0]);
+	s_vulkanContext.m_vkPhysicalDeviceOriginal = physicalDevice();
     m_physicalDeviceFeatures = physicalDevice().getPhysicalDeviceFeatures2();
     m_physicalDeviceProperties = physicalDevice().getPhysicalDeviceProperties2();
 	m_physicalDeviceMemoryProperties = physicalDevice().getPhysicalDeviceMemoryProperties();
@@ -143,6 +144,11 @@ PhysicalDevice physicalDevice()
 {
     return s_vulkanContext.physicalDeviceFromContext();
 }
+
+VkPhysicalDevice vkPhysicalDevice() {
+	return s_vulkanContext.vkPhysicalDeviceFromContext();
+}
+
 
 Device device()
 {
