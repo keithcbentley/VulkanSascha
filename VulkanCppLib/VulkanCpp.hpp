@@ -1951,12 +1951,13 @@ public:
 template <typename T = uint8_t>
 class Buffer_DeviceMemory {
 
-    T* m_pMappedMemory = nullptr;
+	Buffer<T> m_buffer;
+	DeviceMemory<T> m_deviceMemory;
+	TypedCount<T> m_count;
+	T* m_pMappedMemory = nullptr;
+
 
 public:
-    Buffer<T> m_buffer;
-    DeviceMemory<T> m_deviceMemory;
-    TypedCount<T> m_count;
 
     Buffer_DeviceMemory() = default;
     ~Buffer_DeviceMemory() = default;
@@ -2057,6 +2058,10 @@ public:
         memcpy(newbdm.m_pMappedMemory, pSrcMem, newbdm.m_count.vkDeviceSize());
         return newbdm;
     }
+
+	Buffer<> buffer() {
+		return m_buffer;
+	}
 
     //	Useful when porting existing apps.  Make the full Buffer_DeviceMemory
     //	in steps.  Make the buffer and device memory with explicit bind and map steps

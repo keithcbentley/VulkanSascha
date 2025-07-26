@@ -28,8 +28,10 @@ class VulkanExample : public VulkanExampleBase
 public:
 	// Number of array layers in texture array
 	// Also used as m_vulkanInstance count
-	uint32_t layerCount{ 0 };
-	vks::Texture textureArray;
+	uint32_t m_textureLayerCount = 0;
+
+//	vks::Texture textureArray;
+	vkcpp::Texture m_textureArray;
 
 	vks::Buffer vertexBuffer;
 	vks::Buffer indexBuffer;
@@ -71,10 +73,6 @@ public:
 	~VulkanExample()
 	{
 		if (m_device) {
-			vkDestroyImageView(m_device, textureArray.m_vkImageView, nullptr);
-			vkDestroyImage(m_device, textureArray.m_vkImage, nullptr);
-			vkDestroySampler(m_device, textureArray.m_vkSampler, nullptr);
-			vkFreeMemory(m_device, textureArray.m_vkDeviceMemory, nullptr);
 			vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
 			vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
@@ -94,52 +92,30 @@ public:
 		result = ktxTexture_CreateFromNamedFile(filename.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
 		assert(result == KTX_SUCCESS);
 
-		// Get m_vkPhysicalDeviceProperties required for using and upload texture data from the ktx texture object
-		textureArray.width = ktxTexture->baseWidth;
-		textureArray.height = ktxTexture->baseHeight;
-		layerCount = ktxTexture->numLayers;
-        assert(layerCount <= MAX_LAYERS);
-		ktx_uint8_t *ktxTextureData = ktxTexture_GetData(ktxTexture);
-		ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
+				//	Handy shorthand.
+		const uint32_t textureWidth = ktxTexture->baseWidth;
+		const uint32_t textureHeight = ktxTexture->baseHeight;
+		const uint32_t textureMipLevelCount = ktxTexture->numLevels;
+		const uint32_t textureLayerCount = ktxTexture->numLayers;
+		const uint8_t* const pTextureData = ktxTexture_GetData(ktxTexture);
+		const uint64_t textureSize = ktxTexture_GetSize(ktxTexture);
+		m_textureLayerCount = textureLayerCount;
 
-		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
-		VkMemoryRequirements memReqs;
-
-		// Create a host-visible staging buffer that contains the raw m_vkImage data
-		VkBuffer stagingBuffer;
-		VkDeviceMemory stagingMemory;
-
-		VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo();
-		bufferCreateInfo.size = ktxTextureSize;
-		// This buffer is used as a transfer source for the buffer copy
-		bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &stagingBuffer));
-
-		// Get m_vkDeviceMemory requirements for the staging buffer (alignment, m_vkDeviceMemory type bits)
-		vkGetBufferMemoryRequirements(m_device, stagingBuffer, &memReqs);
-
-		memAllocInfo.allocationSize = memReqs.size;
-		// Get m_vkDeviceMemory type index for a host visible buffer
-		memAllocInfo.memoryTypeIndex
-			= vkcpp::findMemoryTypeIndex(
-				memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
-
-		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &stagingMemory));
-		VK_CHECK_RESULT(vkBindBufferMemory(m_device, stagingBuffer, stagingMemory, 0));
-
-		// Copy texture data into staging buffer
-		uint8_t *data;
-		VK_CHECK_RESULT(vkMapMemory(m_device, stagingMemory, 0, memReqs.size, 0, (void **)&data));
-		memcpy(data, ktxTextureData, ktxTextureSize);
-		vkUnmapMemory(m_device, stagingMemory);
+		vkcpp::Buffer_DeviceMemory<> newStagingBuffer
+			= vkcpp::Buffer_DeviceMemory<>::withCopy(
+				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+				vkcpp::TypedCount<>(ktxTexture_GetSize(ktxTexture)),
+				0,
+				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+				ktxTexture_GetData(ktxTexture));
+		newStagingBuffer.unmapMemory();
+		
 
 		// Setup buffer copy regions for array layers
 		std::vector<VkBufferImageCopy> bufferCopyRegions;
 
 		// To keep this simple, we will only load layers and no mip level
-		for (uint32_t layer = 0; layer < layerCount; layer++)
+		for (uint32_t layer = 0; layer < textureLayerCount; layer++)
 		{
 			// Calculate offset into staging buffer for the current array layer
 			ktx_size_t offset;
@@ -158,8 +134,6 @@ public:
 			bufferCopyRegions.push_back(bufferCopyRegion);
 		}
 
-		// Create optimal tiled target m_vkImage
-		//VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 		VkImageCreateInfo imageCreateInfo {};
 		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -169,20 +143,11 @@ public:
 		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageCreateInfo.extent = { textureArray.width, textureArray.height, 1 };
+		imageCreateInfo.extent = { textureWidth, textureHeight, 1 };
 		imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		imageCreateInfo.arrayLayers = layerCount;
-
-		VK_CHECK_RESULT(vkCreateImage(m_device, &imageCreateInfo, nullptr, &textureArray.m_vkImage));
-
-		vkGetImageMemoryRequirements(m_device, textureArray.m_vkImage, &memReqs);
-
-		memAllocInfo.allocationSize = memReqs.size;
-		memAllocInfo.memoryTypeIndex
-			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
-
-		VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &textureArray.m_vkDeviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(m_device, textureArray.m_vkImage, textureArray.m_vkDeviceMemory, 0));
+		imageCreateInfo.arrayLayers = textureLayerCount;
+		m_textureArray.takeImage(vkcpp::Image(imageCreateInfo));
+		m_textureArray.allocateBindImageMemory(vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
 		VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
@@ -192,11 +157,11 @@ public:
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		subresourceRange.baseMipLevel = 0;
 		subresourceRange.levelCount = 1;
-		subresourceRange.layerCount = layerCount;
+		subresourceRange.layerCount = textureLayerCount;
 
 		vks::tools::setImageLayout(
 			copyCmd,
-			textureArray.m_vkImage,
+			m_textureArray.image(),
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			subresourceRange);
@@ -204,19 +169,19 @@ public:
 		// Copy the cube map faces from the staging buffer to the optimal tiled m_vkImage
 		vkCmdCopyBufferToImage(
 			copyCmd,
-			stagingBuffer,
-			textureArray.m_vkImage,
+			newStagingBuffer.buffer(),
+			m_textureArray.image(),
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			static_cast<uint32_t>(bufferCopyRegions.size()),
 			bufferCopyRegions.data());
 
 		// Change texture m_vkImage layout to shader read after all faces have been copied
-		textureArray.m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		m_textureArray.setVkImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		vks::tools::setImageLayout(
 			copyCmd,
-			textureArray.m_vkImage,
+			m_textureArray.image(),
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			textureArray.m_vkImageLayout,
+			m_textureArray.vkImageLayout(),
 			subresourceRange);
 
 		m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
@@ -235,21 +200,21 @@ public:
 		vkSamplerCreateInfo.minLod = 0.0f;
 		vkSamplerCreateInfo.maxLod = 0.0f;
 		vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(m_device, &vkSamplerCreateInfo, nullptr, &textureArray.m_vkSampler));
+		m_textureArray.takeSampler(vkcpp::Sampler(vkSamplerCreateInfo));
 
-		// Create m_vkImage m_vkImageView
-		VkImageViewCreateInfo VkImageViewCreateInfo = vks::initializers::imageViewCreateInfo();
-		VkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-		VkImageViewCreateInfo.format = format;
-		VkImageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-		VkImageViewCreateInfo.subresourceRange.layerCount = layerCount;
-		VkImageViewCreateInfo.subresourceRange.levelCount = 1;
-		VkImageViewCreateInfo.image = textureArray.m_vkImage;
-		VK_CHECK_RESULT(vkCreateImageView(m_device, &VkImageViewCreateInfo, nullptr, &textureArray.m_vkImageView));
+		//VK_CHECK_RESULT(vkCreateSampler(m_device, &vkSamplerCreateInfo, nullptr, &textureArray.m_vkSampler));
+
+		// Create texture ImageView
+		vkcpp::ImageViewCreateInfo imageViewCreateInfo;
+		imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+		imageViewCreateInfo.format = format;
+		imageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		imageViewCreateInfo.subresourceRange.layerCount = textureLayerCount;
+		imageViewCreateInfo.subresourceRange.levelCount = 1;
+		imageViewCreateInfo.image = m_textureArray.image();
+		m_textureArray.takeImageView(vkcpp::ImageView(imageViewCreateInfo));
 
 		// Clean up staging resources
-		vkFreeMemory(m_device, stagingMemory, nullptr);
-		vkDestroyBuffer(m_device, stagingBuffer, nullptr);
 		ktxTexture_Destroy(ktxTexture);
 	}
 
@@ -291,7 +256,7 @@ public:
 
 			commandBuffer.cmdBindVertexBuffer(vertexBuffer.m_buffer);
 			commandBuffer.cmdBindIndexBuffer(indexBuffer.m_buffer, VK_INDEX_TYPE_UINT32);
-			commandBuffer.cmdDrawIndexed(m_indexCount, layerCount);
+			commandBuffer.cmdDrawIndexed(m_indexCount, m_textureLayerCount);
 
 			drawUI(commandBuffer);
 
@@ -400,9 +365,9 @@ public:
 		// Image descriptor for the texture array
 		VkDescriptorImageInfo textureDescriptor =
 			vks::initializers::descriptorImageInfo(
-				textureArray.m_vkSampler,
-				textureArray.m_vkImageView,
-				textureArray.m_vkImageLayout);
+				m_textureArray.sampler(),
+				m_textureArray.imageView(),
+				m_textureArray.vkImageLayout());
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 			// Binding 0 : Vertex shader uniform buffer
@@ -464,7 +429,7 @@ public:
 
 	void prepareUniformBuffers()
 	{
-		uniformData.instance = new PerInstanceData[layerCount];
+		uniformData.instance = new PerInstanceData[m_textureLayerCount];
 
 		uint32_t uboSize = sizeof(uniformData.matrices) + (MAX_LAYERS * sizeof(PerInstanceData));
 
@@ -476,8 +441,8 @@ public:
 
 		// Array indices and model matrices are fixed
 		float offset = -1.5f;
-		float center = (layerCount*offset) / 2.0f - (offset * 0.5f);
-		for (uint32_t i = 0; i < layerCount; i++) {
+		float center = (m_textureLayerCount *offset) / 2.0f - (offset * 0.5f);
+		for (uint32_t i = 0; i < m_textureLayerCount; i++) {
 			// Instance model matrix
 			uniformData.instance[i].model = glm::translate(glm::mat4(1.0f), glm::vec3(i * offset - center, 0.0f, 0.0f));
 			uniformData.instance[i].model = glm::scale(uniformData.instance[i].model, glm::vec3(0.5f));
@@ -488,7 +453,7 @@ public:
 		// Update instanced part of the uniform buffer
 		uint8_t *pData;
 		uint32_t dataOffset = sizeof(uniformData.matrices);
-		uint32_t dataSize = layerCount * sizeof(PerInstanceData);
+		uint32_t dataSize = m_textureLayerCount * sizeof(PerInstanceData);
 		VK_CHECK_RESULT(vkMapMemory(m_device, uniformBuffer.m_deviceMemory, dataOffset, dataSize, 0, (void **)&pData));
 		memcpy(pData, uniformData.instance, dataSize);
 		vkUnmapMemory(m_device, uniformBuffer.m_deviceMemory);

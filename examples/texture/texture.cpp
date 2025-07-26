@@ -104,8 +104,6 @@ public:
         const uint64_t textureSize = ktxTexture_GetSize(ktxTexture);
 		m_uiData.m_mipLevelsForUI = ktxTexture->numLevels;
 
-        // We prefer using staging to copy the texture data to a m_vkDevice local optimal m_vkImage
-        //        VkBool32 useStaging = true;
 
 
         vkcpp::Buffer_DeviceMemory<> stagingBufferAndMemory
@@ -195,7 +193,7 @@ public:
 
         // Now do the actual memory transfer from staging buffer memory to the image memory.
         commandBuffer.cmdCopyBufferToImage(
-            stagingBufferAndMemory.m_buffer,
+            stagingBufferAndMemory.buffer(),
             m_texture.image(),
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             static_cast<uint32_t>(bufferCopyRegions.size()),
