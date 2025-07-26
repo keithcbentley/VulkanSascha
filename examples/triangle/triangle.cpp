@@ -24,13 +24,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <VulkanCpp.hpp>
 #include "vulkanexamplebase.h"
+#include <VulkanCpp.hpp>
 #include <vulkan/vulkan.h>
 
 vkcpp::VulkanContext vkcpp::s_vulkanContext;
-
-
 
 // We want to keep GPU and CPU busy. To do that we may start building a new command buffer while the previous one is still being executed
 // This number defines how many frames may be worked on simultaneously at once
@@ -45,23 +43,20 @@ public:
         float color[3];
     };
 
-    vkcpp::Buffer_DeviceMemory<> m_vertices;
-    vkcpp::Buffer_DeviceMemory<> m_indices;
-    uint32_t m_indicesCount { 0 };
-
-    // Uniform buffer block object
-    struct UniformBuffer {
-        vkcpp::DeviceMemory<> m_deviceMemoryOriginal;
-        vkcpp::Buffer<> m_bufferOriginal;
-        // The descriptor set stores the resources bound to the binding points in a shader
-        // It connects the binding points of the different shaders with the buffers and images used for those bindings
-        vkcpp::DescriptorSet m_descriptorSet;
-        // We keep a pointer to the mapped buffer, so we can easily update it's contents via a memcpy
-        uint8_t* m_pMappedMemory { nullptr };
+    std::vector<Vertex> s_vertexDataBuffer {
+        { { 1.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+        { { -1.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+        { { 0.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } }
     };
+    //        uint32_t vertexBufferSize = static_cast<uint32_t>(vertexBuffer.size()) * sizeof(Vertex);
 
-    // We use one UBO per frame, so we can have a frame overlap and make sure that uniforms aren't updated while still in use
-    std::array<UniformBuffer, MAX_CONCURRENT_FRAMES> m_uniformBuffers;
+    // Setup indices
+    std::vector<uint32_t> s_vertexIndexBuffer { 0, 1, 2 };
+    //        m_indicesCount = static_cast<uint32_t>(indexBuffer.size());
+    //        uint32_t indexBufferSize = m_indicesCount * sizeof(uint32_t);
+
+    vkcpp::Buffer_DeviceMemory<Vertex> m_vertices;
+    vkcpp::Buffer_DeviceMemory<uint32_t> m_indices;
 
     // For simplicity we use the same uniform block layout as in the shader:
     //
@@ -79,6 +74,23 @@ public:
         glm::mat4 modelMatrix;
         glm::mat4 viewMatrix;
     };
+
+    // Uniform buffer block object
+    template <typename T = uint8_t>
+    struct UniformBuffer {
+        vkcpp::DeviceMemory<T> m_deviceMemoryOriginal;
+        vkcpp::Buffer<T> m_bufferOriginal;
+        // The descriptor set stores the resources bound to the binding points in a shader
+        // It connects the binding points of the different shaders with the buffers and images used for those bindings
+        vkcpp::DescriptorSet m_descriptorSet;
+        // We keep a pointer to the mapped buffer, so we can easily update it's contents via a memcpy
+        uint8_t* m_pMappedMemory { nullptr };
+
+        vkcpp::Buffer_DeviceMemory<T> m_buffer_deviceMemory;
+    };
+
+    // We use one UBO per frame, so we can have a frame overlap and make sure that uniforms aren't updated while still in use
+    std::array<UniformBuffer<ShaderData>, MAX_CONCURRENT_FRAMES> m_uniformBuffers;
 
     // The m_vkPipeline layout is used by a m_vkPipeline to access the descriptor sets
     // It defines interface (without binding any actual data) between the shader stages used by the m_vkPipeline and the shader resources
@@ -102,7 +114,7 @@ public:
     std::vector<VkSemaphore> m_vkPresentCompleteSemaphores {};
     std::vector<VkSemaphore> m_vkRenderCompleteSemaphores {};
 
-    //std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> m_vkCommandBuffers {};
+    // std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> m_vkCommandBuffers {};
     std::array<VkFence, MAX_CONCURRENT_FRAMES> m_vkWaitFences {};
 
     // To select the correct sync and command objects, we need to keep track of the current frame
@@ -140,7 +152,6 @@ public:
         }
     }
 
-
     // Create the per-frame (in flight) Vulkan synchronization primitives used in this example
     void createSynchronizationPrimitives()
     {
@@ -169,27 +180,15 @@ public:
         }
     }
 
-
     // Prepare vertex and index buffers for an indexed triangle
     // Also uploads them to m_vkDevice local m_vkDeviceMemory using staging and initializes vertex input and attribute binding to match the vertex shader
     void createVertexBuffer()
     {
-        // A note on m_vkDeviceMemory management in Vulkan in general:
-        //	This is a very complex topic and while it's fine for an example application to small individual m_vkDeviceMemory allocations that is not
-        //	what should be done a real-world application, where you should allocate large chunks of m_vkDeviceMemory at once instead.
-
-        // Setup vertices
-        std::vector<Vertex> vertexBuffer {
-            { { 1.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
-            { { -1.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
-            { { 0.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } }
-        };
-        uint32_t vertexBufferSize = static_cast<uint32_t>(vertexBuffer.size()) * sizeof(Vertex);
-
-        // Setup indices
-        std::vector<uint32_t> indexBuffer { 0, 1, 2 };
-        m_indicesCount = static_cast<uint32_t>(indexBuffer.size());
-        uint32_t indexBufferSize = m_indicesCount * sizeof(uint32_t);
+        //	A note on m_vkDeviceMemory management in Vulkan in general:
+        //	This is a very complex topic and while it's fine for an example application to do
+        //	small individual m_vkDeviceMemory allocations that is not
+        //	what should be done a real-world application, where you should allocate
+        //	large chunks of m_vkDeviceMemory at once instead.
 
         // Static data like vertex and index buffer should be stored on the m_vkDevice m_vkDeviceMemory for optimal (and fastest) access by the GPU
         //
@@ -210,33 +209,33 @@ public:
         // We will do the same thing for the index info.
 
         // Create a host-visible buffer to copy the vertex data to (staging buffer)
-		vkcpp::Buffer_DeviceMemory<> verticesStagingBuffer
-			= vkcpp::Buffer_DeviceMemory<>::withCopy(
-				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-				vertexBufferSize,
-				0,
-				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-				vertexBuffer.data());
+        vkcpp::Buffer_DeviceMemory verticesStagingBuffer
+            = vkcpp::Buffer_DeviceMemory<Vertex>::withCopy(
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                vkcpp::TypedCount(s_vertexDataBuffer),
+                0,
+                vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+                s_vertexDataBuffer.data());
         verticesStagingBuffer.unmapMemory();
-		m_vertices = vkcpp::Buffer_DeviceMemory(
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			vertexBufferSize,
-			0,
-			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
+        m_vertices = vkcpp::Buffer_DeviceMemory(
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            vkcpp::TypedCount(s_vertexDataBuffer),
+            0,
+            vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
-		vkcpp::Buffer_DeviceMemory<> indicesStagingBuffer
-			= vkcpp::Buffer_DeviceMemory<>::withCopy(
-				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-				indexBufferSize,
-				0,
-				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-				indexBuffer.data());
+        vkcpp::Buffer_DeviceMemory indicesStagingBuffer
+            = vkcpp::Buffer_DeviceMemory<uint32_t>::withCopy(
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                vkcpp::TypedCount(s_vertexIndexBuffer),
+                0,
+                vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+                s_vertexIndexBuffer.data());
         indicesStagingBuffer.unmapMemory();
-		m_indices = vkcpp::Buffer_DeviceMemory(
-			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			indexBufferSize,
-			0,
-			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
+        m_indices = vkcpp::Buffer_DeviceMemory(
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            vkcpp::TypedCount(s_vertexIndexBuffer),
+            0,
+            vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
         // Buffer copies have to be submitted to a m_vkQueue, so we need a command buffer for them
         // Note: Some devices offer a dedicated transfer m_vkQueue (with only the transfer bit set) that may be faster when doing lots of copies
@@ -254,10 +253,10 @@ public:
         // Put buffer region copies into command buffer
         VkBufferCopy copyRegion {};
         // Vertex buffer
-        copyRegion.size = vertexBufferSize;
+        copyRegion.size = vkcpp::TypedCount(s_vertexDataBuffer).vkDeviceSize();
         vkCmdCopyBuffer(vkCommandBuffer, verticesStagingBuffer.m_buffer, m_vertices.m_buffer, 1, &copyRegion);
         // Index buffer
-        copyRegion.size = indexBufferSize;
+        copyRegion.size = vkcpp::TypedCount(s_vertexIndexBuffer).vkDeviceSize();
         vkCmdCopyBuffer(vkCommandBuffer, indicesStagingBuffer.m_buffer, m_indices.m_buffer, 1, &copyRegion);
         VK_CHECK_RESULT(vkEndCommandBuffer(vkCommandBuffer));
 
@@ -350,7 +349,7 @@ public:
         vkGetImageMemoryRequirements(m_device, m_defaultDepthStencil.m_image, &vkMemoryRequirements);
         vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
         vkMemoryAllocateInfo.memoryTypeIndex
-			= vkcpp::findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
+            = vkcpp::findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
         m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(vkMemoryAllocateInfo);
 
         VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
@@ -415,46 +414,43 @@ public:
         constexpr int colorPresentAttachmentIndex = 0;
         constexpr int depthStencilAttachmentIndex = 1;
 
-		constexpr int subpassCount = 1;
+        constexpr int subpassCount = 1;
         constexpr int theOnlySubpassIndex = 0;
 
         vkcpp::RenderPassCreateInfo renderPassCreateInfo(subpassCount, attachmentCount);
-		renderPassCreateInfo.attachmentDescription(colorPresentAttachmentIndex)
-			= vkcpp::AttachmentDescription::simpleColorPresent(m_swapChain.colorFormat);
+        renderPassCreateInfo.attachmentDescription(colorPresentAttachmentIndex)
+            = vkcpp::AttachmentDescription::simpleColorPresent(m_swapChain.colorFormat);
 
-		renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex)
-			= vkcpp::AttachmentDescription::simpleDepthStencil(m_vkFormatDepth);
+        renderPassCreateInfo.attachmentDescription(depthStencilAttachmentIndex)
+            = vkcpp::AttachmentDescription::simpleDepthStencil(m_vkFormatDepth);
 
-		renderPassCreateInfo.subpassDescription(theOnlySubpassIndex)
-			.addColorAttachmentReference(colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-			.setDepthStencilAttachmentReference(depthStencilAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        renderPassCreateInfo.subpassDescription(theOnlySubpassIndex)
+            .addColorAttachmentReference(colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+            .setDepthStencilAttachmentReference(depthStencilAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
+        // Setup subpass dependencies
+        // These will add the implicit attachment layout transitions specified by the attachment descriptions
+        // The actual usage layout is preserved through the layout specified in the attachment reference
+        // Each subpass dependency will introduce a m_vkDeviceMemory and execution dependency between the source and dest subpass described by
+        // srcStageMask, dstStageMask, srcAccessMask, dstAccessMask (and dependencyFlags is set)
+        // Note: VK_SUBPASS_EXTERNAL is a special constant that refers to all commands executed outside of the actual renderpass)
+        renderPassCreateInfo
+            .addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
+            .addSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_NONE)
+            .addDst(
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
 
-		// Setup subpass dependencies
-		// These will add the implicit attachment layout transitions specified by the attachment descriptions
-		// The actual usage layout is preserved through the layout specified in the attachment reference
-		// Each subpass dependency will introduce a m_vkDeviceMemory and execution dependency between the source and dest subpass described by
-		// srcStageMask, dstStageMask, srcAccessMask, dstAccessMask (and dependencyFlags is set)
-		// Note: VK_SUBPASS_EXTERNAL is a special constant that refers to all commands executed outside of the actual renderpass)
-		renderPassCreateInfo
-			.addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
-			.addSrc(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_NONE)
-			.addDst(
-				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
-
-		auto fragmentTests = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-		renderPassCreateInfo
-			.addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
-			.addSrc(fragmentTests, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
-			.addDst(
-				fragmentTests,
-				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT);
-
+        auto fragmentTests = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        renderPassCreateInfo
+            .addSubpassDependency(VK_SUBPASS_EXTERNAL, theOnlySubpassIndex)
+            .addSrc(fragmentTests, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
+            .addDst(
+                fragmentTests,
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT);
 
         // Create the actual renderpass
         m_renderPassOriginal = vkcpp::RenderPass(renderPassCreateInfo);
-
     }
 
     // Vulkan loads its shaders from an immediate binary representation called SPIR-V
@@ -477,7 +473,7 @@ public:
             assert(shaderSize > 0);
         }
 
-		if (shaderCode) {
+        if (shaderCode) {
             // Create a new shader module that will be used for m_vkPipeline creation
             VkShaderModuleCreateInfo shaderModuleCI {};
             shaderModuleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -669,16 +665,15 @@ public:
     void createUniformBuffers()
     {
         // Prepare and initialize the per-frame uniform buffer blocks containing shader uniforms
-        // Single uniforms like in OpenGL are no longer present in Vulkan. All hader uniforms are passed via uniform buffer blocks
-
-        VkBufferCreateInfo bufferInfo {};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = sizeof(ShaderData);
-        bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        // Single uniforms like in OpenGL are no longer present in Vulkan. All shader uniforms are passed via uniform buffer blocks
 
         // Create the buffers
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            m_uniformBuffers[i].m_bufferOriginal = vkcpp::Buffer(bufferInfo);
+            vkcpp::BufferCreateInfoTyped<ShaderData> bufferCreateInfo;
+            bufferCreateInfo.size = sizeof(ShaderData);
+            bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
+            m_uniformBuffers[i].m_bufferOriginal = vkcpp::Buffer<ShaderData>(bufferCreateInfo);
 
             // Get m_vkDeviceMemory requirements including size, alignment and m_vkDeviceMemory type
             VkMemoryRequirements vkMemoryRequirements = m_uniformBuffers[i].m_bufferOriginal.getMemoryRequirements();
@@ -696,12 +691,18 @@ public:
             vkMemoryAllocateInfo.memoryTypeIndex
                 = vkcpp::findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT);
 
-            m_uniformBuffers[i].m_deviceMemoryOriginal = vkcpp::DeviceMemory(vkMemoryAllocateInfo);
+            m_uniformBuffers[i].m_deviceMemoryOriginal = vkcpp::DeviceMemory<ShaderData>(vkMemoryAllocateInfo);
 
             // Bind m_vkDeviceMemory to buffer
             vkBindBufferMemory(m_device, m_uniformBuffers[i].m_bufferOriginal, m_uniformBuffers[i].m_deviceMemoryOriginal, 0);
             // We map the buffer once, so we can update it without having to map it again
-            vkMapMemory(m_device, m_uniformBuffers[i].m_deviceMemoryOriginal, 0, sizeof(ShaderData), 0, (void**)&m_uniformBuffers[i].m_pMappedMemory);
+            vkMapMemory(
+                m_device,
+                m_uniformBuffers[i].m_deviceMemoryOriginal,
+                0,
+                sizeof(ShaderData),
+                0,
+                (void**)&m_uniformBuffers[i].m_pMappedMemory);
         }
     }
 
@@ -731,12 +732,12 @@ public:
         // Note that the implementation is free to return the images in any order, so we must use the acquire function and can't just cycle through the images/imageIndex on our own
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(
-			m_device,
-			m_swapChain.swapChain,
-			UINT64_MAX,
-			m_vkPresentCompleteSemaphores[m_currentFrameIndex],
-			VK_NULL_HANDLE,
-			&imageIndex);
+            m_device,
+            m_swapChain.swapChain,
+            UINT64_MAX,
+            m_vkPresentCompleteSemaphores[m_currentFrameIndex],
+            VK_NULL_HANDLE,
+            &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
             windowResize();
             return;
@@ -779,7 +780,7 @@ public:
         renderPassBeginInfo.pClearValues = clearValues;
         renderPassBeginInfo.framebuffer = m_vkFrameBuffers[imageIndex];
 
-		vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[m_currentFrameIndex];
+        vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[m_currentFrameIndex];
 
         commandBuffer
             .reset()
@@ -791,7 +792,7 @@ public:
             .cmdBindPipeline(m_graphicsPipeline)
             .cmdBindVertexBuffer(m_vertices.m_buffer)
             .cmdBindIndexBuffer(m_indices.m_buffer, VK_INDEX_TYPE_UINT32)
-            .cmdDrawIndexed(m_indicesCount)
+            .cmdDrawIndexed(s_vertexIndexBuffer.size())
             .cmdEndRenderPass()
             .end();
 
@@ -805,7 +806,7 @@ public:
         submitInfo.addCommandBuffer(commandBuffer);
         submitInfo.addWaitSemaphore(m_vkPresentCompleteSemaphores[m_currentFrameIndex], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
         submitInfo.addSignalSemaphore(m_vkRenderCompleteSemaphores[imageIndex]);
-		m_queue.submit(submitInfo, m_vkWaitFences[m_currentFrameIndex]);
+        m_queue.submit(submitInfo, m_vkWaitFences[m_currentFrameIndex]);
 
         // Present the current frame buffer to the swap chain
         // Pass the semaphore signaled by the command buffer submission from the submit info as the wait semaphore for swap chain presentation
@@ -840,30 +841,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return (DefWindowProc(hWnd, uMsg, wParam, lParam));
 }
 
-
 int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR, _In_ int)
 {
-	std::cout << std::format("WinMain\n");
+    std::cout << std::format("WinMain\n");
     for (size_t i = 0; i < __argc; i++) {
         VulkanExample::args.push_back(__argv[i]);
     };
 
+    try {
+        vkcpp::VulkanContextCreateInfo appContextCreateInfo;
+        vkcpp::initVulkanContext(appContextCreateInfo);
 
-	try {
-		vkcpp::VulkanContextCreateInfo appContextCreateInfo;
-		vkcpp::initVulkanContext(appContextCreateInfo);
-
-		vulkanExample = new VulkanExample();
-		vulkanExample->initVulkan();
-		vulkanExample->setupWindow(hInstance, WndProc);
-		vulkanExample->prepare();
-		vulkanExample->renderLoop();
-		delete (vulkanExample);
-	}
-	catch (std::exception& e) {
-		std::cout << std::format("exception: %s\n", e.what());
-	}
-	std::cout << "WinMain return;\n";
+        vulkanExample = new VulkanExample();
+        vulkanExample->initVulkan();
+        vulkanExample->setupWindow(hInstance, WndProc);
+        vulkanExample->prepare();
+        vulkanExample->renderLoop();
+        delete (vulkanExample);
+    } catch (std::exception& e) {
+        std::cout << std::format("exception: %s\n", e.what());
+    }
+    std::cout << "WinMain return;\n";
     return 0;
 }
-

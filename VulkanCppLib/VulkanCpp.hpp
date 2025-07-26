@@ -1618,6 +1618,33 @@ public:
     }
 };
 
+template <typename T = uint8_t>
+class TypedCount {
+
+public:
+    uint32_t m_count;
+
+    TypedCount()
+        : m_count(1)
+    {
+    }
+
+    TypedCount(uint32_t count)
+        : m_count(count)
+    {
+    }
+
+    TypedCount(std::vector<T> v)
+        : m_count(static_cast<uint32_t>(v.size()))
+    {
+    }
+
+    VkDeviceSize vkDeviceSize() const
+    {
+        return sizeof(T) * m_count;
+    }
+};
+
 class MemoryAllocateInfo : public VkMemoryAllocateInfo {
 
 public:
@@ -1628,7 +1655,7 @@ public:
     }
 };
 
-template <typename T=uint8_t>
+template <typename T = uint8_t>
 class DeviceMemory : public InteropHandle3<VkDeviceMemory> {
 
     static void destroy(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice)
@@ -1645,6 +1672,11 @@ class DeviceMemory : public InteropHandle3<VkDeviceMemory> {
     VkDeviceSize m_size = 0;
 
 public:
+
+	operator VkDeviceMemory() const {
+		return m_handle;
+	}
+
     DeviceMemory() = default;
     ~DeviceMemory() = default;
 
@@ -1735,7 +1767,13 @@ public:
     }
 };
 
-template<typename T=uint8_t>
+template <typename T = uint8_t>
+class BufferCreateInfoTyped : public BufferCreateInfo {
+public:
+    int m_count = 1;
+};
+
+template <typename T = uint8_t>
 class Buffer : public InteropHandle2<VkBuffer> {
 
     static void destroy(VkBuffer vkBuffer)
@@ -1745,19 +1783,20 @@ class Buffer : public InteropHandle2<VkBuffer> {
 
     Buffer(VkBuffer vkBuffer, VkDeviceSize size, DestroyFunc_t pfnDestroy)
         : InteropHandle2(vkBuffer, pfnDestroy)
-        , m_size(size)
     {
     }
 
-    VkDeviceSize m_size = 0;
-
 public:
+
+	operator VkBuffer() const {
+		return m_handle;
+
+	}
     Buffer() = default;
     ~Buffer() = default;
 
     Buffer(const Buffer& other)
         : InteropHandle2(other)
-        , m_size(other.m_size)
     {
     }
 
@@ -1774,7 +1813,6 @@ public:
 
     Buffer(Buffer&& other) noexcept
         : InteropHandle2(std::move(other))
-        , m_size(other.m_size)
     {
     }
 
@@ -1821,9 +1859,15 @@ public:
         new (this) Buffer(vkBuffer, vkBufferCreateInfo.size, &destroy);
     }
 
-    VkDeviceSize size() const
+    Buffer(BufferCreateInfoTyped<T>& bufferCreateInfoTyped)
     {
-        return m_size;
+        bufferCreateInfoTyped.size = sizeof(T) * bufferCreateInfoTyped.m_count;
+        VkBuffer vkBuffer;
+        VkResult vkResult = vkCreateBuffer(vkDevice(), &bufferCreateInfoTyped, nullptr, &vkBuffer);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) Buffer(vkBuffer, bufferCreateInfoTyped.size, &destroy);
     }
 
     VkMemoryRequirements getMemoryRequirements() const
@@ -1836,7 +1880,7 @@ public:
     DeviceMemory<T> allocateDeviceMemory(MemoryPropertyFlags requiredMemoryPropertyFlags) const
     {
         VkMemoryRequirements vkMemoryRequirements = getMemoryRequirements();
-        return DeviceMemory(vkMemoryRequirements, requiredMemoryPropertyFlags);
+        return DeviceMemory<T>(vkMemoryRequirements, requiredMemoryPropertyFlags);
     }
 
     void bindDeviceMemory(VkDeviceMemory vkDeviceMemory)
@@ -1848,21 +1892,14 @@ public:
     }
 };
 
-template<typename T=uint8_t>
+template <typename T = uint8_t>
 class Buffer_DeviceMemory {
-
-    //	Handy constructor.
-    Buffer_DeviceMemory(Buffer<T>&& buffer, DeviceMemory<T>&& deviceMemory)
-        : m_buffer(std::move(buffer))
-        , m_deviceMemory(std::move(deviceMemory))
-        , m_mappedMemory(nullptr)
-    {
-    }
 
 public:
     Buffer<T> m_buffer;
     DeviceMemory<T> m_deviceMemory;
-    void* m_mappedMemory = nullptr;
+    T* m_mappedMemory = nullptr;
+    TypedCount<T> m_count;
 
     Buffer_DeviceMemory() = default;
     ~Buffer_DeviceMemory() = default;
@@ -1870,6 +1907,7 @@ public:
     Buffer_DeviceMemory(const Buffer_DeviceMemory& other)
         : m_buffer(other.m_buffer)
         , m_deviceMemory(other.m_deviceMemory)
+        , m_count(other.m_count)
         , m_mappedMemory(other.m_mappedMemory)
     {
     }
@@ -1887,6 +1925,7 @@ public:
     Buffer_DeviceMemory(Buffer_DeviceMemory&& other) noexcept
         : m_buffer(std::move(other.m_buffer))
         , m_deviceMemory(std::move(other.m_deviceMemory))
+        , m_count(other.m_count)
         , m_mappedMemory(other.m_mappedMemory)
     {
     }
@@ -1901,55 +1940,83 @@ public:
         return *this;
     }
 
-    //	Basic constructor. Creates Buffer, DeviceMemory, and binds them.
+    //	Most basic constructor.  Just takes existing buffer and memory.
+    //	Used by other constructors and useful for porting.
+    Buffer_DeviceMemory(Buffer<T>&& buffer, DeviceMemory<T>&& deviceMemory, TypedCount<T> count)
+        : m_buffer(std::move(buffer))
+        , m_deviceMemory(std::move(deviceMemory))
+        , m_count(count)
+        , m_mappedMemory(nullptr)
+    {
+    }
+
+    //	Creates Buffer, DeviceMemory, and binds them.
     Buffer_DeviceMemory(
         VkBufferUsageFlags vkBufferUsageFlags,
-        VkDeviceSize size,
+        TypedCount<T> count,
         uint32_t queueFamilyIndex,
         MemoryPropertyFlags requiredMemoryPropertyFlags)
     {
-        Buffer buffer(vkBufferUsageFlags, size, queueFamilyIndex);
-        DeviceMemory deviceMemory = buffer.allocateDeviceMemory(requiredMemoryPropertyFlags);
+        Buffer<T> buffer(vkBufferUsageFlags, count.vkDeviceSize(), queueFamilyIndex);
+        DeviceMemory<T> deviceMemory = buffer.allocateDeviceMemory(requiredMemoryPropertyFlags);
 
         VkResult vkResult = vkBindBufferMemory(vkDevice(), buffer, deviceMemory, 0);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
 
-        new (this) Buffer_DeviceMemory(std::move(buffer), std::move(deviceMemory));
+        new (this) Buffer_DeviceMemory(std::move(buffer), std::move(deviceMemory), count);
     }
 
     static Buffer_DeviceMemory withMap(
         VkBufferUsageFlags vkBufferUsageFlags,
-        int64_t size,
+        TypedCount<T> count,
         uint32_t queueFamilyIndex,
         MemoryPropertyFlags requiredMemoryPropertyFlags)
     {
-        Buffer_DeviceMemory newbdm(vkBufferUsageFlags, size, queueFamilyIndex, requiredMemoryPropertyFlags);
+        Buffer_DeviceMemory newbdm(vkBufferUsageFlags, count, queueFamilyIndex, requiredMemoryPropertyFlags);
         void* mappedMemory;
-        VkResult vkResult = vkMapMemory(vkDevice(), newbdm.m_deviceMemory, 0, size, 0, &mappedMemory);
+        VkResult vkResult = vkMapMemory(vkDevice(), newbdm.m_deviceMemory, 0, newbdm.m_count.vkDeviceSize(), 0, &mappedMemory);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        newbdm.m_mappedMemory = mappedMemory;
+        newbdm.m_mappedMemory = static_cast<T*>(mappedMemory);
         return newbdm;
     }
 
     static Buffer_DeviceMemory withCopy(
         VkBufferUsageFlags vkBufferUsageFlags,
-        int64_t size,
+        TypedCount<T> count,
         uint32_t queueFamilyIndex,
         MemoryPropertyFlags requiredMemoryPropertyFlags,
-        const void* pSrcMem)
+        const T* pSrcMem)
     {
         Buffer_DeviceMemory newbdm = withMap(
             vkBufferUsageFlags,
-            size,
+            count,
             queueFamilyIndex,
             requiredMemoryPropertyFlags);
 
-        memcpy(newbdm.m_mappedMemory, pSrcMem, size);
+        memcpy(newbdm.m_mappedMemory, pSrcMem, newbdm.m_count.vkDeviceSize());
         return newbdm;
+    }
+
+    void bind()
+    {
+        VkResult vkResult = vkBindBufferMemory(vkDevice(), m_buffer, m_deviceMemory, 0);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+    }
+
+    void map()
+    {
+        void* mappedMemory;
+        VkResult vkResult = vkMapMemory(vkDevice(), m_deviceMemory, 0, m_count.vkDeviceSize(), 0, &mappedMemory);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        m_mappedMemory = static_cast<T*>(mappedMemory);
     }
 
     void unmapMemory()
@@ -1996,28 +2063,30 @@ public:
     {
     }
 
-	ShaderModule& operator=(const ShaderModule& other) {
-		if (this == &other) {
-			return *this;
-		}
-		this -> ~ShaderModule();
-		new (this) ShaderModule(other);
-		return *this;
-	}
+    ShaderModule& operator=(const ShaderModule& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~ShaderModule();
+        new (this) ShaderModule(other);
+        return *this;
+    }
 
-	ShaderModule(ShaderModule&& other) noexcept
-		: InteropHandle2(std::move(other)) {
-	}
+    ShaderModule(ShaderModule&& other) noexcept
+        : InteropHandle2(std::move(other))
+    {
+    }
 
-	ShaderModule& operator=(ShaderModule&& other) noexcept {
-		if (this == &other) {
-			return *this;
-		}
-		this -> ~ShaderModule();
-		new (this) ShaderModule(std::move(other));
-		return *this;
-	}
-
+    ShaderModule& operator=(ShaderModule&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~ShaderModule();
+        new (this) ShaderModule(std::move(other));
+        return *this;
+    }
 
     static ShaderModule createShaderModuleFromFile(const std::string& fileName)
     {
@@ -2096,26 +2165,26 @@ public:
         AttachmentDescription attachmentDescription;
         attachmentDescription.format = vkFormatArg;
         attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-		attachmentDescription.setLoadOpStoreOp(
-			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-		attachmentDescription.setInitialLayoutFinalLayout(
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        attachmentDescription.setLoadOpStoreOp(
+            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+        attachmentDescription.setInitialLayoutFinalLayout(
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
         return attachmentDescription;
     }
 
     static AttachmentDescription simpleColor(
         VkFormat vkFormatArg)
     {
-		//	TODO: is store op store the best choice?
-		//	Is it necessary for the usual use case?
-		//	Maybe don't care is more efficient for the usual case?
+        //	TODO: is store op store the best choice?
+        //	Is it necessary for the usual use case?
+        //	Maybe don't care is more efficient for the usual case?
         AttachmentDescription attachmentDescription;
         attachmentDescription.format = vkFormatArg;
         attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-		attachmentDescription.setLoadOpStoreOp(
-			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-		attachmentDescription.setInitialLayoutFinalLayout(
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        attachmentDescription.setLoadOpStoreOp(
+            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+        attachmentDescription.setInitialLayoutFinalLayout(
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         return attachmentDescription;
     }
 
@@ -2126,12 +2195,12 @@ public:
         //	Reasonable defaults
         attachmentDescription.format = vkFormatArg;
         attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-		attachmentDescription.setLoadOpStoreOp(
-			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-		attachmentDescription.setStencilLoadOpStoreOp(
-			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-		attachmentDescription.setInitialLayoutFinalLayout(
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        attachmentDescription.setLoadOpStoreOp(
+            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+        attachmentDescription.setStencilLoadOpStoreOp(
+            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+        attachmentDescription.setInitialLayoutFinalLayout(
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
         return attachmentDescription;
     }
 
@@ -3266,13 +3335,6 @@ public:
         return *this;
     }
 
-    CommandBuffer& cmdCopyBuffer(
-        Buffer<> srcBuffer,
-        Buffer<> dstBuffer)
-    {
-        return cmdCopyBuffer(srcBuffer, dstBuffer, srcBuffer.size());
-    }
-
     CommandBuffer& cmdPipelineBarrier2(DependencyInfo& dependencyInfo)
     {
         vkCmdPipelineBarrier2(*this, &dependencyInfo);
@@ -3386,9 +3448,10 @@ public:
         return *this;
     }
 
-    CommandBuffer& cmdDrawIndexed(uint32_t indexCount)
+	//	std::vector.size() is used as index count a lot, so use size_t as the parameter type.
+    CommandBuffer& cmdDrawIndexed(size_t indexCount)
     {
-        vkCmdDrawIndexed(*this, indexCount, 1, 0, 0, 0);
+        vkCmdDrawIndexed(*this, static_cast<uint32_t>(indexCount), 1, 0, 0, 0);
         return *this;
     }
 
@@ -5255,24 +5318,25 @@ class Framebuffer : public InteropHandle2<VkFramebuffer> {
 
 public:
     Framebuffer() = default;
-	~Framebuffer() = default;
-	Framebuffer(const Framebuffer&) = delete;
-	Framebuffer& operator=(const Framebuffer&) = delete;
-	Framebuffer(Framebuffer&& other) noexcept
-		:InteropHandle2(std::move(other))
-		, m_image_memory_views(std::move(other.m_image_memory_views))
-		, m_imageViews(std::move(other.m_imageViews)) {
+    ~Framebuffer() = default;
+    Framebuffer(const Framebuffer&) = delete;
+    Framebuffer& operator=(const Framebuffer&) = delete;
+    Framebuffer(Framebuffer&& other) noexcept
+        : InteropHandle2(std::move(other))
+        , m_image_memory_views(std::move(other.m_image_memory_views))
+        , m_imageViews(std::move(other.m_imageViews))
+    {
+    }
 
-	}
-
-	Framebuffer& operator=(Framebuffer&& other) noexcept {
-		if (this == &other) {
-			return *this;
-		}
-		this -> ~Framebuffer();
-		new (this) Framebuffer(std::move(other));
-		return *this;
-	}
+    Framebuffer& operator=(Framebuffer&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Framebuffer();
+        new (this) Framebuffer(std::move(other));
+        return *this;
+    }
 
     Framebuffer(FramebufferCreateInfo& framebufferCreateInfo)
     {
@@ -5310,12 +5374,11 @@ public:
     bool m_swapchainUpToDate = false;
 
 private:
-
-    //void makeEmpty()
+    // void makeEmpty()
     //{
-    //    //	TODO: Need to review the whole move thing to make sure this all makes sense.
-    //    m_swapchainFrameBuffers.clear();
-    //}
+    //     //	TODO: Need to review the whole move thing to make sure this all makes sense.
+    //     m_swapchainFrameBuffers.clear();
+    // }
 
     void destroyFrameBuffers()
     {
@@ -5387,9 +5450,9 @@ private:
     }
 
 public:
-	//	TODO: this needs an entire review to see what's actually needed.
-	Swapchain_FrameBuffers() = default;
-	~Swapchain_FrameBuffers() = default;
+    //	TODO: this needs an entire review to see what's actually needed.
+    Swapchain_FrameBuffers() = default;
+    ~Swapchain_FrameBuffers() = default;
 
     Swapchain_FrameBuffers(
         const SwapchainCreateInfo& swapchainCreateInfo,
