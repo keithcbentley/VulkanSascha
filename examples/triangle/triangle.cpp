@@ -253,10 +253,10 @@ public:
         VkBufferCopy copyRegion {};
         // Vertex buffer
         copyRegion.size = vkcpp::TypedCount(s_vertexDataBuffer).vkDeviceSize();
-        vkCmdCopyBuffer(vkCommandBuffer, verticesStagingBuffer.m_buffer, m_vertices.m_buffer, 1, &copyRegion);
+        vkCmdCopyBuffer(vkCommandBuffer, verticesStagingBuffer.buffer(), m_vertices.buffer(), 1, &copyRegion);
         // Index buffer
         copyRegion.size = vkcpp::TypedCount(s_vertexIndexBuffer).vkDeviceSize();
-        vkCmdCopyBuffer(vkCommandBuffer, indicesStagingBuffer.m_buffer, m_indices.m_buffer, 1, &copyRegion);
+        vkCmdCopyBuffer(vkCommandBuffer, indicesStagingBuffer.buffer(), m_indices.buffer(), 1, &copyRegion);
         VK_CHECK_RESULT(vkEndCommandBuffer(vkCommandBuffer));
 
         // Submit the command buffer to the m_vkQueue to finish the copy
@@ -318,7 +318,7 @@ public:
 
             vkcpp::WriteDescriptorSet writeDescriptorSet(m_uniformBuffers[i].m_descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
             writeDescriptorSet.addBufferInfo(
-                m_uniformBuffers[i].m_buffer_deviceMemory.m_buffer, 0, sizeof(ShaderData));
+                m_uniformBuffers[i].m_buffer_deviceMemory.buffer(), 0, sizeof(ShaderData));
 
             vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
         }
@@ -762,8 +762,8 @@ public:
             .cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
             .cmdBindDescriptorSet(m_uniformBuffers[m_currentFrameIndex].m_descriptorSet, m_pipelineLayout)
             .cmdBindPipeline(m_graphicsPipeline)
-            .cmdBindVertexBuffer(m_vertices.m_buffer)
-            .cmdBindIndexBuffer(m_indices.m_buffer, VK_INDEX_TYPE_UINT32)
+            .cmdBindVertexBuffer(m_vertices.buffer())
+            .cmdBindIndexBuffer(m_indices.buffer(), VK_INDEX_TYPE_UINT32)
             .cmdDrawIndexed(s_vertexIndexBuffer.size())
             .cmdEndRenderPass()
             .end();

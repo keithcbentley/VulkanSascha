@@ -2059,7 +2059,7 @@ public:
         return newbdm;
     }
 
-	Buffer<> buffer() {
+	Buffer<T> buffer() {
 		return m_buffer;
 	}
 
