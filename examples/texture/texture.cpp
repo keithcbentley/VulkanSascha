@@ -23,18 +23,14 @@ struct Vertex {
 
 class VulkanExample : public VulkanExampleBase {
 public:
-    // Contains all Vulkan objects that are required to store and use a texture
-    // Note that this repository contains a texture class (VulkanTexture.hpp) that encapsulates texture loading functionality in a class that is used in subsequent demos
-    struct Texture {
-        vkcpp::Sampler m_sampler;
-        vkcpp::Image m_image;
-        VkImageLayout m_vkImageLayout;
-        vkcpp::DeviceMemory<> m_deviceMemory;
-        vkcpp::ImageView m_imageView;
-        uint32_t m_width { 0 };
-        uint32_t m_height { 0 };
-        uint32_t m_mipLevels { 0 };
-    } m_texture;
+    struct
+    {
+        float m_mipLevelsForUI = 0.0;
+        float m_lodBiasFromUI = 0.0;
+    } m_uiData;
+
+
+	vkcpp::Texture m_texture;
 
     vks::Buffer m_vertexBuffer;
     vks::Buffer m_indexBuffer;
@@ -65,9 +61,7 @@ public:
         camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
     }
 
-    ~VulkanExample()
-    {
-    }
+    ~VulkanExample() = default;
 
     /*
             Upload texture m_vkImage data to the GPU
@@ -102,33 +96,25 @@ public:
         result = ktxTexture_CreateFromNamedFile(filename.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
         assert(result == KTX_SUCCESS);
 
-        // Get m_vkPhysicalDeviceProperties required for using and upload texture data from the ktx texture object
-        m_texture.m_width = ktxTexture->baseWidth;
-        m_texture.m_height = ktxTexture->baseHeight;
-        m_texture.m_mipLevels = ktxTexture->numLevels;
-        ktx_uint8_t* ktxTextureData = ktxTexture_GetData(ktxTexture);
-        ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
+        //	Handy shorthand.
+        const uint32_t textureWidth = ktxTexture->baseWidth;
+        const uint32_t textureHeight = ktxTexture->baseHeight;
+        const uint32_t textureMipLevelCount = ktxTexture->numLevels;
+        const uint8_t* const pTextureData = ktxTexture_GetData(ktxTexture);
+        const uint64_t textureSize = ktxTexture_GetSize(ktxTexture);
+		m_uiData.m_mipLevelsForUI = ktxTexture->numLevels;
 
         // We prefer using staging to copy the texture data to a m_vkDevice local optimal m_vkImage
         //        VkBool32 useStaging = true;
 
-        // Only use linear tiling if forced
-        //bool forceLinearTiling = false;
-        //if (forceLinearTiling) {
-        //    // Don't use linear if format is not supported for (linear) shader sampling
-        //    // Get m_vkDevice m_vkPhysicalDeviceProperties for the requested texture format
-        //    VkFormatProperties formatProperties;
-        //    vkGetPhysicalDeviceFormatProperties(m_physicalDevice, format, &formatProperties);
-        //    //            useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
-        //}
 
         vkcpp::Buffer_DeviceMemory<> stagingBufferAndMemory
             = vkcpp::Buffer_DeviceMemory<>::withCopy(
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                ktxTextureSize,
+                vkcpp::TypedCount<>(textureSize),
                 0, //	Queue family index.  Does this matter?
                 vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-                ktxTextureData);
+                pTextureData);
         stagingBufferAndMemory.unmapMemory();
 
         //	Setup buffer copy regions for each mip level.
@@ -136,7 +122,7 @@ public:
         //	to the properly layed out image memory.
         //	TODO: need to make a smart version to hold multiple
         std::vector<VkBufferImageCopy> bufferCopyRegions;
-        for (uint32_t mipLevel = 0; mipLevel < m_texture.m_mipLevels; mipLevel++) {
+        for (uint32_t mipLevel = 0; mipLevel < textureMipLevelCount; mipLevel++) {
             // Calculate offset into staging buffer for the current mip level.
             //	Note that we are using offsets.  We get the offset from the original
             //	memory, and then use it as the offset from the staging buffer base
@@ -164,21 +150,17 @@ public:
         imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
         imageCreateInfo.format = format;
-        imageCreateInfo.mipLevels = m_texture.m_mipLevels;
+        imageCreateInfo.mipLevels = textureMipLevelCount;
         imageCreateInfo.arrayLayers = 1;
         imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageCreateInfo.extent = { m_texture.m_width, m_texture.m_height, 1 };
+        imageCreateInfo.extent = { textureWidth, textureHeight, 1 };
         imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        m_texture.m_image = vkcpp::Image(imageCreateInfo);
+        m_texture.takeImage(vkcpp::Image(imageCreateInfo));
+		m_texture.allocateBindImageMemory(vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
-        VkMemoryRequirements vkMemoryRequirementsImage = m_texture.m_image.getMemoryRequirements();
-        m_texture.m_deviceMemory = vkcpp::DeviceMemory(
-            vkMemoryRequirementsImage, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
-
-        VK_CHECK_RESULT(vkBindImageMemory(m_device, m_texture.m_image, m_texture.m_deviceMemory, 0));
 
         VkCommandBuffer vkcb = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
         vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(vkcb);
@@ -193,14 +175,14 @@ public:
         VkImageSubresourceRange vkImageSubresourceRange = {};
         vkImageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         vkImageSubresourceRange.baseMipLevel = 0;
-        vkImageSubresourceRange.levelCount = m_texture.m_mipLevels;
+        vkImageSubresourceRange.levelCount = textureMipLevelCount;
         vkImageSubresourceRange.layerCount = 1;
 
         //	Use an image memory barrier to transition the texture image layout to transfer target
         //	so we can copy our buffer data to it.
         vkcpp::ImageMemoryBarrier imageMemoryBarrier;
         imageMemoryBarrier
-            .setImage(m_texture.m_image)
+            .setImage(m_texture.image())
             .setOldNewImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
             .setSubresourceRange(vkImageSubresourceRange)
             .setSrcDstAccessMask(VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT)
@@ -214,7 +196,7 @@ public:
         // Now do the actual memory transfer from staging buffer memory to the image memory.
         commandBuffer.cmdCopyBufferToImage(
             stagingBufferAndMemory.m_buffer,
-            m_texture.m_image,
+            m_texture.image(),
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             static_cast<uint32_t>(bufferCopyRegions.size()),
             bufferCopyRegions.data());
@@ -229,7 +211,7 @@ public:
             imageMemoryBarrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
         // Store current layout for later reuse
-        m_texture.m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        m_texture.setVkImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         m_pVulkanDevice->flushCommandBuffer(commandBuffer, m_queue, true);
 
@@ -251,7 +233,7 @@ public:
         vkSamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
         vkSamplerCreateInfo.minLod = 0.0f;
         // Set max level-of-detail to mip level count of the texture
-        vkSamplerCreateInfo.maxLod = (float)m_texture.m_mipLevels;
+        vkSamplerCreateInfo.maxLod = (float)textureMipLevelCount;
         // Enable anisotropic filtering
         // This feature is optional, so we must check if it's supported on the m_vkDevice
         if (vkcpp::vkPhysicalDeviceFeatures().samplerAnisotropy) {
@@ -264,28 +246,27 @@ public:
             vkSamplerCreateInfo.anisotropyEnable = VK_FALSE;
         }
         vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-        m_texture.m_sampler = vkcpp::Sampler(vkSamplerCreateInfo);
+		m_texture.takeSampler(vkcpp::Sampler(vkSamplerCreateInfo));
 
         // Create Image ImageView
         // Textures are not directly accessed by the shaders and
         // are abstracted by m_vkImage views containing additional
         // information and sub resource ranges
-        VkImageViewCreateInfo vkImageViewCreateInfo = vks::initializers::imageViewCreateInfo();
-        vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        vkImageViewCreateInfo.format = format;
+        vkcpp::ImageViewCreateInfo imageViewCreateInfo;
+        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        imageViewCreateInfo.format = format;
         // The subresource range describes the set of mip levels (and array layers) that can be accessed through this m_vkImage m_vkImageView
         // It's possible to create multiple m_vkImage views for a single m_vkImage referring to different (and/or overlapping) ranges of the m_vkImage
-        vkImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-        vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-        vkImageViewCreateInfo.subresourceRange.layerCount = 1;
+        imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+        imageViewCreateInfo.subresourceRange.layerCount = 1;
         // Linear tiling usually won't support mip maps
         // Only set mip map count if optimal tiling is used
-        vkImageViewCreateInfo.subresourceRange.levelCount = m_texture.m_mipLevels;
+        imageViewCreateInfo.subresourceRange.levelCount = textureMipLevelCount;
         // The m_vkImageView will be based on the texture's m_vkImage
-        vkImageViewCreateInfo.image = m_texture.m_image;
-        m_texture.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo);
-
+        imageViewCreateInfo.image = m_texture.image();
+		m_texture.takeImageView(vkcpp::ImageView(imageViewCreateInfo));
     }
 
     void buildCommandBuffers()
@@ -400,11 +381,11 @@ public:
         // Setup a descriptor m_vkImage info for the current texture to be used as a combined m_vkImage sampler
         VkDescriptorImageInfo textureDescriptor;
         // The m_vkImage's m_vkImageView (images are never directly accessed by the shader, but rather through views defining subresources)
-        textureDescriptor.imageView = m_texture.m_imageView;
+        textureDescriptor.imageView = m_texture.imageView();
         // The sampler (Telling the m_vkPipeline how to sample the texture, including repeat, border, etc.)
-        textureDescriptor.sampler = m_texture.m_sampler;
+        textureDescriptor.sampler = m_texture.sampler();
         // The current layout of the m_vkImage(Note: Should always fit the actual use, e.g.shader read)
-        textureDescriptor.imageLayout = m_texture.m_vkImageLayout;
+        textureDescriptor.imageLayout = m_texture.vkImageLayout();
 
         vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
 
@@ -491,6 +472,7 @@ public:
         m_uniformData.modelView = camera.matrices.view;
         m_uniformData.viewPos = camera.viewPos;
         memcpy(m_uniformBuffer.m_pMapped, &m_uniformData, sizeof(m_uniformData));
+		m_uniformData.lodBias = m_uiData.m_lodBiasFromUI;
     }
 
     void prepare()
@@ -515,7 +497,7 @@ public:
         VulkanExampleBase::submitFrame();
     }
 
-    virtual void render()
+    void render()
     {
         if (!m_prepared)
             return;
@@ -523,10 +505,10 @@ public:
         draw();
     }
 
-    virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay)
+    void OnUpdateUIOverlay(vks::UIOverlay* overlay)
     {
         if (overlay->header("Settings")) {
-            if (overlay->sliderFloat("LOD bias", &m_uniformData.lodBias, 0.0f, (float)m_texture.m_mipLevels)) {
+            if (overlay->sliderFloat("LOD bias", &m_uiData.m_lodBiasFromUI, 0.0f, m_uiData.m_mipLevelsForUI)) {
                 updateUniformBuffers();
             }
         }

@@ -1592,19 +1592,19 @@ public:
 
     Semaphore(VkSemaphoreCreateFlags vkSemaphoreCreateFlags)
     {
-		//	TODO: how do the flags work with the newer type of semaphores?
-		//	We are going to need a new type for them. Should we check the flags
-		//	so we don't create one accidentally?
+        //	TODO: how do the flags work with the newer type of semaphores?
+        //	We are going to need a new type for them. Should we check the flags
+        //	so we don't create one accidentally?
         VkSemaphoreCreateInfo vkSemaphoreCreateInfo {};
         vkSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		vkSemaphoreCreateInfo.flags = vkSemaphoreCreateFlags;
-		VkSemaphore vkSemaphore;
-		VkResult vkResult = vkCreateSemaphore(vkDevice(), &vkSemaphoreCreateInfo, nullptr, &vkSemaphore);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-		new (this) Semaphore(vkSemaphore, &destroy);
-	}
+        vkSemaphoreCreateInfo.flags = vkSemaphoreCreateFlags;
+        VkSemaphore vkSemaphore;
+        VkResult vkResult = vkCreateSemaphore(vkDevice(), &vkSemaphoreCreateInfo, nullptr, &vkSemaphore);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        new (this) Semaphore(vkSemaphore, &destroy);
+    }
 };
 
 class Fence : public InteropHandle2<VkFence> {
@@ -1668,7 +1668,6 @@ public:
         new (this) Fence(vkFence, &destroy);
     }
 
-
     void wait() const
     {
         VkFence vkFence = *this;
@@ -1680,20 +1679,20 @@ template <typename T = uint8_t>
 class TypedCount {
 
 public:
-    uint32_t m_count;
+    uint64_t m_count;
 
     TypedCount()
         : m_count(1)
     {
     }
 
-    TypedCount(uint32_t count)
+    explicit TypedCount(uint64_t count)
         : m_count(count)
     {
     }
 
     TypedCount(std::vector<T> v)
-        : m_count(static_cast<uint32_t>(v.size()))
+        : m_count(static_cast<uint64_t>(v.size()))
     {
     }
 
@@ -2829,6 +2828,10 @@ public:
 class ImageViewCreateInfo : public VkImageViewCreateInfo {
 
 public:
+    ImageViewCreateInfo()
+        : VkImageViewCreateInfo {}
+    {
+    }
     ImageViewCreateInfo(
         VkImage vkImage,
         VkImageViewType vkImageViewType,
@@ -5264,9 +5267,9 @@ public:
     }
 };
 
-class Image_Memory {
+class Image_DeviceMemory {
 
-    Image_Memory(Image&& image, DeviceMemory<>&& deviceMemory)
+    Image_DeviceMemory(Image&& image, DeviceMemory<>&& deviceMemory)
         : m_image(std::move(image))
         , m_deviceMemory(std::move(deviceMemory))
     {
@@ -5276,29 +5279,30 @@ public:
     Image m_image;
     DeviceMemory<> m_deviceMemory;
 
-    Image_Memory() = default;
-    ~Image_Memory() = default;
+    Image_DeviceMemory() = default;
+    ~Image_DeviceMemory() = default;
 
-    Image_Memory(const Image_Memory&) = delete;
-    Image_Memory& operator=(const Image_Memory&) = delete;
+    //	TODO: not clear why copying would be needed.
+    Image_DeviceMemory(const Image_DeviceMemory&) = delete;
+    Image_DeviceMemory& operator=(const Image_DeviceMemory&) = delete;
 
-    Image_Memory(Image_Memory&& other) noexcept
+    Image_DeviceMemory(Image_DeviceMemory&& other) noexcept
         : m_image(std::move(other.m_image))
         , m_deviceMemory(std::move(other.m_deviceMemory))
     {
     }
 
-    Image_Memory& operator=(Image_Memory&& other) noexcept
+    Image_DeviceMemory& operator=(Image_DeviceMemory&& other) noexcept
     {
         if (this == &other) {
             return *this;
         }
-        this->~Image_Memory();
-        new (this) Image_Memory(std::move(other));
+        this->~Image_DeviceMemory();
+        new (this) Image_DeviceMemory(std::move(other));
         return *this;
     }
 
-    Image_Memory(
+    Image_DeviceMemory(
         const ImageCreateInfo& imageCreateInfo,
         MemoryPropertyFlags properties)
     {
@@ -5310,10 +5314,10 @@ public:
             throw Exception(vkResult);
         }
 
-        new (this) Image_Memory(std::move(image), std::move(deviceMemory));
+        new (this) Image_DeviceMemory(std::move(image), std::move(deviceMemory));
     }
 
-    Image_Memory(
+    Image_DeviceMemory(
         VkExtent2D vkExtent2D,
         VkFormat format,
         VkImageUsageFlags usage,
@@ -5321,7 +5325,7 @@ public:
     {
         ImageCreateInfo imageCreateInfo(format, usage);
         imageCreateInfo.setExtent(vkExtent2D);
-        new (this) Image_Memory(imageCreateInfo, properties);
+        new (this) Image_DeviceMemory(imageCreateInfo, properties);
     }
 };
 
@@ -5614,7 +5618,7 @@ public:
             depthBufferFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
         imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
         imageCreateInfo.setExtent(vkExtent2D);
-        Image_Memory image_memory(imageCreateInfo, MEMORY_PROPERTY_DEVICE_LOCAL);
+        Image_DeviceMemory image_memory(imageCreateInfo, MEMORY_PROPERTY_DEVICE_LOCAL);
 
         ImageViewCreateInfo imageViewCreateInfo(
             image_memory.m_image,
@@ -5628,5 +5632,62 @@ public:
             std::move(image_memory.m_deviceMemory),
             std::move(imageView));
     }
+};
+
+class Texture {
+    Image m_image;
+    DeviceMemory<> m_imageDeviceMemory;
+    ImageView m_imageView;
+    Sampler m_sampler;
+
+    VkImageLayout m_vkImageLayout;
+
+public:
+    Texture() = default;
+    ~Texture() = default;
+
+    //	No move, no copy for now.
+    Texture(const Texture&) = delete;
+    Texture& operator=(const Texture&) = delete;
+    Texture(Texture&&) noexcept = delete;
+    Texture& operator=(Texture&&) noexcept = delete;
+
+	Image image() {
+		return m_image;
+	}
+
+	//	Useful when porting.
+	void takeImage(Image&& image) {
+		m_image = std::move(image);
+	}
+
+	Sampler sampler() {
+		return m_sampler;
+	}
+
+	void takeSampler(Sampler&& sampler) {
+		m_sampler = std::move(sampler);
+	}
+
+	ImageView imageView() {
+		return m_imageView;
+	}
+
+	void takeImageView(ImageView&& imageView) {
+		m_imageView = std::move(imageView);
+	}
+
+	void allocateBindImageMemory(MemoryPropertyFlags requiredProperties) {
+		m_imageDeviceMemory = m_image.allocateDeviceMemory(requiredProperties);
+		m_image.bindImageMemory(m_imageDeviceMemory);
+	}
+
+	void setVkImageLayout(VkImageLayout vkImageLayout) {
+		m_vkImageLayout = vkImageLayout;
+	}
+
+	VkImageLayout vkImageLayout() {
+		return m_vkImageLayout;
+	}
 };
 }
