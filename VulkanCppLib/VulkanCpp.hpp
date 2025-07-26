@@ -1672,10 +1672,10 @@ class DeviceMemory : public InteropHandle3<VkDeviceMemory> {
     VkDeviceSize m_size = 0;
 
 public:
-
-	operator VkDeviceMemory() const {
-		return m_handle;
-	}
+    operator VkDeviceMemory() const
+    {
+        return m_handle;
+    }
 
     DeviceMemory() = default;
     ~DeviceMemory() = default;
@@ -1787,11 +1787,10 @@ class Buffer : public InteropHandle2<VkBuffer> {
     }
 
 public:
-
-	operator VkBuffer() const {
-		return m_handle;
-
-	}
+    operator VkBuffer() const
+    {
+        return m_handle;
+    }
     Buffer() = default;
     ~Buffer() = default;
 
@@ -1895,10 +1894,11 @@ public:
 template <typename T = uint8_t>
 class Buffer_DeviceMemory {
 
+    T* m_pMappedMemory = nullptr;
+
 public:
     Buffer<T> m_buffer;
     DeviceMemory<T> m_deviceMemory;
-    T* m_mappedMemory = nullptr;
     TypedCount<T> m_count;
 
     Buffer_DeviceMemory() = default;
@@ -1908,7 +1908,7 @@ public:
         : m_buffer(other.m_buffer)
         , m_deviceMemory(other.m_deviceMemory)
         , m_count(other.m_count)
-        , m_mappedMemory(other.m_mappedMemory)
+        , m_pMappedMemory(other.m_pMappedMemory)
     {
     }
 
@@ -1926,7 +1926,7 @@ public:
         : m_buffer(std::move(other.m_buffer))
         , m_deviceMemory(std::move(other.m_deviceMemory))
         , m_count(other.m_count)
-        , m_mappedMemory(other.m_mappedMemory)
+        , m_pMappedMemory(other.m_pMappedMemory)
     {
     }
 
@@ -1946,7 +1946,7 @@ public:
         : m_buffer(std::move(buffer))
         , m_deviceMemory(std::move(deviceMemory))
         , m_count(count)
-        , m_mappedMemory(nullptr)
+        , m_pMappedMemory(nullptr)
     {
     }
 
@@ -1980,7 +1980,7 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        newbdm.m_mappedMemory = static_cast<T*>(mappedMemory);
+        newbdm.m_pMappedMemory = static_cast<T*>(mappedMemory);
         return newbdm;
     }
 
@@ -1997,10 +1997,13 @@ public:
             queueFamilyIndex,
             requiredMemoryPropertyFlags);
 
-        memcpy(newbdm.m_mappedMemory, pSrcMem, newbdm.m_count.vkDeviceSize());
+        memcpy(newbdm.m_pMappedMemory, pSrcMem, newbdm.m_count.vkDeviceSize());
         return newbdm;
     }
 
+	//	Useful when porting existing apps.  Make the full Buffer_DeviceMemory
+	//	in steps.  Make the buffer and device memory with explicit bind and map steps
+	//	and then do the full conversion.
     void bind()
     {
         VkResult vkResult = vkBindBufferMemory(vkDevice(), m_buffer, m_deviceMemory, 0);
@@ -2009,6 +2012,7 @@ public:
         }
     }
 
+	//	See bind()
     void map()
     {
         void* mappedMemory;
@@ -2016,13 +2020,19 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        m_mappedMemory = static_cast<T*>(mappedMemory);
+		m_pMappedMemory = static_cast<T*>(mappedMemory);
+    }
+
+    T& mappedMemory()
+    {
+		//	TODO: do a null check and barf if necessary.
+        return *m_pMappedMemory;
     }
 
     void unmapMemory()
     {
         vkUnmapMemory(vkDevice(), m_deviceMemory);
-        m_mappedMemory = nullptr;
+		m_pMappedMemory = nullptr;
     }
 };
 
@@ -3448,7 +3458,7 @@ public:
         return *this;
     }
 
-	//	std::vector.size() is used as index count a lot, so use size_t as the parameter type.
+    //	std::vector.size() is used as index count a lot, so use size_t as the parameter type.
     CommandBuffer& cmdDrawIndexed(size_t indexCount)
     {
         vkCmdDrawIndexed(*this, static_cast<uint32_t>(indexCount), 1, 0, 0, 0);

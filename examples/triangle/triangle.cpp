@@ -76,21 +76,20 @@ public:
     };
 
     // Uniform buffer block object
-    template <typename T = uint8_t>
     struct UniformBuffer {
-        vkcpp::DeviceMemory<T> m_deviceMemoryOriginal;
-        vkcpp::Buffer<T> m_bufferOriginal;
+        //        vkcpp::DeviceMemory<T> m_deviceMemoryOriginal;
+        //        vkcpp::Buffer<T> m_bufferOriginal;
         // The descriptor set stores the resources bound to the binding points in a shader
         // It connects the binding points of the different shaders with the buffers and images used for those bindings
         vkcpp::DescriptorSet m_descriptorSet;
         // We keep a pointer to the mapped buffer, so we can easily update it's contents via a memcpy
-        uint8_t* m_pMappedMemory { nullptr };
+        //        uint8_t* m_pMappedMemory { nullptr };
 
-        vkcpp::Buffer_DeviceMemory<T> m_buffer_deviceMemory;
+        vkcpp::Buffer_DeviceMemory<ShaderData> m_buffer_deviceMemory;
     };
 
     // We use one UBO per frame, so we can have a frame overlap and make sure that uniforms aren't updated while still in use
-    std::array<UniformBuffer<ShaderData>, MAX_CONCURRENT_FRAMES> m_uniformBuffers;
+    std::array<UniformBuffer, MAX_CONCURRENT_FRAMES> m_uniformBuffers;
 
     // The m_vkPipeline layout is used by a m_vkPipeline to access the descriptor sets
     // It defines interface (without binding any actual data) between the shader stages used by the m_vkPipeline and the shader resources
@@ -318,7 +317,8 @@ public:
             // descriptor set matching that binding point
 
             vkcpp::WriteDescriptorSet writeDescriptorSet(m_uniformBuffers[i].m_descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-            writeDescriptorSet.addBufferInfo(m_uniformBuffers[i].m_bufferOriginal, 0, sizeof(ShaderData));
+            writeDescriptorSet.addBufferInfo(
+                m_uniformBuffers[i].m_buffer_deviceMemory.m_buffer, 0, sizeof(ShaderData));
 
             vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
         }
@@ -669,40 +669,12 @@ public:
 
         // Create the buffers
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            vkcpp::BufferCreateInfoTyped<ShaderData> bufferCreateInfo;
-            bufferCreateInfo.size = sizeof(ShaderData);
-            bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-
-            m_uniformBuffers[i].m_bufferOriginal = vkcpp::Buffer<ShaderData>(bufferCreateInfo);
-
-            // Get m_vkDeviceMemory requirements including size, alignment and m_vkDeviceMemory type
-            VkMemoryRequirements vkMemoryRequirements = m_uniformBuffers[i].m_bufferOriginal.getMemoryRequirements();
-
-            VkMemoryAllocateInfo vkMemoryAllocateInfo {};
-            vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            vkMemoryAllocateInfo.pNext = nullptr;
-            vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
-
-            // Get the m_vkDeviceMemory type index that supports host visible m_vkDeviceMemory access
-            // Most implementations offer multiple m_vkDeviceMemory types and selecting the correct one to allocate m_vkDeviceMemory from is crucial
-            // We also want the buffer to be host coherent so we don't have to flush (or sync after every update.
-            // Note: This may affect performance so you might not want to do this in a real world application that updates buffers on a regular base
-
-            vkMemoryAllocateInfo.memoryTypeIndex
-                = vkcpp::findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT);
-
-            m_uniformBuffers[i].m_deviceMemoryOriginal = vkcpp::DeviceMemory<ShaderData>(vkMemoryAllocateInfo);
-
-            // Bind m_vkDeviceMemory to buffer
-            vkBindBufferMemory(m_device, m_uniformBuffers[i].m_bufferOriginal, m_uniformBuffers[i].m_deviceMemoryOriginal, 0);
-            // We map the buffer once, so we can update it without having to map it again
-            vkMapMemory(
-                m_device,
-                m_uniformBuffers[i].m_deviceMemoryOriginal,
-                0,
-                sizeof(ShaderData),
-                0,
-                (void**)&m_uniformBuffers[i].m_pMappedMemory);
+            m_uniformBuffers[i].m_buffer_deviceMemory
+                = vkcpp::Buffer_DeviceMemory<ShaderData>::withMap(
+                    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                    vkcpp::TypedCount<ShaderData>(1),
+                    0,
+                    vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT);
         }
     }
 
@@ -753,7 +725,7 @@ public:
 
         // Copy the current matrices to the current frame's uniform buffer
         // Note: Since we requested a host coherent m_vkDeviceMemory type for the uniform buffer, the write is instantly visible to the GPU
-        memcpy(m_uniformBuffers[m_currentFrameIndex].m_pMappedMemory, &shaderData, sizeof(ShaderData));
+		m_uniformBuffers[m_currentFrameIndex].m_buffer_deviceMemory.mappedMemory() = shaderData;
 
         // Build the command buffer
         // Unlike in OpenGL all rendering commands are recorded into command buffers that are then submitted to the m_vkQueue
