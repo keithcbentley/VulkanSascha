@@ -58,7 +58,7 @@ public:
 
     struct FrameBufferAttachment {
         vkcpp::Image m_image;
-        vkcpp::DeviceMemory m_deviceMemory;
+        vkcpp::DeviceMemory<> m_deviceMemory;
         vkcpp::ImageView m_imageView;
         VkFormat format;
     };

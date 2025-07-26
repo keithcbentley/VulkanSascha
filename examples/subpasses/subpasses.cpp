@@ -299,7 +299,7 @@ public:
             = vkcpp::AttachmentDescription::simpleColor(m_attachments.m_albedo.m_vkFormat);
 
         renderPassCreateInfo.attachmentDescription(depthAttachmentIndex)
-            = vkcpp::AttachmentDescription::simpleDepth(m_vkFormatDepth);
+            = vkcpp::AttachmentDescription::simpleDepthStencil(m_vkFormatDepth);
 
         constexpr VkAttachmentReference colorPresentAttachmentReference
             = { colorPresentAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };

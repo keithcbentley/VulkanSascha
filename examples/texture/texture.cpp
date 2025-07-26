@@ -29,7 +29,7 @@ public:
         vkcpp::Sampler m_sampler;
         vkcpp::Image m_image;
         VkImageLayout m_vkImageLayout;
-        vkcpp::DeviceMemory m_deviceMemory;
+        vkcpp::DeviceMemory<> m_deviceMemory;
         vkcpp::ImageView m_imageView;
         uint32_t m_width { 0 };
         uint32_t m_height { 0 };
@@ -122,8 +122,8 @@ public:
         //    //            useStaging = !(formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
         //}
 
-        vkcpp::Buffer_DeviceMemory stagingBufferAndMemory
-            = vkcpp::Buffer_DeviceMemory::withCopy(
+        vkcpp::Buffer_DeviceMemory<> stagingBufferAndMemory
+            = vkcpp::Buffer_DeviceMemory<>::withCopy(
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 ktxTextureSize,
                 0, //	Queue family index.  Does this matter?
