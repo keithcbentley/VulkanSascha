@@ -1547,59 +1547,115 @@ const VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
 PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties();
 uint32_t findMemoryTypeIndex(uint32_t usableMemoryIndexBits, MemoryPropertyFlags requiredPropertiesArg);
 
-class Semaphore : public InteropHandle3<VkSemaphore> {
+class Semaphore : public InteropHandle2<VkSemaphore> {
 
-    Semaphore(VkSemaphore vkSemaphore, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : InteropHandle3(vkSemaphore, vkDevice, pfnDestroy)
+    Semaphore(VkSemaphore vkSemaphore, DestroyFunc_t pfnDestroy)
+        : InteropHandle2(vkSemaphore, pfnDestroy)
     {
     }
 
-    static void destroy(VkSemaphore vkSemaphore, VkDevice vkDevice)
+    static void destroy(VkSemaphore vkSemaphore)
     {
-        vkDestroySemaphore(vkDevice, vkSemaphore, nullptr);
+        vkDestroySemaphore(device(), vkSemaphore, nullptr);
     }
 
 public:
     Semaphore() = default;
+    ~Semaphore() = default;
 
-    Semaphore(const VkSemaphoreCreateInfo& vkSemaphoreCreateInfo)
+    Semaphore(const Semaphore& other)
+        : InteropHandle2(other)
     {
-        VkSemaphore vkSemaphore;
-        VkResult vkResult = vkCreateSemaphore(vkDevice(), &vkSemaphoreCreateInfo, nullptr, &vkSemaphore);
-        if (vkResult != VK_SUCCESS) {
-            throw Exception(vkResult);
+    }
+    Semaphore& operator=(const Semaphore& other)
+    {
+        if (this == &other) {
+            return *this;
         }
-        new (this) Semaphore(vkSemaphore, vkDevice(), &destroy);
+        this->~Semaphore();
+        new (this) Semaphore(other);
     }
 
-    Semaphore(VkDevice vkDevice)
+    Semaphore(Semaphore&& other) noexcept
+        : InteropHandle2(std::move(other))
     {
+    }
+
+    Semaphore& operator=(Semaphore&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Semaphore();
+        new (this) Semaphore(std::move(other));
+    }
+
+    Semaphore(VkSemaphoreCreateFlags vkSemaphoreCreateFlags)
+    {
+		//	TODO: how do the flags work with the newer type of semaphores?
+		//	We are going to need a new type for them. Should we check the flags
+		//	so we don't create one accidentally?
         VkSemaphoreCreateInfo vkSemaphoreCreateInfo {};
         vkSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        new (this) Semaphore(vkSemaphoreCreateInfo);
-    }
+		vkSemaphoreCreateInfo.flags = vkSemaphoreCreateFlags;
+		VkSemaphore vkSemaphore;
+		VkResult vkResult = vkCreateSemaphore(vkDevice(), &vkSemaphoreCreateInfo, nullptr, &vkSemaphore);
+		if (vkResult != VK_SUCCESS) {
+			throw Exception(vkResult);
+		}
+		new (this) Semaphore(vkSemaphore, &destroy);
+	}
 };
 
-class Fence : public InteropHandle3<VkFence> {
-    //	Vulkan set/reset/signaled names are not really clear when it comes to fences.
-    //	Use better open/closed terminology.
-#define VKCPP_FENCE_CREATE_OPENED VK_FENCE_CREATE_SIGNALED_BIT
+class Fence : public InteropHandle2<VkFence> {
 
-    Fence(VkFence vkFence, VkDevice vkDevice, DestroyFunc_t pfnDestroy)
-        : InteropHandle3(vkFence, vkDevice, pfnDestroy)
+    Fence(VkFence vkFence, DestroyFunc_t pfnDestroy)
+        : InteropHandle2(vkFence, pfnDestroy)
     {
     }
 
-    static void destroy(VkFence vkFence, VkDevice vkDevice)
+    static void destroy(VkFence vkFence)
     {
-        vkDestroyFence(vkDevice, vkFence, nullptr);
+        vkDestroyFence(device(), vkFence, nullptr);
     }
 
 public:
+    Fence() = default;
+    ~Fence() = default;
+
+    Fence(const Fence& other)
+        : InteropHandle2(other)
+    {
+    }
+
+    Fence& operator=(const Fence& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Fence();
+        new (this) Fence(other);
+    }
+
+    Fence(Fence&& other) noexcept
+        : InteropHandle2(std::move(other))
+    {
+    }
+
+    Fence& operator=(Fence&& other) noexcept
+    {
+        if (this == &other) {
+            return *this;
+        }
+        this->~Fence();
+        new (this) Fence(std::move(other));
+    }
+
     //	Kind of an exception to the argument ordering usually used.
     //	Flags are almost always 0, so make them optional.  Only
     //	the m_vkDevice is required.
-    Fence(VkFenceCreateFlags vkFenceCreateFlags = 0)
+
+    Fence(VkFenceCreateFlags vkFenceCreateFlags)
     {
         VkFenceCreateInfo vkFenceCreateInfo {};
         vkFenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -1609,14 +1665,9 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) Fence(vkFence, vkDevice(), &destroy);
+        new (this) Fence(vkFence, &destroy);
     }
 
-    void close() const
-    {
-        VkFence vkFence = *this;
-        vkResetFences(vkDevice(), 1, &vkFence);
-    }
 
     void wait() const
     {
