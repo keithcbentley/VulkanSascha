@@ -107,13 +107,12 @@ public:
 
 
         vkcpp::Buffer_DeviceMemory<> stagingBufferAndMemory
-            = vkcpp::Buffer_DeviceMemory<>::withCopy(
+            = vkcpp::Buffer_DeviceMemory<>::withCopyUnmap(
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 vkcpp::TypedCount<>(textureSize),
                 0, //	Queue family index.  Does this matter?
                 vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
                 pTextureData);
-        stagingBufferAndMemory.unmapMemory();
 
         //	Setup buffer copy regions for each mip level.
         //	We use this later when we finally copy the staging data

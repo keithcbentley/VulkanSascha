@@ -49,6 +49,16 @@ public:
     }
 };
 
+class NullPointerException : public Exception
+{
+
+public:
+	NullPointerException()
+		: Exception(VK_INCOMPLETE) {
+	}
+};
+
+
 //	Yikes! Vulkan uses enums for bit values but uses
 //	non-typesafe uints for the combination of flags.
 //	The newer flags use 64 bit uints for values and combinations
@@ -2042,7 +2052,7 @@ public:
         return newbdm;
     }
 
-    static Buffer_DeviceMemory withCopy(
+    static Buffer_DeviceMemory withCopyUnmap(
         VkBufferUsageFlags vkBufferUsageFlags,
         TypedCount<T> count,
         uint32_t queueFamilyIndex,
@@ -2056,6 +2066,7 @@ public:
             requiredMemoryPropertyFlags);
 
         memcpy(newbdm.m_pMappedMemory, pSrcMem, newbdm.m_count.vkDeviceSize());
+		newbdm.unmapMemory();
         return newbdm;
     }
 
@@ -2075,7 +2086,7 @@ public:
     }
 
     //	See bind()
-    void map()
+    void mapMemory()
     {
         void* mappedMemory;
         VkResult vkResult = vkMapMemory(vkDevice(), m_deviceMemory, 0, m_count.vkDeviceSize(), 0, &mappedMemory);
@@ -2093,6 +2104,9 @@ public:
 
     void unmapMemory()
     {
+		if (!m_pMappedMemory) {
+			throw NullPointerException();
+		}
         vkUnmapMemory(vkDevice(), m_deviceMemory);
         m_pMappedMemory = nullptr;
     }

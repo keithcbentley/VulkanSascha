@@ -26,11 +26,8 @@ struct Vertex {
 class VulkanExample : public VulkanExampleBase
 {
 public:
-	// Number of array layers in texture array
-	// Also used as m_vulkanInstance count
 	uint32_t m_textureLayerCount = 0;
 
-//	vks::Texture textureArray;
 	vkcpp::Texture m_textureArray;
 
 	vks::Buffer vertexBuffer;
@@ -92,7 +89,7 @@ public:
 		result = ktxTexture_CreateFromNamedFile(filename.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
 		assert(result == KTX_SUCCESS);
 
-				//	Handy shorthand.
+		//	Handy shorthand.
 		const uint32_t textureWidth = ktxTexture->baseWidth;
 		const uint32_t textureHeight = ktxTexture->baseHeight;
 		const uint32_t textureMipLevelCount = ktxTexture->numLevels;
@@ -102,13 +99,12 @@ public:
 		m_textureLayerCount = textureLayerCount;
 
 		vkcpp::Buffer_DeviceMemory<> newStagingBuffer
-			= vkcpp::Buffer_DeviceMemory<>::withCopy(
+			= vkcpp::Buffer_DeviceMemory<>::withCopyUnmap(
 				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 				vkcpp::TypedCount<>(ktxTexture_GetSize(ktxTexture)),
 				0,
 				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
 				ktxTexture_GetData(ktxTexture));
-		newStagingBuffer.unmapMemory();
 		
 
 		// Setup buffer copy regions for array layers

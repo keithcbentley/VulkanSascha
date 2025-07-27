@@ -18,15 +18,21 @@ vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 class VulkanExample : public VulkanExampleBase {
 public:
-    bool m_displaySkybox = true;
 
-    vks::Texture cubeMap;
+	struct
+	{
+		uint32_t	m_mipLevelsForUI = 0;
+		float		m_lodBiasFromUI = 0.0;
+		int32_t		m_objectIndexFromUI = 0;
+		bool		m_displaySkybox = true;
+	} m_uiData;
+
+    vkcpp::Texture m_textureCubeMap;
 
     struct Models {
         vkglTF::Model skybox;
         // The sample lets you select different models to apply the cubemap to
         std::vector<vkglTF::Model> objects;
-        int32_t objectIndex = 0;
     } models;
 
     struct UBOVS {
@@ -35,6 +41,7 @@ public:
         glm::mat4 inverseModelview;
         float lodBias = 0.0f;
     } uboVS;
+
     vks::Buffer uniformBuffer;
 
     vkcpp::PipelineLayout m_pipelineLayout;
@@ -57,15 +64,7 @@ public:
         camera.setPerspective(60.0f, (float)m_drawAreaWidth / (float)m_drawAreaHeight, 0.1f, 256.0f);
     }
 
-    ~VulkanExample()
-    {
-        if (m_device) {
-            vkDestroyImageView(m_device, cubeMap.m_vkImageView, nullptr);
-            vkDestroyImage(m_device, cubeMap.m_vkImage, nullptr);
-            vkDestroySampler(m_device, cubeMap.m_vkSampler, nullptr);
-            vkFreeMemory(m_device, cubeMap.m_vkDeviceMemory, nullptr);
-        }
-    }
+	~VulkanExample() = default;
 
     // Enable physical m_vkDevice m_vkPhysicalDeviceFeatures required for this example
     virtual void getEnabledFeatures()
@@ -87,74 +86,45 @@ public:
         result = ktxTexture_CreateFromNamedFile(filename.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
         assert(result == KTX_SUCCESS);
 
-        // Get m_vkPhysicalDeviceProperties required for using and upload texture data from the ktx texture object
-        cubeMap.width = ktxTexture->baseWidth;
-        cubeMap.height = ktxTexture->baseHeight;
-        cubeMap.mipLevels = ktxTexture->numLevels;
-        ktx_uint8_t* ktxTextureData = ktxTexture_GetData(ktxTexture);
-        ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
 
-        VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
-        VkMemoryRequirements memReqs;
+		//	Handy shorthand.
+		const uint32_t textureCubeMapWidth = ktxTexture->baseWidth;
+		const uint32_t textureCubeMapHeight = ktxTexture->baseHeight;
+		const uint32_t textureCubeMapMipLevelCount = ktxTexture->numLevels;
+		const uint8_t* const pTextureCubeMapData = ktxTexture_GetData(ktxTexture);
+		const uint64_t textureCubeMapSize = ktxTexture_GetSize(ktxTexture);
+		m_uiData.m_mipLevelsForUI = textureCubeMapMipLevelCount;
 
-        // Create a host-visible staging buffer that contains the raw m_vkImage data
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingMemory;
+		vkcpp::Buffer_DeviceMemory<> newStagingBuffer
+			= vkcpp::Buffer_DeviceMemory<>::withCopyUnmap(
+				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+				vkcpp::TypedCount<>(ktxTexture_GetSize(ktxTexture)),
+				0,
+				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+				ktxTexture_GetData(ktxTexture));
 
-        VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo();
-        bufferCreateInfo.size = ktxTextureSize;
-        // This buffer is used as a transfer source for the buffer copy
-        bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VK_CHECK_RESULT(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &stagingBuffer));
-
-        // Get m_vkDeviceMemory requirements for the staging buffer (alignment, m_vkDeviceMemory type bits)
-        vkGetBufferMemoryRequirements(m_device, stagingBuffer, &memReqs);
-        memAllocInfo.allocationSize = memReqs.size;
-        // Get m_vkDeviceMemory type index for a host visible buffer
-        memAllocInfo.memoryTypeIndex
-			= vkcpp::findMemoryTypeIndex(
-				memReqs.memoryTypeBits,
-				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
-        VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &stagingMemory));
-        VK_CHECK_RESULT(vkBindBufferMemory(m_device, stagingBuffer, stagingMemory, 0));
-
-        // Copy texture data into staging buffer
-        uint8_t* data;
-        VK_CHECK_RESULT(vkMapMemory(m_device, stagingMemory, 0, memReqs.size, 0, (void**)&data));
-        memcpy(data, ktxTextureData, ktxTextureSize);
-        vkUnmapMemory(m_device, stagingMemory);
-
-        // Create optimal tiled target m_vkImage
-        // VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 
         VkImageCreateInfo imageCreateInfo {};
         imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
         imageCreateInfo.format = format;
-        imageCreateInfo.mipLevels = cubeMap.mipLevels;
+        imageCreateInfo.mipLevels = textureCubeMapMipLevelCount;
         imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageCreateInfo.extent = { cubeMap.width, cubeMap.height, 1 };
+        imageCreateInfo.extent = { textureCubeMapWidth, textureCubeMapHeight, 1 };
         imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         // Cube faces count as array layers in Vulkan
+		//	TODO: kind of a magic number.
+		//	Cubes always have 6 sides, but we aren't doing any checking
+		//	on the texture that we loaded.
         imageCreateInfo.arrayLayers = 6;
         // This flag is required for cube map images
         imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-
-        VK_CHECK_RESULT(vkCreateImage(m_device, &imageCreateInfo, nullptr, &cubeMap.m_vkImage));
-
-        vkGetImageMemoryRequirements(m_device, cubeMap.m_vkImage, &memReqs);
-
-        memAllocInfo.allocationSize = memReqs.size;
-        memAllocInfo.memoryTypeIndex
-			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
-
-        VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &cubeMap.m_vkDeviceMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(m_device, cubeMap.m_vkImage, cubeMap.m_vkDeviceMemory, 0));
+		m_textureCubeMap.takeImage(vkcpp::Image(imageCreateInfo));
+		m_textureCubeMap.allocateBindImageMemory(vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
         VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
@@ -162,19 +132,19 @@ public:
         std::vector<VkBufferImageCopy> bufferCopyRegions;
         uint32_t offset = 0;
 
-        for (uint32_t face = 0; face < 6; face++) {
-            for (uint32_t level = 0; level < cubeMap.mipLevels; level++) {
+        for (uint32_t faceLayer = 0; faceLayer < 6; faceLayer++) {
+            for (uint32_t mipLevel = 0; mipLevel < textureCubeMapMipLevelCount; mipLevel++) {
                 // Calculate offset into staging buffer for the current mip level and face
                 ktx_size_t offset;
-                KTX_error_code ret = ktxTexture_GetImageOffset(ktxTexture, level, 0, face, &offset);
+                KTX_error_code ret = ktxTexture_GetImageOffset(ktxTexture, mipLevel, 0, faceLayer, &offset);
                 assert(ret == KTX_SUCCESS);
                 VkBufferImageCopy bufferCopyRegion = {};
                 bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                bufferCopyRegion.imageSubresource.mipLevel = level;
-                bufferCopyRegion.imageSubresource.baseArrayLayer = face;
+                bufferCopyRegion.imageSubresource.mipLevel = mipLevel;
+                bufferCopyRegion.imageSubresource.baseArrayLayer = faceLayer;
                 bufferCopyRegion.imageSubresource.layerCount = 1;
-                bufferCopyRegion.imageExtent.width = ktxTexture->baseWidth >> level;
-                bufferCopyRegion.imageExtent.height = ktxTexture->baseHeight >> level;
+                bufferCopyRegion.imageExtent.width = textureCubeMapWidth >> mipLevel;
+                bufferCopyRegion.imageExtent.height = textureCubeMapHeight >> mipLevel;
                 bufferCopyRegion.imageExtent.depth = 1;
                 bufferCopyRegion.bufferOffset = offset;
                 bufferCopyRegions.push_back(bufferCopyRegion);
@@ -186,12 +156,12 @@ public:
         VkImageSubresourceRange subresourceRange = {};
         subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         subresourceRange.baseMipLevel = 0;
-        subresourceRange.levelCount = cubeMap.mipLevels;
+		subresourceRange.levelCount = textureCubeMapMipLevelCount;
         subresourceRange.layerCount = 6;
 
         vks::tools::setImageLayout(
             copyCmd,
-            cubeMap.m_vkImage,
+            m_textureCubeMap.image(),
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             subresourceRange);
@@ -199,60 +169,56 @@ public:
         // Copy the cube map faces from the staging buffer to the optimal tiled m_vkImage
         vkCmdCopyBufferToImage(
             copyCmd,
-            stagingBuffer,
-            cubeMap.m_vkImage,
+            newStagingBuffer.buffer(),
+            m_textureCubeMap.image(),
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             static_cast<uint32_t>(bufferCopyRegions.size()),
             bufferCopyRegions.data());
 
         // Change texture m_vkImage layout to shader read after all faces have been copied
-        cubeMap.m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        vks::tools::setImageLayout(
-            copyCmd,
-            cubeMap.m_vkImage,
+        m_textureCubeMap.setVkImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vks::tools::setImageLayout(
+			copyCmd,
+			m_textureCubeMap.image(),
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            cubeMap.m_vkImageLayout,
+            m_textureCubeMap.vkImageLayout(),
             subresourceRange);
 
         m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
 
         // Create sampler
-        VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
-        sampler.magFilter = VK_FILTER_LINEAR;
-        sampler.minFilter = VK_FILTER_LINEAR;
-        sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        sampler.addressModeV = sampler.addressModeU;
-        sampler.addressModeW = sampler.addressModeU;
-        sampler.mipLodBias = 0.0f;
-        sampler.compareOp = VK_COMPARE_OP_NEVER;
-        sampler.minLod = 0.0f;
-        sampler.maxLod = static_cast<float>(cubeMap.mipLevels);
-        sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-        sampler.maxAnisotropy = 1.0f;
+		VkSamplerCreateInfo vkSamplerCreateInfo = vks::initializers::samplerCreateInfo();
+		vkSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+		vkSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+		vkSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		vkSamplerCreateInfo.addressModeV = vkSamplerCreateInfo.addressModeU;
+		vkSamplerCreateInfo.addressModeW = vkSamplerCreateInfo.addressModeU;
+		vkSamplerCreateInfo.mipLodBias = 0.0f;
+		vkSamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+		vkSamplerCreateInfo.minLod = 0.0f;
+		vkSamplerCreateInfo.maxLod = static_cast<float>(textureCubeMapMipLevelCount);
+		vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		vkSamplerCreateInfo.maxAnisotropy = 1.0f;
         // if (m_pVulkanDevice->m_vkPhysicalDeviceFeatures.samplerAnisotropy)
         //{
         //	sampler.maxAnisotropy = m_pVulkanDevice->m_vkPhysicalDeviceProperties.limits.maxSamplerAnisotropy;
         //	sampler.anisotropyEnable = VK_TRUE;
         // }
-        VK_CHECK_RESULT(vkCreateSampler(m_device, &sampler, nullptr, &cubeMap.m_vkSampler));
+		m_textureCubeMap.takeSampler(vkcpp::Sampler(vkSamplerCreateInfo));
 
-        // Create m_vkImage m_vkImageView
-        VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
-        // Cube map m_vkImageView type
-        view.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-        view.format = format;
-        view.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		vkcpp::ImageViewCreateInfo imageViewCreateInfo;
+		imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+		imageViewCreateInfo.format = format;
+		imageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
         // 6 array layers (faces)
-        view.subresourceRange.layerCount = 6;
+		imageViewCreateInfo.subresourceRange.layerCount = 6;
         // Set number of mip levels
-        view.subresourceRange.levelCount = cubeMap.mipLevels;
-        view.image = cubeMap.m_vkImage;
-        VK_CHECK_RESULT(vkCreateImageView(m_device, &view, nullptr, &cubeMap.m_vkImageView));
+		imageViewCreateInfo.subresourceRange.levelCount = textureCubeMapMipLevelCount;
+		imageViewCreateInfo.image = m_textureCubeMap.image();
+		m_textureCubeMap.takeImageView(vkcpp::ImageView(imageViewCreateInfo));
 
         // Clean up staging resources
-        vkFreeMemory(m_device, stagingMemory, nullptr);
-        vkDestroyBuffer(m_device, stagingBuffer, nullptr);
         ktxTexture_Destroy(ktxTexture);
     }
 
@@ -284,14 +250,14 @@ public:
                 .cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
                 .cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout);
 
-            if (m_displaySkybox) {
+            if (m_uiData.m_displaySkybox) {
                 commandBuffer.cmdBindPipeline(m_pipelineSkybox);
                 models.skybox.draw(commandBuffer);
             }
 
             // 3D object
             commandBuffer.cmdBindPipeline(m_pipelineReflect);
-            models.objects[models.objectIndex].draw(commandBuffer);
+            models.objects[m_uiData.m_objectIndexFromUI].draw(commandBuffer);
 
             drawUI(commandBuffer);
 
@@ -354,9 +320,9 @@ public:
             .addImageWriteDescriptor(
                 combinedImageSamplerBindingIndex,
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                cubeMap.m_vkImageView,
-                cubeMap.m_vkImageLayout,
-                cubeMap.m_vkSampler);
+                m_textureCubeMap.imageView(),
+				m_textureCubeMap.vkImageLayout(),
+				m_textureCubeMap.sampler());
         descriptorSetUpdater.updateDescriptorSets();
     }
 
@@ -397,7 +363,6 @@ public:
         shaderStages[1] = loadShader(getShadersPath() + "texturecubemap/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
         rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
 		m_pipelineSkybox = vkcpp::GraphicsPipeline(pipelineCI);
-        //VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkSkybox));
 
         // Cube map reflect pipeline
         shaderStages[0] = loadShader(getShadersPath() + "texturecubemap/reflect.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -407,7 +372,6 @@ public:
         depthStencilState.depthTestEnable = VK_TRUE;
         rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
 		m_pipelineReflect = vkcpp::GraphicsPipeline(pipelineCI);
-        //VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkReflect));
     }
 
     // Prepare and initialize uniform buffer containing shader uniforms
@@ -423,10 +387,12 @@ public:
     void updateUniformBuffers()
     {
         uboVS.projection = camera.matrices.perspective;
-        // Note: Both the object and skybox use the same uniform data, the translation part of the skybox is removed in the shader (see skybox.vert)
+        // Note: Both the object and skybox use the same uniform data,
+		// the translation part of the skybox is removed in the shader (see skybox.vert)
         uboVS.modelView = camera.matrices.view;
         uboVS.inverseModelview = glm::inverse(camera.matrices.view);
         memcpy(uniformBuffer.m_pMapped, &uboVS, sizeof(uboVS));
+		uboVS.lodBias = m_uiData.m_lodBiasFromUI;
     }
 
     void prepare()
@@ -449,7 +415,7 @@ public:
         VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
     }
-    virtual void render()
+    void render()
     {
         if (!m_prepared)
             return;
@@ -457,16 +423,17 @@ public:
         draw();
     }
 
-    virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay)
+
+    void OnUpdateUIOverlay(vks::UIOverlay* overlay)
     {
         if (overlay->header("Settings")) {
-            if (overlay->sliderFloat("LOD bias", &uboVS.lodBias, 0.0f, (float)cubeMap.mipLevels)) {
+            if (overlay->sliderFloat("LOD bias", &m_uiData.m_lodBiasFromUI, 0.0f, (float)m_uiData.m_mipLevelsForUI)) {
                 updateUniformBuffers();
             }
-            if (overlay->comboBox("Object type", &models.objectIndex, m_objectNames)) {
+            if (overlay->comboBox("Object type", &m_uiData.m_objectIndexFromUI, m_objectNames)) {
                 buildCommandBuffers();
             }
-            if (overlay->checkBox("Skybox", &m_displaySkybox)) {
+            if (overlay->checkBox("Skybox", &m_uiData.m_displaySkybox)) {
                 buildCommandBuffers();
             }
         }
