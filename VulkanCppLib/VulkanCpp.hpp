@@ -1723,15 +1723,15 @@ public:
 };
 
 template <typename T = uint8_t>
-class DeviceMemory : public InteropHandle3<VkDeviceMemory> {
+class DeviceMemory : public InteropHandle2<VkDeviceMemory> {
 
-    static void destroy(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice)
+    static void destroy(VkDeviceMemory vkDeviceMemory)
     {
-        vkFreeMemory(vkDevice, vkDeviceMemory, nullptr);
+        vkFreeMemory(device(), vkDeviceMemory, nullptr);
     }
 
-    DeviceMemory(VkDeviceMemory vkDeviceMemory, VkDevice vkDevice, VkDeviceSize size, DestroyFunc_t pfnDestroy)
-        : InteropHandle3(vkDeviceMemory, vkDevice, pfnDestroy)
+    DeviceMemory(VkDeviceMemory vkDeviceMemory, VkDeviceSize size, DestroyFunc_t pfnDestroy)
+        : InteropHandle2(vkDeviceMemory, pfnDestroy)
         , m_size(size)
     {
     }
@@ -1748,7 +1748,7 @@ public:
     ~DeviceMemory() = default;
 
     DeviceMemory(const DeviceMemory& other)
-        : InteropHandle3(other)
+        : InteropHandle2(other)
         , m_size(other.m_size)
     {
     }
@@ -1764,7 +1764,7 @@ public:
     }
 
     DeviceMemory(DeviceMemory&& other) noexcept
-        : InteropHandle3(std::move(other))
+        : InteropHandle2(std::move(other))
         , m_size(other.m_size)
     {
     }
@@ -1786,7 +1786,7 @@ public:
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
         }
-        new (this) DeviceMemory(vkDeviceMemory, vkDevice(), vkMemoryAllocateInfo.allocationSize, &destroy);
+        new (this) DeviceMemory(vkDeviceMemory, vkMemoryAllocateInfo.allocationSize, &destroy);
     }
 
     DeviceMemory(

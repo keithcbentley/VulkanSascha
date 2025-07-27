@@ -209,13 +209,12 @@ public:
 
         // Create a host-visible buffer to copy the vertex data to (staging buffer)
         vkcpp::Buffer_DeviceMemory verticesStagingBuffer
-            = vkcpp::Buffer_DeviceMemory<Vertex>::withCopy(
+            = vkcpp::Buffer_DeviceMemory<Vertex>::withCopyUnmap(
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 vkcpp::TypedCount(s_vertexDataBuffer),
                 0,
                 vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
                 s_vertexDataBuffer.data());
-        verticesStagingBuffer.unmapMemory();
         m_vertices = vkcpp::Buffer_DeviceMemory(
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             vkcpp::TypedCount(s_vertexDataBuffer),
@@ -223,13 +222,12 @@ public:
             vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
         vkcpp::Buffer_DeviceMemory indicesStagingBuffer
-            = vkcpp::Buffer_DeviceMemory<uint32_t>::withCopy(
+            = vkcpp::Buffer_DeviceMemory<uint32_t>::withCopyUnmap(
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 vkcpp::TypedCount(s_vertexIndexBuffer),
                 0,
                 vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
                 s_vertexIndexBuffer.data());
-        indicesStagingBuffer.unmapMemory();
         m_indices = vkcpp::Buffer_DeviceMemory(
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             vkcpp::TypedCount(s_vertexIndexBuffer),
