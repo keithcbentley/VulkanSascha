@@ -10,7 +10,6 @@
 
 vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
-
 // Vertex layout for this example
 struct Vertex {
     float pos[3];
@@ -92,8 +91,8 @@ class FractalNoise {
 private:
     PerlinNoise<T> perlinNoise;
     uint32_t octaves;
-	T frequency{};
-	T amplitude{};
+    T frequency {};
+    T amplitude {};
     T persistence;
 
 public:
@@ -125,19 +124,16 @@ public:
 class VulkanExample : public VulkanExampleBase {
 public:
     // Contains all Vulkan objects that are required to store and use a 3D texture
-    struct Texture {
-        VkSampler m_vkSampler = VK_NULL_HANDLE;
-        VkImage m_vkImage = VK_NULL_HANDLE;
-        VkImageLayout m_vkImageLayout;
-        VkDeviceMemory m_vkDeviceMemory = VK_NULL_HANDLE;
-        VkImageView m_vkImageView = VK_NULL_HANDLE;
+    vkcpp::Texture m_texture3d;
+
+    struct Texture3DConfig {
         VkDescriptorImageInfo m_vkDescriptorImageInfo;
         VkFormat m_vkFormat;
         uint32_t m_width { 0 };
         uint32_t m_height { 0 };
         uint32_t m_depth { 0 };
         uint32_t m_mipLevels { 0 };
-    } m_textureSascha;
+    } m_texture3dConfig;
 
     vks::Buffer vertexBuffer;
     vks::Buffer indexBuffer;
@@ -172,7 +168,6 @@ public:
     ~VulkanExample()
     {
         if (m_device) {
-            destroyTextureImage(m_textureSascha);
             vkDestroyPipeline(m_device, m_vkPipeline, nullptr);
             vkDestroyPipelineLayout(m_device, m_vkPipelineLayout, nullptr);
             vkDestroyDescriptorSetLayout(m_device, m_vkDescriptorSetLayout, nullptr);
@@ -184,16 +179,16 @@ public:
     void prepareNoiseTexture(uint32_t width, uint32_t height, uint32_t depth)
     {
         // A 3D texture is described as m_drawAreaWidth x m_drawAreaHeight x depth
-		m_textureSascha.m_width = width;
-		m_textureSascha.m_height = height;
-		m_textureSascha.m_depth = depth;
-		m_textureSascha.m_mipLevels = 1;
-		m_textureSascha.m_vkFormat = VK_FORMAT_R8_UNORM;
+        m_texture3dConfig.m_width = width;
+        m_texture3dConfig.m_height = height;
+        m_texture3dConfig.m_depth = depth;
+        m_texture3dConfig.m_mipLevels = 1;
+        m_texture3dConfig.m_vkFormat = VK_FORMAT_R8_UNORM;
 
         // Format support check
         // 3D texture support in Vulkan is mandatory (in contrast to OpenGL) so no need to check if it's supported
         VkFormatProperties formatProperties;
-        vkGetPhysicalDeviceFormatProperties(m_physicalDevice, m_textureSascha.m_vkFormat, &formatProperties);
+        vkGetPhysicalDeviceFormatProperties(m_physicalDevice, m_texture3dConfig.m_vkFormat, &formatProperties);
         // Check if format supports transfer
         if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)) {
             std::cout << "Error: Device does not support flag TRANSFER_DST for selected texture format!" << std::endl;
@@ -208,66 +203,59 @@ public:
 
         // Create optimal tiled target m_vkImage
         // VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
-        VkImageCreateInfo imageCreateInfo {};
-        imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageCreateInfo.imageType = VK_IMAGE_TYPE_3D;
-        imageCreateInfo.format = m_textureSascha.m_vkFormat;
-        imageCreateInfo.mipLevels = m_textureSascha.m_mipLevels;
-        imageCreateInfo.arrayLayers = 1;
-        imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        imageCreateInfo.extent.width = m_textureSascha.m_width;
-        imageCreateInfo.extent.height = m_textureSascha.m_height;
-        imageCreateInfo.extent.depth = m_textureSascha.m_depth;
+        VkImageCreateInfo vkImageCreateInfo {};
+        vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        vkImageCreateInfo.imageType = VK_IMAGE_TYPE_3D;
+        vkImageCreateInfo.format = m_texture3dConfig.m_vkFormat;
+        vkImageCreateInfo.mipLevels = m_texture3dConfig.m_mipLevels;
+        vkImageCreateInfo.arrayLayers = 1;
+        vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        vkImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        vkImageCreateInfo.extent.width = m_texture3dConfig.m_width;
+        vkImageCreateInfo.extent.height = m_texture3dConfig.m_height;
+        vkImageCreateInfo.extent.depth = m_texture3dConfig.m_depth;
         // Set initial layout of the m_vkImage to undefined
-        imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        VK_CHECK_RESULT(vkCreateImage(m_device, &imageCreateInfo, nullptr, &m_textureSascha.m_vkImage));
-
-        // Device local m_vkDeviceMemory to back up m_vkImage
-        VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
-        VkMemoryRequirements memReqs = {};
-        vkGetImageMemoryRequirements(m_device, m_textureSascha.m_vkImage, &memReqs);
-        memAllocInfo.allocationSize = memReqs.size;
-        memAllocInfo.memoryTypeIndex
-			= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
-        VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &m_textureSascha.m_vkDeviceMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(m_device, m_textureSascha.m_vkImage, m_textureSascha.m_vkDeviceMemory, 0));
+        vkImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        vkImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        m_texture3d.takeImage(vkcpp::Image(vkImageCreateInfo));
+        m_texture3d.allocateBindImageMemory(vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
         // Create sampler
-        VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
-        sampler.magFilter = VK_FILTER_LINEAR;
-        sampler.minFilter = VK_FILTER_LINEAR;
-        sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        sampler.mipLodBias = 0.0f;
-        sampler.compareOp = VK_COMPARE_OP_NEVER;
-        sampler.minLod = 0.0f;
-        sampler.maxLod = 0.0f;
-        sampler.maxAnisotropy = 1.0;
-        sampler.anisotropyEnable = VK_FALSE;
-        sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-        VK_CHECK_RESULT(vkCreateSampler(m_device, &sampler, nullptr, &m_textureSascha.m_vkSampler));
+        VkSamplerCreateInfo vkSamplerCreateInfo = vks::initializers::samplerCreateInfo();
+        vkSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+        vkSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+        vkSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        vkSamplerCreateInfo.mipLodBias = 0.0f;
+        vkSamplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+        vkSamplerCreateInfo.minLod = 0.0f;
+        vkSamplerCreateInfo.maxLod = 0.0f;
+        vkSamplerCreateInfo.maxAnisotropy = 1.0;
+        vkSamplerCreateInfo.anisotropyEnable = VK_FALSE;
+        vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+        m_texture3d.takeSampler(vkcpp::Sampler(vkSamplerCreateInfo));
 
         // Create m_vkImage m_vkImageView
-        VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
-        view.image = m_textureSascha.m_vkImage;
-        view.viewType = VK_IMAGE_VIEW_TYPE_3D;
-        view.format = m_textureSascha.m_vkFormat;
-        view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        view.subresourceRange.baseMipLevel = 0;
-        view.subresourceRange.baseArrayLayer = 0;
-        view.subresourceRange.layerCount = 1;
-        view.subresourceRange.levelCount = 1;
-        VK_CHECK_RESULT(vkCreateImageView(m_device, &view, nullptr, &m_textureSascha.m_vkImageView));
+        vkcpp::ImageViewCreateInfo imageViewCreateInfo;
+        imageViewCreateInfo.image = m_texture3d.image();
+        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
+        imageViewCreateInfo.format = m_texture3dConfig.m_vkFormat;
+        imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+        imageViewCreateInfo.subresourceRange.layerCount = 1;
+        imageViewCreateInfo.subresourceRange.levelCount = 1;
+        m_texture3d.takeImageView(vkcpp::ImageView(imageViewCreateInfo));
+
+        // VK_CHECK_RESULT(vkCreateImageView(m_device, &view, nullptr, &m_textureSascha.m_vkImageView));
 
         // Fill m_vkImage descriptor m_vkImage info to be used descriptor set setup
-		m_textureSascha.m_vkDescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		m_textureSascha.m_vkDescriptorImageInfo.imageView = m_textureSascha.m_vkImageView;
-		m_textureSascha.m_vkDescriptorImageInfo.sampler = m_textureSascha.m_vkSampler;
+        m_texture3dConfig.m_vkDescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        m_texture3dConfig.m_vkDescriptorImageInfo.imageView = m_texture3d.imageView();
+        m_texture3dConfig.m_vkDescriptorImageInfo.sampler = m_texture3d.sampler();
 
         updateNoiseTexture();
     }
@@ -275,13 +263,14 @@ public:
     // Generate randomized noise and upload it to the 3D texture using staging
     void updateNoiseTexture()
     {
-        const uint32_t texMemSize = m_textureSascha.m_width * m_textureSascha.m_height * m_textureSascha.m_depth;
+        const uint32_t texMemSize
+            = m_texture3dConfig.m_width * m_texture3dConfig.m_height * m_texture3dConfig.m_depth;
 
         uint8_t* data = new uint8_t[texMemSize];
         memset(data, 0, texMemSize);
 
         // Generate perlin based noise
-        std::cout << "Generating " << m_textureSascha.m_width << " x " << m_textureSascha.m_height << " x " << m_textureSascha.m_depth << " noise texture..." << std::endl;
+        //        std::cout << "Generating " << m_textureSascha.m_width << " x " << m_textureSascha.m_height << " x " << m_textureSascha.m_depth << " noise texture..." << std::endl;
 
         auto tStart = std::chrono::high_resolution_clock::now();
 
@@ -291,15 +280,18 @@ public:
         const float noiseScale = static_cast<float>(rand() % 10) + 4.0f;
 
 #pragma omp parallel for
-        for (int32_t z = 0; z < static_cast<int32_t>(m_textureSascha.m_depth); z++) {
-            for (int32_t y = 0; y < static_cast<int32_t>(m_textureSascha.m_height); y++) {
-                for (int32_t x = 0; x < static_cast<int32_t>(m_textureSascha.m_width); x++) {
-                    float nx = (float)x / (float)m_textureSascha.m_width;
-                    float ny = (float)y / (float)m_textureSascha.m_height;
-                    float nz = (float)z / (float)m_textureSascha.m_depth;
+        for (int32_t z = 0; z < static_cast<int32_t>(m_texture3dConfig.m_depth); z++) {
+            for (int32_t y = 0; y < static_cast<int32_t>(m_texture3dConfig.m_height); y++) {
+                for (int32_t x = 0; x < static_cast<int32_t>(m_texture3dConfig.m_width); x++) {
+                    float nx = (float)x / (float)m_texture3dConfig.m_width;
+                    float ny = (float)y / (float)m_texture3dConfig.m_height;
+                    float nz = (float)z / (float)m_texture3dConfig.m_depth;
                     float n = fractalNoise.noise(nx * noiseScale, ny * noiseScale, nz * noiseScale);
                     n = n - floor(n);
-                    data[x + y * m_textureSascha.m_width + z * m_textureSascha.m_width * m_textureSascha.m_height] = static_cast<uint8_t>(floor(n * 255));
+                    data[x
+                        + y * m_texture3dConfig.m_width
+                        + z * m_texture3dConfig.m_width * m_texture3dConfig.m_height]
+                        = static_cast<uint8_t>(floor(n * 255));
                 }
             }
         }
@@ -326,9 +318,9 @@ public:
         vkGetBufferMemoryRequirements(m_device, stagingBuffer, &memReqs);
         memAllocInfo.allocationSize = memReqs.size;
         memAllocInfo.memoryTypeIndex
-			= vkcpp::findMemoryTypeIndex(
-				memReqs.memoryTypeBits,
-				vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
+            = vkcpp::findMemoryTypeIndex(
+                memReqs.memoryTypeBits,
+                vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT);
         VK_CHECK_RESULT(vkAllocateMemory(m_device, &memAllocInfo, nullptr, &stagingMemory));
         VK_CHECK_RESULT(vkBindBufferMemory(m_device, stagingBuffer, stagingMemory, 0));
 
@@ -351,7 +343,7 @@ public:
         // initial undefined m_vkImage layout to the transfer destination layout
         vks::tools::setImageLayout(
             copyCmd,
-			m_textureSascha.m_vkImage,
+            m_texture3d.image(),
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             subresourceRange);
@@ -364,25 +356,25 @@ public:
         bufferCopyRegion.imageSubresource.mipLevel = 0;
         bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
         bufferCopyRegion.imageSubresource.layerCount = 1;
-        bufferCopyRegion.imageExtent.width = m_textureSascha.m_width;
-        bufferCopyRegion.imageExtent.height = m_textureSascha.m_height;
-        bufferCopyRegion.imageExtent.depth = m_textureSascha.m_depth;
+        bufferCopyRegion.imageExtent.width = m_texture3dConfig.m_width;
+        bufferCopyRegion.imageExtent.height = m_texture3dConfig.m_height;
+        bufferCopyRegion.imageExtent.depth = m_texture3dConfig.m_depth;
 
         vkCmdCopyBufferToImage(
             copyCmd,
             stagingBuffer,
-			m_textureSascha.m_vkImage,
+            m_texture3d.image(),
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1,
             &bufferCopyRegion);
 
         // Change texture m_vkImage layout to shader read after all mip levels have been copied
-		m_textureSascha.m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        m_texture3d.setVkImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         vks::tools::setImageLayout(
             copyCmd,
-			m_textureSascha.m_vkImage,
+            m_texture3d.image(),
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			m_textureSascha.m_vkImageLayout,
+            m_texture3d.vkImageLayout(),
             subresourceRange);
 
         m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
@@ -391,19 +383,6 @@ public:
         delete[] data;
         vkFreeMemory(m_device, stagingMemory, nullptr);
         vkDestroyBuffer(m_device, stagingBuffer, nullptr);
-    }
-
-    // Free all Vulkan resources used a texture object
-    void destroyTextureImage(Texture texture)
-    {
-        if (texture.m_vkImageView != VK_NULL_HANDLE)
-            vkDestroyImageView(m_device, texture.m_vkImageView, nullptr);
-        if (texture.m_vkImage != VK_NULL_HANDLE)
-            vkDestroyImage(m_device, texture.m_vkImage, nullptr);
-        if (texture.m_vkSampler != VK_NULL_HANDLE)
-            vkDestroySampler(m_device, texture.m_vkSampler, nullptr);
-        if (texture.m_vkDeviceMemory != VK_NULL_HANDLE)
-            vkFreeMemory(m_device, texture.m_vkDeviceMemory, nullptr);
     }
 
     void buildCommandBuffers()
@@ -424,25 +403,25 @@ public:
         renderPassBeginInfo.pClearValues = clearValues;
 
         for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
-			vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
+            vkcpp::CommandBuffer commandBuffer = vkcpp::CommandBuffer::makeCopy(m_drawCommandBuffers[i]);
 
-			// Set target frame buffer
+            // Set target frame buffer
             renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
 
-			commandBuffer.begin(cmdBufInfo);
-			commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
-			commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
-			commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
-			commandBuffer.cmdBindPipeline(m_vkPipeline);
-			commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSet, m_vkPipelineLayout);
-			commandBuffer.cmdBindVertexBuffer(vertexBuffer.m_buffer);
-			commandBuffer.cmdBindIndexBuffer(indexBuffer.m_buffer, VK_INDEX_TYPE_UINT32);
-			commandBuffer.cmdDrawIndexed(m_indexCount);
+            commandBuffer.begin(cmdBufInfo);
+            commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
+            commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
+            commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
+            commandBuffer.cmdBindPipeline(m_vkPipeline);
+            commandBuffer.cmdBindDescriptorSet(m_vkDescriptorSet, m_vkPipelineLayout);
+            commandBuffer.cmdBindVertexBuffer(vertexBuffer.m_buffer);
+            commandBuffer.cmdBindIndexBuffer(indexBuffer.m_buffer, VK_INDEX_TYPE_UINT32);
+            commandBuffer.cmdDrawIndexed(m_indexCount);
 
             drawUI(commandBuffer);
 
             commandBuffer.cmdEndRenderPass();
-			commandBuffer.end();
+            commandBuffer.end();
         }
     }
 
@@ -470,28 +449,27 @@ public:
 
         // Host visible source buffers (staging)
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-			&stagingBuffers.vertices, vertices.size() * sizeof(Vertex), vertices.data()));
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+            &stagingBuffers.vertices, vertices.size() * sizeof(Vertex), vertices.data()));
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-			&stagingBuffers.indices, indices.size() * sizeof(uint32_t), indices.data()));
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+            &stagingBuffers.indices, indices.size() * sizeof(uint32_t), indices.data()));
 
         // Device local destination buffers
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
-			&vertexBuffer, vertices.size() * sizeof(Vertex)));
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+            &vertexBuffer, vertices.size() * sizeof(Vertex)));
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
-			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
-			&indexBuffer, indices.size() * sizeof(uint32_t)));
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+            &indexBuffer, indices.size() * sizeof(uint32_t)));
 
         // Copy from host do m_vkDevice
         m_pVulkanDevice->copyBuffer(&stagingBuffers.vertices, &vertexBuffer, m_queue);
         m_pVulkanDevice->copyBuffer(&stagingBuffers.indices, &indexBuffer, m_queue);
-
     }
 
     void setupDescriptors()
@@ -521,9 +499,9 @@ public:
 
         // Image descriptor for the 3D texture
         VkDescriptorImageInfo textureDescriptor = vks::initializers::descriptorImageInfo(
-			m_textureSascha.m_vkSampler,
-			m_textureSascha.m_vkImageView,
-			m_textureSascha.m_vkImageLayout);
+            m_texture3d.sampler(),
+            m_texture3d.imageView(),
+            m_texture3d.vkImageLayout());
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             // Binding 0 : Vertex shader uniform buffer
@@ -590,9 +568,9 @@ public:
     {
         // Vertex shader uniform buffer block
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-			&uniformBuffer, sizeof(UniformData), &uniformData));
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+            &uniformBuffer, sizeof(UniformData), &uniformData));
         VK_CHECK_RESULT(uniformBuffer.map());
     }
 
@@ -627,7 +605,7 @@ public:
     {
         VulkanExampleBase::prepareFrame();
         m_vkSubmitInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+        VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
         m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
         VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
         VulkanExampleBase::submitFrame();
