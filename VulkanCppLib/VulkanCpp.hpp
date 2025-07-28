@@ -4003,31 +4003,30 @@ class DescriptorSetLayoutCreateInfo : public VkDescriptorSetLayoutCreateInfo {
 
     //	Always up to date.
 
-	//	TODO: not doing anything with VkDescriptorSetLayoutCreateFlags yet.
+    //	TODO: not doing anything with VkDescriptorSetLayoutCreateFlags yet.
 
     std::vector<VkDescriptorSetLayoutBinding> m_bindings;
 
 public:
-	~DescriptorSetLayoutCreateInfo() = default;
-	DescriptorSetLayoutCreateInfo(const DescriptorSetLayoutCreateInfo&) = delete;
-	DescriptorSetLayoutCreateInfo& operator=(const DescriptorSetLayoutCreateInfo&) = delete;
-	DescriptorSetLayoutCreateInfo(DescriptorSetLayoutCreateInfo&&) noexcept = delete;
-	DescriptorSetLayoutCreateInfo& operator=(DescriptorSetLayoutCreateInfo&&) noexcept = delete;
+    ~DescriptorSetLayoutCreateInfo() = default;
+    DescriptorSetLayoutCreateInfo(const DescriptorSetLayoutCreateInfo&) = delete;
+    DescriptorSetLayoutCreateInfo& operator=(const DescriptorSetLayoutCreateInfo&) = delete;
+    DescriptorSetLayoutCreateInfo(DescriptorSetLayoutCreateInfo&&) noexcept = delete;
+    DescriptorSetLayoutCreateInfo& operator=(DescriptorSetLayoutCreateInfo&&) noexcept = delete;
 
-
-	DescriptorSetLayoutCreateInfo()
+    DescriptorSetLayoutCreateInfo()
         : VkDescriptorSetLayoutCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     }
 
-    //DescriptorSetLayoutCreateInfo(
-    //    std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
-    //    : VkDescriptorSetLayoutCreateInfo {}
+    // DescriptorSetLayoutCreateInfo(
+    //     std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
+    //     : VkDescriptorSetLayoutCreateInfo {}
     //{
-    //    sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    //    addDescriptorSetLayoutBindings(descriptorSetLayoutBindings);
-    //}
+    //     sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    //     addDescriptorSetLayoutBindings(descriptorSetLayoutBindings);
+    // }
 
     DescriptorSetLayoutCreateInfo& addDescriptorSetLayoutBinding(
         int bindingIndex,
@@ -4047,17 +4046,16 @@ public:
         return *this;
     }
 
-    //void addDescriptorSetLayoutBindings(
-    //    std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
+    // void addDescriptorSetLayoutBindings(
+    //     std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
     //{
-    //    for (DescriptorSetLayoutBinding& descriptorSetLayoutBinding : descriptorSetLayoutBindings) {
-    //        addDescriptorSetLayoutBinding(
-    //            descriptorSetLayoutBinding.m_bindingIndex,
-    //            descriptorSetLayoutBinding.m_vkDescriptorType,
-    //            descriptorSetLayoutBinding.m_shaderStageFlags);
-    //    }
-    //}
-
+    //     for (DescriptorSetLayoutBinding& descriptorSetLayoutBinding : descriptorSetLayoutBindings) {
+    //         addDescriptorSetLayoutBinding(
+    //             descriptorSetLayoutBinding.m_bindingIndex,
+    //             descriptorSetLayoutBinding.m_vkDescriptorType,
+    //             descriptorSetLayoutBinding.m_shaderStageFlags);
+    //     }
+    // }
 };
 
 class DescriptorSetLayout : public InteropHandle2<VkDescriptorSetLayout> {
@@ -4134,24 +4132,93 @@ public:
     }
 };
 
-//	TODO: incomplete
-//	This is the smart version of VkWriteDescriptorSet to use with VkUpdateDescriptorSets.
-//	There is also a DescriptorSetUpdater that wraps everything.  Not sure which is better.
-//	Maybe keep both.
+//	Hold on.  This gets complicated.
+//	This is the smart version of VkWriteDescriptor set.
+//	The name is a bit misleading.  Updating descriptor sets and
+//	push descriptors use arrays of these.  So it really a write
+//	array entry. That said, it's a bit complicated itself.
+//
+//	The VkWriteDescriptor part require specifying the descriptor set number,
+//	binding index, and an array (or partial array) of element. A single
+//	resource update looks like an array of one element.
+//
+//	An entry can update only one descriptor type per entry.
+//
+//	In theory, one array of these structures could update anything
+//	and everything using vkWriteDescriptorSets.  In practice, at least
+//	in the demos, updates are pretty simple.  There is usually only one
+//	descriptor set, and each entry updates only one resource rather than
+//	using the count/array aspect of the structure.  Also, the push
+//	descriptor set command can only handle one descriptor set (number)
+//	at a time.
+//
+//	With all this in mind, the following restrictions apply.  Full
+//	array functionality is not supported (yet) but it should be easy
+//	to add since the data is already stored in a vector.
+//
+//	The structure is kept up to date, but because of the vectors,
+//	it's not a drop in replacement for the raw vk structure. The
+//	WriteDescriptorSetArray handles the complexities of creating
+//	an array of actual VkWriteDescriptorSet structures for use
+//	when writing a descriptor set, or using push descriptors.
+//
+//	The write descriptor set array will handle the complexities of
+//	constructing the "real" VkWriteDescriptorSet array for use in
+//	Vulkan functions.
+//
+//	The common usage (so far) seems to be to update a single descriptor
+//	set at a time, and push descriptor sets use only one descriptor set
+//	per call. Because of this, and in order to simplify the interface,
+//	the descriptor set array will use, and remember, only one descriptor
+//	set at a time. Using multiple descriptor sets in one array will require
+//	a separate call on the array object to change the descriptor set before
+//	adding more descriptors.
 class WriteDescriptorSet : public VkWriteDescriptorSet {
 
-    std::vector<VkDescriptorImageInfo> m_vkDescriptorImageInfos;
-    std::vector<VkDescriptorBufferInfo> m_vkDescriptorBufferInfos;
+	std::vector<VkDescriptorBufferInfo> m_vkDescriptorBufferInfos;
+	std::vector<VkDescriptorImageInfo> m_vkDescriptorImageInfos;
     std::vector<VkBufferView> m_vkBufferViewTexels;
+
+	void reassemble() {
+		if (!m_vkDescriptorBufferInfos.empty()) {
+			pBufferInfo = m_vkDescriptorBufferInfos.data();
+			return;
+		}
+			
+		if (!m_vkDescriptorImageInfos.empty()) {
+			pImageInfo = m_vkDescriptorImageInfos.data();
+			return;
+		}
+
+		if (!m_vkBufferViewTexels.empty()) {
+			pTexelBufferView = m_vkBufferViewTexels.data();
+			return;
+		}
+
+	}
 
 public:
     ~WriteDescriptorSet() = default;
     WriteDescriptorSet(const WriteDescriptorSet&) = delete;
     WriteDescriptorSet& operator=(const WriteDescriptorSet&) = delete;
-    WriteDescriptorSet(WriteDescriptorSet&&) noexcept = delete;
+
+	//	Need at least the move constructor so that WriteDescriptorSetArray
+	//	can put them into a vector.
+    WriteDescriptorSet(WriteDescriptorSet&& other) noexcept
+		:VkWriteDescriptorSet(other)
+    {
+		m_vkDescriptorBufferInfos = std::move(other.m_vkDescriptorBufferInfos);
+		m_vkDescriptorImageInfos = std::move(other.m_vkDescriptorImageInfos);
+		m_vkBufferViewTexels = std::move(other.m_vkBufferViewTexels);
+		reassemble();
+	}
+
     WriteDescriptorSet& operator=(WriteDescriptorSet&&) noexcept = delete;
 
-    WriteDescriptorSet(VkDescriptorSet vkDescriptorSet, uint32_t bindingIndex, VkDescriptorType vkDescriptorType)
+    WriteDescriptorSet(
+        VkDescriptorSet vkDescriptorSet,
+        uint32_t bindingIndex,
+        VkDescriptorType vkDescriptorType)
         : VkWriteDescriptorSet {}
     {
         sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -4160,7 +4227,8 @@ public:
         descriptorType = vkDescriptorType;
     }
 
-    void addBufferInfo(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range)
+    void addBufferInfo(
+        VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range)
     {
         VkDescriptorBufferInfo vkDescriptorBufferInfo {};
         vkDescriptorBufferInfo.buffer = buffer;
@@ -4170,220 +4238,185 @@ public:
         descriptorCount = static_cast<uint32_t>(m_vkDescriptorBufferInfos.size());
         pBufferInfo = m_vkDescriptorBufferInfos.data();
     }
+
+    void addBufferInfo(const VkDescriptorBufferInfo vkDescriptorBufferInfo)
+    {
+        m_vkDescriptorBufferInfos.emplace_back(vkDescriptorBufferInfo);
+        descriptorCount = static_cast<uint32_t>(m_vkDescriptorBufferInfos.size());
+        pBufferInfo = m_vkDescriptorBufferInfos.data();
+    }
+
+    void addImageInfo(const VkDescriptorImageInfo& vkDescriptorImageInfo)
+    {
+        m_vkDescriptorImageInfos.emplace_back(vkDescriptorImageInfo);
+        descriptorCount = static_cast<uint32_t>(m_vkDescriptorImageInfos.size());
+        pImageInfo = m_vkDescriptorImageInfos.data();
+    }
 };
 
-class DescriptorSetUpdater {
+class WriteDescriptorSetArray {
 
-    //	TODO: Need to add VkBufferView.  Looks like
-    //	m_vkImage, buffer, and bufferview are the only kinds of
-    //	data that are described by descriptors and that
-    //	can need to be written/updated.
+    //	The smart data.
+    std::vector<WriteDescriptorSet> m_writeDescriptorSets;
 
-    //	TODO: can this be made always up to date?
-    //	Use vector for each type of info, and then set pointer
-    //	after saving info.  Does it matter?
-
-    //	TODO: add a check to see if the destructor is called without
-    //	a call to
-
-    //	Union to hold each type of info that can be updated/written.
-    union WriteDescriptorInfo {
-        VkDescriptorBufferInfo m_vkDescriptorBufferInfo;
-        VkDescriptorImageInfo m_vkDescriptorImageInfo;
-
-        WriteDescriptorInfo(const VkDescriptorBufferInfo& vkDescriptorBufferInfo)
-            : m_vkDescriptorBufferInfo(vkDescriptorBufferInfo)
-        {
-        }
-
-        WriteDescriptorInfo(const VkDescriptorImageInfo& vkDescriptorImageInfo)
-            : m_vkDescriptorImageInfo(vkDescriptorImageInfo)
-        {
-        }
-    };
-
-    //	Each write descriptor has a parallel piece of data.
-    //	The write descriptor takes a pointer to the data so
-    //	we need to assemble it when it is needed.  To tell
-    //	which pointer field of the write descriptor is being used,
-    //	we write a marker into the appropriate field, and then
-    //	replace the marker with the real pointer when assembled
-    //	for use.
+    //	For now, we assemble the write descriptor set information
+    //	into an array that we keep. This array has only a limited
+    //	useful lifetime, so creating a separate array seems a bit
+    //	dangerous.  Instead, the "real" array is assembled internal
+    //	and then a reference is given out.
     std::vector<VkWriteDescriptorSet> m_vkWriteDescriptorSets;
-    std::vector<WriteDescriptorInfo> m_writeDescriptorInfos;
 
-    VkDescriptorSet m_preboundDescriptorSet = VK_NULL_HANDLE;
+    VkDescriptorSet m_currentDescriptorSet = VK_NULL_HANDLE;
 
-    bool m_updateCalled = false;
+    bool m_assembleCalled = false;
 
 public:
-    DescriptorSetUpdater() = default;
-    ~DescriptorSetUpdater() noexcept(false)
+    ~WriteDescriptorSetArray() noexcept(false)
     {
-        if (!m_updateCalled) {
-            throw Exception("DescriptorSetUpdater destroyed before calling update.");
+        if (!m_assembleCalled) {
+            throw Exception("WriteDescriptorSetArray destroyed without being used.");
         }
     }
-    DescriptorSetUpdater(const DescriptorSetUpdater&) = delete;
-    DescriptorSetUpdater& operator=(const DescriptorSetUpdater&) = delete;
-    DescriptorSetUpdater(DescriptorSetUpdater&&) noexcept = delete;
-    DescriptorSetUpdater& operator=(DescriptorSetUpdater&&) noexcept = delete;
+    WriteDescriptorSetArray(const WriteDescriptorSetArray&) = delete;
+    WriteDescriptorSetArray& operator=(const WriteDescriptorSetArray&) = delete;
+    WriteDescriptorSetArray(WriteDescriptorSetArray&&) noexcept = delete;
+    WriteDescriptorSetArray& operator=(WriteDescriptorSetArray&&) noexcept = delete;
 
-    DescriptorSetUpdater(VkDescriptorSet vkDescriptorSet)
-        : m_preboundDescriptorSet(vkDescriptorSet)
+    WriteDescriptorSetArray(VkDescriptorSet vkDescriptorSet)
+        : m_currentDescriptorSet(vkDescriptorSet)
     {
     }
 
-    DescriptorSetUpdater& addBufferWriteDescriptor(
-        uint32_t bindingIndex,
-        VkDescriptorType vkDescriptorType,
-        VkBuffer vkBufferArg,
-        VkDeviceSize offsetArg,
-        VkDeviceSize rangeArg)
-    {
-        //	Just need a non-zero marker
-        const VkDescriptorBufferInfo* bufferMarker = reinterpret_cast<VkDescriptorBufferInfo*>(-1);
+    // WriteDescriptorSetArray& addBufferWriteDescriptor(
+    //     uint32_t bindingIndex,
+    //     VkDescriptorType vkDescriptorType,
+    //     VkBuffer vkBufferArg,
+    //     VkDeviceSize offsetArg,
+    //     VkDeviceSize rangeArg)
+    //{
 
-        VkWriteDescriptorSet vkWriteDescriptorSet {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = m_preboundDescriptorSet,
-            .dstBinding = bindingIndex,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vkDescriptorType,
-            .pBufferInfo = bufferMarker
-        };
+    //    VkWriteDescriptorSet vkWriteDescriptorSet {
+    //        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    //        .dstSet = m_currentDescriptorSet,
+    //        .dstBinding = bindingIndex,
+    //        .dstArrayElement = 0,
+    //        .descriptorCount = 1,
+    //        .descriptorType = vkDescriptorType,
+    //    };
 
-        VkDescriptorBufferInfo vkDescriptorBufferInfo {
-            .buffer = vkBufferArg,
-            .offset = offsetArg,
-            .range = rangeArg
-        };
+    //    VkDescriptorBufferInfo vkDescriptorBufferInfo {
+    //        .buffer = vkBufferArg,
+    //        .offset = offsetArg,
+    //        .range = rangeArg
+    //    };
 
-        m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
-        m_writeDescriptorInfos.emplace_back(vkDescriptorBufferInfo);
-        return *this;
-    }
+    //    m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
+    //    return *this;
+    //}
 
     //	Handy version for Sascha Willems demos.
     //	Descriptor buffer info is already created.
-    //	Uses prebound descriptor set.
-    DescriptorSetUpdater& addBufferWriteDescriptor(
+    WriteDescriptorSetArray& addBufferWriteDescriptor(
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
         const VkDescriptorBufferInfo& vkDescriptorBufferInfo)
     {
-        //	Just need a non-zero marker
-        const VkDescriptorBufferInfo* bufferMarker = reinterpret_cast<VkDescriptorBufferInfo*>(-1);
-
-        //	TODO: maybe check prebound descriptor set for null handle.
-        VkWriteDescriptorSet vkWriteDescriptorSet {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = m_preboundDescriptorSet,
-            .dstBinding = bindingIndex,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vkDescriptorType,
-            .pBufferInfo = bufferMarker
-        };
-
-        m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
-        m_writeDescriptorInfos.emplace_back(vkDescriptorBufferInfo);
+        WriteDescriptorSet& writeDescriptorSet
+            = m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
+        writeDescriptorSet.addBufferInfo(vkDescriptorBufferInfo);
         return *this;
     }
 
-    DescriptorSetUpdater& addImageWriteDescriptor(
-        uint32_t bindingIndex,
-        VkDescriptorType vkDescriptorType,
-        VkImageView vkImageViewArg,
-        VkImageLayout vkImageLayout,
-        VkSampler vkSamplerArg)
-    {
-        //	Just need a non-zero marker
-        const VkDescriptorImageInfo* imageMarker = reinterpret_cast<VkDescriptorImageInfo*>(-1);
+    // WriteDescriptorSetArray& addImageWriteDescriptor(
+    //     uint32_t bindingIndex,
+    //     VkDescriptorType vkDescriptorType,
+    //     VkImageView vkImageViewArg,
+    //     VkImageLayout vkImageLayout,
+    //     VkSampler vkSamplerArg)
+    //{
 
-        VkWriteDescriptorSet vkWriteDescriptorSet {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = m_preboundDescriptorSet,
-            .dstBinding = bindingIndex,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vkDescriptorType,
-            .pImageInfo = imageMarker
-        };
+    //    VkWriteDescriptorSet vkWriteDescriptorSet {
+    //        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    //        .dstSet = m_currentDescriptorSet,
+    //        .dstBinding = bindingIndex,
+    //        .dstArrayElement = 0,
+    //        .descriptorCount = 1,
+    //        .descriptorType = vkDescriptorType,
+    //    };
 
-        VkDescriptorImageInfo vkDescriptorImageInfo {
-            .sampler = vkSamplerArg,
-            .imageView = vkImageViewArg,
-            .imageLayout = vkImageLayout,
-        };
+    //    VkDescriptorImageInfo vkDescriptorImageInfo {
+    //        .sampler = vkSamplerArg,
+    //        .imageView = vkImageViewArg,
+    //        .imageLayout = vkImageLayout,
+    //    };
 
-        m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
-        m_writeDescriptorInfos.emplace_back(vkDescriptorImageInfo);
-        return *this;
-    }
+    //    m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
+    //    return *this;
+    //}
 
-    DescriptorSetUpdater& addImageWriteDescriptor(
-        uint32_t bindingIndex,
-        VkDescriptorType vkDescriptorType,
-        VkImageView vkImageViewArg,
-        VkImageLayout vkImageLayout)
-    {
-        return addImageWriteDescriptor(
-            bindingIndex, vkDescriptorType, vkImageViewArg, vkImageLayout, VK_NULL_HANDLE);
-    }
+    // WriteDescriptorSetArray& addImageWriteDescriptor(
+    //     uint32_t bindingIndex,
+    //     VkDescriptorType vkDescriptorType,
+    //     VkImageView vkImageViewArg,
+    //     VkImageLayout vkImageLayout)
+    //{
+    //     return addImageWriteDescriptor(
+    //         bindingIndex, vkDescriptorType, vkImageViewArg, vkImageLayout, VK_NULL_HANDLE);
+    // }
 
-    DescriptorSetUpdater& addImageWriteDescriptor(
+    WriteDescriptorSetArray& addImageWriteDescriptor(
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
         const VkDescriptorImageInfo& vkDescriptorImageInfo)
     {
-        //	Just need a non-zero marker
-        const VkDescriptorImageInfo* imageMarker = reinterpret_cast<VkDescriptorImageInfo*>(-1);
-
-        VkWriteDescriptorSet vkWriteDescriptorSet {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = m_preboundDescriptorSet,
-            .dstBinding = bindingIndex,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vkDescriptorType,
-            .pImageInfo = imageMarker
-        };
-
-        m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
-        m_writeDescriptorInfos.emplace_back(vkDescriptorImageInfo);
+        WriteDescriptorSet& writeDescriptorSet
+            = m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
+        writeDescriptorSet.addImageInfo(vkDescriptorImageInfo);
         return *this;
     }
 
     void assemble()
     {
-        int index = 0;
-        //	Update marked pointers to the proper address from the info array.
+        //	DANGER Will Robinson!
+        //	We create an array of VkWriteDescriptorSets by shallow copying the
+        //	VkWriteDescriptorSet info from the smart WriteDescriptorSets.
+        //	This means that the pointers in the VkWriteDescriptorSets are pointing
+        //	to the data in the smart WriteDescriptorSet.  And this means that the
+        //	VkWriteDescriptorSet is only valid as long as the WriteDescriptorSet
+        //	is unchanged. This shouldn't be a problem in normal usage, but don't
+        //	go playing clever games with the VkWriteDescriptorSet data.
 
-        for (VkWriteDescriptorSet& vkWriteDescriptorSet : m_vkWriteDescriptorSets) {
-            if (vkWriteDescriptorSet.pBufferInfo) {
-                vkWriteDescriptorSet.pBufferInfo = &(m_writeDescriptorInfos.at(index).m_vkDescriptorBufferInfo);
-            }
-            if (vkWriteDescriptorSet.pImageInfo) {
-                vkWriteDescriptorSet.pImageInfo = &(m_writeDescriptorInfos.at(index).m_vkDescriptorImageInfo);
-            }
-            ++index;
+        //	TODO: need to figure out what to do if there were no updates.
+        //	Kind of an edge case but might avoid some debugging pain later.
+
+        if (m_assembleCalled) {
+            return;
         }
+        for (const WriteDescriptorSet& writeDescriptorSet : m_writeDescriptorSets) {
+            m_vkWriteDescriptorSets.emplace_back(static_cast<VkWriteDescriptorSet>(writeDescriptorSet));
+        }
+        m_assembleCalled = true;
+    }
+
+    VkWriteDescriptorSet* vkWriteDescriptorSetsData()
+    {
+        assemble();
+        return m_vkWriteDescriptorSets.data();
+    }
+
+    uint32_t vkWriteDescriptorSetsSize()
+    {
+        assemble();
+        return static_cast<uint32_t>(m_vkWriteDescriptorSets.size());
     }
 
     void updateDescriptorSets()
     {
-        assemble();
-        //	TODO: check for no updates before calling.
         vkUpdateDescriptorSets(
             vkDevice(),
-            static_cast<uint32_t>(m_vkWriteDescriptorSets.size()),
-            m_vkWriteDescriptorSets.data(),
+            vkWriteDescriptorSetsSize(),
+            vkWriteDescriptorSetsData(),
             0, nullptr);
-        m_updateCalled = true;
-        //	TODO: should the update info be cleared after this?
-        //	is it ever reused?
     }
 };
 

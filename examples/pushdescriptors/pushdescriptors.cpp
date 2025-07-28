@@ -20,9 +20,13 @@ vkcpp::VulkanContext vkcpp::s_vulkanContext;
 
 class VulkanExample : public VulkanExampleBase {
 public:
+    static constexpr uint32_t s_uniformBufferBindingNumber = 0;
+    static constexpr uint32_t s_vertexBufferBindingNumber = 1;
+    static constexpr uint32_t s_combinedImageSamplerBindingNumber = 2;
+
     bool animate = true;
 
-//    PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR { VK_NULL_HANDLE };
+    //    PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR { VK_NULL_HANDLE };
     VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProps {};
 
     struct Cube {
@@ -39,6 +43,7 @@ public:
         glm::mat4 projection;
         glm::mat4 view;
     } uniformData;
+
     vks::Buffer uniformBuffer;
 
     VkPipeline m_vkPipeline { VK_NULL_HANDLE };
@@ -99,11 +104,13 @@ public:
             vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[i];
 
             renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
-            commandBuffer.begin();
-            commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
-            commandBuffer.cmdBindPipeline(m_vkPipeline);
-            commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
-            commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
+
+            commandBuffer
+                .begin()
+                .cmdBeginRenderPass(renderPassBeginInfo)
+                .cmdBindPipeline(m_vkPipeline)
+                .cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
+                .cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
 
             model.bindBuffers(commandBuffer);
 
@@ -117,39 +124,31 @@ public:
                 // Note: dstSet for each descriptor set write is left at zero
                 // as this is ignored when using push descriptors
 
-                constexpr int descriptorCount = 3;
-                constexpr int globalUniformBufferIndex = 0;
-                constexpr int cubeUniformBufferIndex = 1;
-                constexpr int textureIndex = 2;
+                //	Using push descriptors, so no descriptor set handle.
+                vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(VK_NULL_HANDLE);
+                writeDescriptorSetArray
+                    .addBufferWriteDescriptor(
+                        s_uniformBufferBindingNumber,
+                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        uniformBuffer.m_vkDescriptorBufferInfo)
+                    .addBufferWriteDescriptor(
+                        s_vertexBufferBindingNumber,
+                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        cube.uniformBuffer.m_vkDescriptorBufferInfo)
+                    .addImageWriteDescriptor(
+                        s_combinedImageSamplerBindingNumber,
+                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        cube.texture.m_vkDescriptorImageInfo);
 
-                std::array<VkWriteDescriptorSet, descriptorCount> writeDescriptorSets {};
-
-                // Scene matrices
-                writeDescriptorSets[globalUniformBufferIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writeDescriptorSets[globalUniformBufferIndex].dstSet = 0;
-                writeDescriptorSets[globalUniformBufferIndex].dstBinding = 0;
-                writeDescriptorSets[globalUniformBufferIndex].descriptorCount = 1;
-                writeDescriptorSets[globalUniformBufferIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                writeDescriptorSets[globalUniformBufferIndex].pBufferInfo = &uniformBuffer.m_vkDescriptorBufferInfo;
-
-                // Model matrices
-                writeDescriptorSets[cubeUniformBufferIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writeDescriptorSets[cubeUniformBufferIndex].dstSet = 0;
-                writeDescriptorSets[cubeUniformBufferIndex].dstBinding = 1;
-                writeDescriptorSets[cubeUniformBufferIndex].descriptorCount = 1;
-                writeDescriptorSets[cubeUniformBufferIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                writeDescriptorSets[cubeUniformBufferIndex].pBufferInfo = &cube.uniformBuffer.m_vkDescriptorBufferInfo;
-
-                // Texture
-                writeDescriptorSets[textureIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writeDescriptorSets[textureIndex].dstSet = 0;
-                writeDescriptorSets[textureIndex].dstBinding = 2;
-                writeDescriptorSets[textureIndex].descriptorCount = 1;
-                writeDescriptorSets[textureIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                writeDescriptorSets[textureIndex].pImageInfo = &cube.texture.m_vkDescriptorImageInfo;
-
-                //				commandBuffer.cmdPushDescriptorSets(writeDescriptorSets, );
-                vkCmdPushDescriptorSet(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 3, writeDescriptorSets.data());
+                vkCmdPushDescriptorSet(
+                    commandBuffer,
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    m_vkPipelineLayout,
+                    //	TODO: magic number.  Is this 0 because it's the first (only, index ==0)
+                    //	descriptor set added to the descriptor set layout?
+                    0,
+                    writeDescriptorSetArray.vkWriteDescriptorSetsSize(),
+                    writeDescriptorSetArray.vkWriteDescriptorSetsData());
 
                 model.draw(commandBuffer);
             }
@@ -180,9 +179,12 @@ public:
     void setupDescriptorSetLayout()
     {
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-            vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
-            vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1),
-            vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 2),
+            vks::initializers::descriptorSetLayoutBinding(
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, s_uniformBufferBindingNumber),
+            vks::initializers::descriptorSetLayoutBinding(
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, s_vertexBufferBindingNumber),
+            vks::initializers::descriptorSetLayoutBinding(
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, s_combinedImageSamplerBindingNumber),
         };
 
         VkDescriptorSetLayoutCreateInfo descriptorLayoutCI {};
@@ -201,15 +203,28 @@ public:
         VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCI, nullptr, &m_vkPipelineLayout));
 
         // Pipeline
-        VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
-        VkPipelineRasterizationStateCreateInfo rasterizationStateCI = vks::initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
-        VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
-        VkPipelineColorBlendStateCreateInfo colorBlendStateCI = vks::initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
-        VkPipelineDepthStencilStateCreateInfo depthStencilStateCI = vks::initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
-        VkPipelineViewportStateCreateInfo viewportStateCI = vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
-        VkPipelineMultisampleStateCreateInfo multisampleStateCI = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
-        const std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-        VkPipelineDynamicStateCreateInfo dynamicStateCI = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
+        VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI
+            = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+        VkPipelineRasterizationStateCreateInfo rasterizationStateCI
+            = vks::initializers::pipelineRasterizationStateCreateInfo(
+                VK_POLYGON_MODE_FILL,
+                VK_CULL_MODE_BACK_BIT,
+                VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                0);
+        VkPipelineColorBlendAttachmentState blendAttachmentState
+            = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
+        VkPipelineColorBlendStateCreateInfo colorBlendStateCI
+            = vks::initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+        VkPipelineDepthStencilStateCreateInfo depthStencilStateCI
+            = vks::initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+        VkPipelineViewportStateCreateInfo viewportStateCI
+            = vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
+        VkPipelineMultisampleStateCreateInfo multisampleStateCI
+            = vks::initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+        const std::vector<VkDynamicState> dynamicStateEnables
+            = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        VkPipelineDynamicStateCreateInfo dynamicStateCI
+            = vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
         std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
         VkGraphicsPipelineCreateInfo pipelineCI
