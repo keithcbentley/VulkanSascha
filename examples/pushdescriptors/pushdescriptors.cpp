@@ -140,15 +140,9 @@ public:
                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                         cube.texture.m_vkDescriptorImageInfo);
 
-                vkCmdPushDescriptorSet(
-                    commandBuffer,
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    m_vkPipelineLayout,
-                    //	TODO: magic number.  Is this 0 because it's the first (only, index ==0)
-                    //	descriptor set added to the descriptor set layout?
-                    0,
-                    writeDescriptorSetArray.vkWriteDescriptorSetsSize(),
-                    writeDescriptorSetArray.vkWriteDescriptorSetsData());
+				//	TODO: 0 is kind of a magic number here.
+				//	Where does it really come from? Is it because it's the first descriptor set?
+				commandBuffer.cmdPushDescriptorSet(writeDescriptorSetArray,0,m_vkPipelineLayout);
 
                 model.draw(commandBuffer);
             }
