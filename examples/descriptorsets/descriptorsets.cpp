@@ -203,18 +203,18 @@ public:
 			//	TODO: could we make a sort of "prebound" updater that is bound
 			//	to a particular descriptor set at creation.  It would make adding
 			//	the descriptors a bit tidier.
-            vkcpp::DescriptorSetUpdater descriptorSetUpdater(cube.m_descriptorSet);
-            descriptorSetUpdater.addBufferWriteDescriptor(
+            vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(cube.m_descriptorSet);
+			writeDescriptorSetArray.addBufferWriteDescriptor(
                 uniformBufferBindingIndex,
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 cube.uniformBuffer.m_vkDescriptorBufferInfo);
 
-            descriptorSetUpdater.addImageWriteDescriptor(
+			writeDescriptorSetArray.addImageWriteDescriptor(
                 combinedImageSamplerBindingIndex,
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 cube.texture.m_vkDescriptorImageInfo);
 
-            descriptorSetUpdater.updateDescriptorSets();
+			writeDescriptorSetArray.updateDescriptorSets();
         }
     }
 

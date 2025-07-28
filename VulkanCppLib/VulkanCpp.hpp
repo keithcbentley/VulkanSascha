@@ -3288,7 +3288,6 @@ public:
 };
 static_assert(sizeof(BufferImageCopy) == sizeof(VkBufferImageCopy));
 
-
 class SubmitInfo : public VkSubmitInfo {
 
     //	Always up to date.
@@ -3897,6 +3896,13 @@ public:
         descriptorType = vkDescriptorType;
     }
 
+    void addBufferInfo(const VkDescriptorBufferInfo& vkDescriptorBufferInfo)
+    {
+        m_vkDescriptorBufferInfos.emplace_back(vkDescriptorBufferInfo);
+        descriptorCount = static_cast<uint32_t>(m_vkDescriptorBufferInfos.size());
+        pBufferInfo = m_vkDescriptorBufferInfos.data();
+    }
+
     void addBufferInfo(
         VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range)
     {
@@ -3904,16 +3910,7 @@ public:
         vkDescriptorBufferInfo.buffer = buffer;
         vkDescriptorBufferInfo.offset = offset;
         vkDescriptorBufferInfo.range = range;
-        m_vkDescriptorBufferInfos.emplace_back(vkDescriptorBufferInfo);
-        descriptorCount = static_cast<uint32_t>(m_vkDescriptorBufferInfos.size());
-        pBufferInfo = m_vkDescriptorBufferInfos.data();
-    }
-
-    void addBufferInfo(const VkDescriptorBufferInfo vkDescriptorBufferInfo)
-    {
-        m_vkDescriptorBufferInfos.emplace_back(vkDescriptorBufferInfo);
-        descriptorCount = static_cast<uint32_t>(m_vkDescriptorBufferInfos.size());
-        pBufferInfo = m_vkDescriptorBufferInfos.data();
+        addBufferInfo(vkDescriptorBufferInfo);
     }
 
     void addImageInfo(const VkDescriptorImageInfo& vkDescriptorImageInfo)
@@ -3921,6 +3918,31 @@ public:
         m_vkDescriptorImageInfos.emplace_back(vkDescriptorImageInfo);
         descriptorCount = static_cast<uint32_t>(m_vkDescriptorImageInfos.size());
         pImageInfo = m_vkDescriptorImageInfos.data();
+    }
+
+    void addImageInfo(
+        VkImageView vkImageViewArg,
+        VkImageLayout vkImageLayoutArg,
+        VkSampler vkSamplerArg)
+    {
+        VkDescriptorImageInfo vkDescriptorImageInfo {
+            .sampler = vkSamplerArg,
+            .imageView = vkImageViewArg,
+            .imageLayout = vkImageLayoutArg,
+        };
+        addImageInfo(vkDescriptorImageInfo);
+    }
+
+    void addImageInfo(
+        VkImageView vkImageViewArg,
+        VkImageLayout vkImageLayoutArg)
+    {
+        VkDescriptorImageInfo vkDescriptorImageInfo {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = vkImageViewArg,
+            .imageLayout = vkImageLayoutArg,
+        };
+        addImageInfo(vkDescriptorImageInfo);
     }
 };
 
@@ -3997,43 +4019,6 @@ public:
         return *this;
     }
 
-    // WriteDescriptorSetArray& addImageWriteDescriptor(
-    //     uint32_t bindingIndex,
-    //     VkDescriptorType vkDescriptorType,
-    //     VkImageView vkImageViewArg,
-    //     VkImageLayout vkImageLayout,
-    //     VkSampler vkSamplerArg)
-    //{
-
-    //    VkWriteDescriptorSet vkWriteDescriptorSet {
-    //        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    //        .dstSet = m_currentDescriptorSet,
-    //        .dstBinding = bindingIndex,
-    //        .dstArrayElement = 0,
-    //        .descriptorCount = 1,
-    //        .descriptorType = vkDescriptorType,
-    //    };
-
-    //    VkDescriptorImageInfo vkDescriptorImageInfo {
-    //        .sampler = vkSamplerArg,
-    //        .imageView = vkImageViewArg,
-    //        .imageLayout = vkImageLayout,
-    //    };
-
-    //    m_vkWriteDescriptorSets.push_back(vkWriteDescriptorSet);
-    //    return *this;
-    //}
-
-    // WriteDescriptorSetArray& addImageWriteDescriptor(
-    //     uint32_t bindingIndex,
-    //     VkDescriptorType vkDescriptorType,
-    //     VkImageView vkImageViewArg,
-    //     VkImageLayout vkImageLayout)
-    //{
-    //     return addImageWriteDescriptor(
-    //         bindingIndex, vkDescriptorType, vkImageViewArg, vkImageLayout, VK_NULL_HANDLE);
-    // }
-
     WriteDescriptorSetArray& addImageWriteDescriptor(
         uint32_t bindingIndex,
         VkDescriptorType vkDescriptorType,
@@ -4042,6 +4027,31 @@ public:
         WriteDescriptorSet& writeDescriptorSet
             = m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
         writeDescriptorSet.addImageInfo(vkDescriptorImageInfo);
+        return *this;
+    }
+
+    WriteDescriptorSetArray& addImageWriteDescriptor(
+        uint32_t bindingIndex,
+        VkDescriptorType vkDescriptorType,
+        VkImageView vkImageView,
+        VkImageLayout vkImageLayout,
+        VkSampler vkSampler)
+    {
+        WriteDescriptorSet& writeDescriptorSet
+            = m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
+        writeDescriptorSet.addImageInfo(vkImageView, vkImageLayout, vkSampler);
+        return *this;
+    }
+
+    WriteDescriptorSetArray& addImageWriteDescriptor(
+        uint32_t bindingIndex,
+        VkDescriptorType vkDescriptorType,
+        VkImageView vkImageView,
+        VkImageLayout vkImageLayout)
+    {
+        WriteDescriptorSet& writeDescriptorSet
+            = m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
+        writeDescriptorSet.addImageInfo(vkImageView, vkImageLayout);
         return *this;
     }
 
@@ -5421,314 +5431,349 @@ public:
     }
 };
 
-class CommandBuffer : public InteropHandle3<VkCommandBuffer, VkCommandPool>
-{
+class CommandBuffer : public InteropHandle3<VkCommandBuffer, VkCommandPool> {
 
-	static void destroy(VkCommandBuffer vkCommandBuffer, VkCommandPool vkCommandPool) {
-		vkFreeCommandBuffers(vkDevice(), vkCommandPool, 1, &vkCommandBuffer);
-	}
+    static void destroy(VkCommandBuffer vkCommandBuffer, VkCommandPool vkCommandPool)
+    {
+        vkFreeCommandBuffers(vkDevice(), vkCommandPool, 1, &vkCommandBuffer);
+    }
 
-	CommandBuffer(
-		VkCommandBuffer vkCommandBuffer,
-		VkCommandPool vkCommandPool,
-		DestroyFunc_t pfnDestroy)
-		: InteropHandle3(vkCommandBuffer, vkCommandPool, pfnDestroy) {
-	}
+    CommandBuffer(
+        VkCommandBuffer vkCommandBuffer,
+        VkCommandPool vkCommandPool,
+        DestroyFunc_t pfnDestroy)
+        : InteropHandle3(vkCommandBuffer, vkCommandPool, pfnDestroy)
+    {
+    }
 
 public:
-	CommandBuffer() = default;
+    CommandBuffer() = default;
 
-	CommandBuffer(VkCommandPool vkCommandPool) {
-		VkCommandBufferAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandPool = vkCommandPool;
-		allocInfo.commandBufferCount = 1;
-		VkCommandBuffer vkCommandBuffer;
-		vkAllocateCommandBuffers(vkDevice(), &allocInfo, &vkCommandBuffer);
-		new (this) CommandBuffer(vkCommandBuffer, vkCommandPool, &destroy);
-	}
+    CommandBuffer(VkCommandPool vkCommandPool)
+    {
+        VkCommandBufferAllocateInfo allocInfo {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = vkCommandPool;
+        allocInfo.commandBufferCount = 1;
+        VkCommandBuffer vkCommandBuffer;
+        vkAllocateCommandBuffers(vkDevice(), &allocInfo, &vkCommandBuffer);
+        new (this) CommandBuffer(vkCommandBuffer, vkCommandPool, &destroy);
+    }
 
-	//	Handy way to make simple copy from an existing vkCommandBuffer.
-	//	Note that we don't have a real command pool.
-	static CommandBuffer makeCopy(VkCommandBuffer vkCommandBuffer) {
-		return CommandBuffer(vkCommandBuffer, VK_NULL_HANDLE, nullptr);
-	}
+    //	Handy way to make simple copy from an existing vkCommandBuffer.
+    //	Note that we don't have a real command pool.
+    static CommandBuffer makeCopy(VkCommandBuffer vkCommandBuffer)
+    {
+        return CommandBuffer(vkCommandBuffer, VK_NULL_HANDLE, nullptr);
+    }
 
-	CommandBuffer& reset() {
-		VkResult vkResult = vkResetCommandBuffer(*this, 0);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-		return *this;
-	}
+    CommandBuffer& reset()
+    {
+        VkResult vkResult = vkResetCommandBuffer(*this, 0);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        return *this;
+    }
 
-	CommandBuffer& begin() {
-		VkCommandBufferBeginInfo vkCommandBufferBeginInfo{};
-		vkCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    CommandBuffer& begin()
+    {
+        VkCommandBufferBeginInfo vkCommandBufferBeginInfo {};
+        vkCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-		return *this;
-	}
+        VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        return *this;
+    }
 
-	CommandBuffer& begin(const VkCommandBufferBeginInfo& vkCommandBufferBeginInfo) {
-		VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-		return *this;
-	}
+    CommandBuffer& begin(const VkCommandBufferBeginInfo& vkCommandBufferBeginInfo)
+    {
+        VkResult vkResult = vkBeginCommandBuffer(*this, &vkCommandBufferBeginInfo);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        return *this;
+    }
 
-	CommandBuffer& beginOneTimeSubmit() {
-		VkCommandBufferBeginInfo beginInfo{};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		vkBeginCommandBuffer(*this, &beginInfo);
-		return *this;
-	}
+    CommandBuffer& beginOneTimeSubmit()
+    {
+        VkCommandBufferBeginInfo beginInfo {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkBeginCommandBuffer(*this, &beginInfo);
+        return *this;
+    }
 
-	CommandBuffer& end() {
-		VkResult vkResult = vkEndCommandBuffer(*this);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-		return *this;
-	}
+    CommandBuffer& end()
+    {
+        VkResult vkResult = vkEndCommandBuffer(*this);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+        return *this;
+    }
 
-	CommandBuffer& cmdBeginRendering(const VkRenderingInfo& vkRenderingInfo) {
-		vkCmdBeginRendering(*this, &vkRenderingInfo);
-		return *this;
-	}
+    CommandBuffer& cmdBeginRendering(const VkRenderingInfo& vkRenderingInfo)
+    {
+        vkCmdBeginRendering(*this, &vkRenderingInfo);
+        return *this;
+    }
 
-	CommandBuffer& cmdEndRendering() {
-		vkCmdEndRendering(*this);
-		return *this;
-	}
+    CommandBuffer& cmdEndRendering()
+    {
+        vkCmdEndRendering(*this);
+        return *this;
+    }
 
-	CommandBuffer& cmdCopyBufferToImage(
-		Buffer<> buffer,
-		Image image,
-		uint32_t width,
-		uint32_t height) {
-		BufferImageCopy bufferImageCopy;
-		bufferImageCopy.imageExtent = {width, height, 1};
+    CommandBuffer& cmdCopyBufferToImage(
+        Buffer<> buffer,
+        Image image,
+        uint32_t width,
+        uint32_t height)
+    {
+        BufferImageCopy bufferImageCopy;
+        bufferImageCopy.imageExtent = { width, height, 1 };
 
-		vkCmdCopyBufferToImage(*this, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopy);
-		return *this;
-	}
+        vkCmdCopyBufferToImage(*this, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopy);
+        return *this;
+    }
 
-	CommandBuffer& cmdCopyBufferToImage(
-		Buffer<> buffer,
-		Image image,
-		VkImageLayout vkImageLayout,
-		uint32_t regionCount,
-		const VkBufferImageCopy* pRegions) {
-		vkCmdCopyBufferToImage(*this, buffer, image, vkImageLayout, regionCount, pRegions);
-		return *this;
-	}
+    CommandBuffer& cmdCopyBufferToImage(
+        Buffer<> buffer,
+        Image image,
+        VkImageLayout vkImageLayout,
+        uint32_t regionCount,
+        const VkBufferImageCopy* pRegions)
+    {
+        vkCmdCopyBufferToImage(*this, buffer, image, vkImageLayout, regionCount, pRegions);
+        return *this;
+    }
 
-	//	TODO: do we need to implement cmdCopyBuffer2?
-	CommandBuffer& cmdCopyBuffer(
-		Buffer<> srcBuffer,
-		Buffer<> dstBuffer,
-		VkDeviceSize size) {
-		//	TODO: maybe do some size checking on the destination to avoid overwriting.
-		VkBufferCopy vkBufferCopy{.srcOffset = 0, .dstOffset = 0, .size = size};
+    //	TODO: do we need to implement cmdCopyBuffer2?
+    CommandBuffer& cmdCopyBuffer(
+        Buffer<> srcBuffer,
+        Buffer<> dstBuffer,
+        VkDeviceSize size)
+    {
+        //	TODO: maybe do some size checking on the destination to avoid overwriting.
+        VkBufferCopy vkBufferCopy { .srcOffset = 0, .dstOffset = 0, .size = size };
 
-		vkCmdCopyBuffer(*this, srcBuffer, dstBuffer, 1, &vkBufferCopy);
-		return *this;
-	}
+        vkCmdCopyBuffer(*this, srcBuffer, dstBuffer, 1, &vkBufferCopy);
+        return *this;
+    }
 
-	CommandBuffer& cmdPipelineBarrier2(DependencyInfo& dependencyInfo) {
-		vkCmdPipelineBarrier2(*this, &dependencyInfo);
-		return *this;
-	}
+    CommandBuffer& cmdPipelineBarrier2(DependencyInfo& dependencyInfo)
+    {
+        vkCmdPipelineBarrier2(*this, &dependencyInfo);
+        return *this;
+    }
 
-	CommandBuffer& cmdBeginRenderPass(const VkRenderPassBeginInfo& vkRenderPassBeginInfo) {
-		vkCmdBeginRenderPass(*this, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		return *this;
-	}
+    CommandBuffer& cmdBeginRenderPass(const VkRenderPassBeginInfo& vkRenderPassBeginInfo)
+    {
+        vkCmdBeginRenderPass(*this, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        return *this;
+    }
 
-	CommandBuffer& cmdNextSubpass() {
-		vkCmdNextSubpass(*this, VK_SUBPASS_CONTENTS_INLINE);
-		return *this;
-	}
+    CommandBuffer& cmdNextSubpass()
+    {
+        vkCmdNextSubpass(*this, VK_SUBPASS_CONTENTS_INLINE);
+        return *this;
+    }
 
-	CommandBuffer& cmdEndRenderPass() {
-		vkCmdEndRenderPass(*this);
-		return *this;
-	}
+    CommandBuffer& cmdEndRenderPass()
+    {
+        vkCmdEndRenderPass(*this);
+        return *this;
+    }
 
-	CommandBuffer& cmdSetViewport(VkExtent2D vkExtent2D) {
-		VkViewport viewport{};
-		viewport.width = static_cast<float>(vkExtent2D.width);
-		viewport.height = static_cast<float>(vkExtent2D.height);
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-		vkCmdSetViewport(*this, 0, 1, &viewport);
-		return *this;
-	}
+    CommandBuffer& cmdSetViewport(VkExtent2D vkExtent2D)
+    {
+        VkViewport viewport {};
+        viewport.width = static_cast<float>(vkExtent2D.width);
+        viewport.height = static_cast<float>(vkExtent2D.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(*this, 0, 1, &viewport);
+        return *this;
+    }
 
-	CommandBuffer& cmdSetViewport(uint32_t width, uint32_t height) {
-		VkViewport viewport{};
-		viewport.width = static_cast<float>(width);
-		viewport.height = static_cast<float>(height);
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-		vkCmdSetViewport(*this, 0, 1, &viewport);
-		return *this;
-	}
+    CommandBuffer& cmdSetViewport(uint32_t width, uint32_t height)
+    {
+        VkViewport viewport {};
+        viewport.width = static_cast<float>(width);
+        viewport.height = static_cast<float>(height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(*this, 0, 1, &viewport);
+        return *this;
+    }
 
-	CommandBuffer& cmdSetViewport(const VkViewport& vkViewport) {
-		vkCmdSetViewport(*this, 0, 1, &vkViewport);
-		return *this;
-	}
+    CommandBuffer& cmdSetViewport(const VkViewport& vkViewport)
+    {
+        vkCmdSetViewport(*this, 0, 1, &vkViewport);
+        return *this;
+    }
 
-	CommandBuffer& cmdSetScissor(VkExtent2D vkExtent2D) {
-		VkRect2D scissor{};
-		scissor.extent = vkExtent2D;
-		vkCmdSetScissor(*this, 0, 1, &scissor);
-		return *this;
-	}
+    CommandBuffer& cmdSetScissor(VkExtent2D vkExtent2D)
+    {
+        VkRect2D scissor {};
+        scissor.extent = vkExtent2D;
+        vkCmdSetScissor(*this, 0, 1, &scissor);
+        return *this;
+    }
 
-	CommandBuffer& cmdSetScissor(const VkRect2D& scissor) {
-		vkCmdSetScissor(*this, 0, 1, &scissor);
-		return *this;
-	}
+    CommandBuffer& cmdSetScissor(const VkRect2D& scissor)
+    {
+        vkCmdSetScissor(*this, 0, 1, &scissor);
+        return *this;
+    }
 
-	CommandBuffer& cmdSetScissor(uint32_t width, uint32_t height) {
-		VkRect2D scissor{};
-		scissor.extent.width = width;
-		scissor.extent.height = height;
-		vkCmdSetScissor(*this, 0, 1, &scissor);
-		return *this;
-	}
+    CommandBuffer& cmdSetScissor(uint32_t width, uint32_t height)
+    {
+        VkRect2D scissor {};
+        scissor.extent.width = width;
+        scissor.extent.height = height;
+        vkCmdSetScissor(*this, 0, 1, &scissor);
+        return *this;
+    }
 
-	CommandBuffer& cmdBindPipeline(VkPipeline vkPipeline) {
-		vkCmdBindPipeline(*this, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
-		return *this;
-	}
+    CommandBuffer& cmdBindPipeline(VkPipeline vkPipeline)
+    {
+        vkCmdBindPipeline(*this, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+        return *this;
+    }
 
-	CommandBuffer& cmdBindDescriptorSet(
-		VkDescriptorSet vkDescriptorSet,
-		VkPipelineLayout vkPipelineLayout) {
-		vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
-								vkPipelineLayout, 0, 1, &vkDescriptorSet, 0, nullptr);
-		return *this;
-	}
+    CommandBuffer& cmdBindDescriptorSet(
+        VkDescriptorSet vkDescriptorSet,
+        VkPipelineLayout vkPipelineLayout)
+    {
+        vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            vkPipelineLayout, 0, 1, &vkDescriptorSet, 0, nullptr);
+        return *this;
+    }
 
-	CommandBuffer& cmdBindDescriptorSetDynamicOffset(
-		VkDescriptorSet vkDescriptorSet,
-		VkPipelineLayout vkPipelineLayout,
-		uint32_t dynamicOffset) {
-		vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
-								vkPipelineLayout, 0, 1, &vkDescriptorSet, 1, &dynamicOffset);
-		return *this;
-	}
+    CommandBuffer& cmdBindDescriptorSetDynamicOffset(
+        VkDescriptorSet vkDescriptorSet,
+        VkPipelineLayout vkPipelineLayout,
+        uint32_t dynamicOffset)
+    {
+        vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            vkPipelineLayout, 0, 1, &vkDescriptorSet, 1, &dynamicOffset);
+        return *this;
+    }
 
-	CommandBuffer& cmdBindVertexBuffer(VkBuffer vkBuffer) {
-		VkDeviceSize offsets[1]{0};
-		vkCmdBindVertexBuffers(*this, 0, 1, &vkBuffer, offsets);
-		return *this;
-	}
+    CommandBuffer& cmdBindVertexBuffer(VkBuffer vkBuffer)
+    {
+        VkDeviceSize offsets[1] { 0 };
+        vkCmdBindVertexBuffers(*this, 0, 1, &vkBuffer, offsets);
+        return *this;
+    }
 
-	CommandBuffer& cmdBindIndexBuffer(VkBuffer vkBuffer, VkIndexType vkIndexType) {
-		vkCmdBindIndexBuffer(*this, vkBuffer, 0, vkIndexType);
-		return *this;
-	}
+    CommandBuffer& cmdBindIndexBuffer(VkBuffer vkBuffer, VkIndexType vkIndexType)
+    {
+        vkCmdBindIndexBuffer(*this, vkBuffer, 0, vkIndexType);
+        return *this;
+    }
 
-	//	std::vector.size() is used as index count a lot, so use size_t as the parameter type.
-	CommandBuffer& cmdDrawIndexed(size_t indexCount) {
-		vkCmdDrawIndexed(*this, static_cast<uint32_t>(indexCount), 1, 0, 0, 0);
-		return *this;
-	}
+    //	std::vector.size() is used as index count a lot, so use size_t as the parameter type.
+    CommandBuffer& cmdDrawIndexed(size_t indexCount)
+    {
+        vkCmdDrawIndexed(*this, static_cast<uint32_t>(indexCount), 1, 0, 0, 0);
+        return *this;
+    }
 
-	CommandBuffer& cmdDrawIndexed(uint32_t indexCount, uint32_t instanceCount) {
-		vkCmdDrawIndexed(*this, indexCount, instanceCount, 0, 0, 0);
-		return *this;
-	}
+    CommandBuffer& cmdDrawIndexed(uint32_t indexCount, uint32_t instanceCount)
+    {
+        vkCmdDrawIndexed(*this, indexCount, instanceCount, 0, 0, 0);
+        return *this;
+    }
 
-	CommandBuffer& cmdDraw(uint32_t vertexCount, uint32_t indexCount) {
-		vkCmdDraw(*this, vertexCount, indexCount, 0, 0);
-		return *this;
-	}
+    CommandBuffer& cmdDraw(uint32_t vertexCount, uint32_t indexCount)
+    {
+        vkCmdDraw(*this, vertexCount, indexCount, 0, 0);
+        return *this;
+    }
 
-	CommandBuffer& cmdPushConstant(
-		void* pData,
-		uint32_t size,
-		VkPipelineLayout vkPipelineLayout,
-		VkShaderStageFlagBits vkShaderStage) {
-		vkCmdPushConstants(
-			*this,
-			vkPipelineLayout,
-			vkShaderStage,
-			0,
-			size,
-			pData);
+    CommandBuffer& cmdPushConstant(
+        void* pData,
+        uint32_t size,
+        VkPipelineLayout vkPipelineLayout,
+        VkShaderStageFlagBits vkShaderStage)
+    {
+        vkCmdPushConstants(
+            *this,
+            vkPipelineLayout,
+            vkShaderStage,
+            0,
+            size,
+            pData);
 
-		return *this;
-	}
+        return *this;
+    }
 
-	CommandBuffer& cmdPipelineBarrierImageMemory(
-		VkImage vkImage,
-		VkAccessFlags vkSrcAccessMask,
-		VkAccessFlags vkDstAccessMask,
-		VkImageLayout vkImageLayoutOld,
-		VkImageLayout vkImageLayoutNew,
-		VkPipelineStageFlags vkSrcStageMask,
-		VkPipelineStageFlags vkDstStageMask,
-		const ImageSubresourceRange& imageSubresourceRange) {
-		ImageMemoryBarrier imageMemoryBarrier;
-		imageMemoryBarrier.srcAccessMask = vkSrcAccessMask;
-		imageMemoryBarrier.dstAccessMask = vkDstAccessMask;
-		imageMemoryBarrier.oldLayout = vkImageLayoutOld;
-		imageMemoryBarrier.newLayout = vkImageLayoutNew;
-		imageMemoryBarrier.image = vkImage;
-		imageMemoryBarrier.subresourceRange = imageSubresourceRange;
+    CommandBuffer& cmdPipelineBarrierImageMemory(
+        VkImage vkImage,
+        VkAccessFlags vkSrcAccessMask,
+        VkAccessFlags vkDstAccessMask,
+        VkImageLayout vkImageLayoutOld,
+        VkImageLayout vkImageLayoutNew,
+        VkPipelineStageFlags vkSrcStageMask,
+        VkPipelineStageFlags vkDstStageMask,
+        const ImageSubresourceRange& imageSubresourceRange)
+    {
+        ImageMemoryBarrier imageMemoryBarrier;
+        imageMemoryBarrier.srcAccessMask = vkSrcAccessMask;
+        imageMemoryBarrier.dstAccessMask = vkDstAccessMask;
+        imageMemoryBarrier.oldLayout = vkImageLayoutOld;
+        imageMemoryBarrier.newLayout = vkImageLayoutNew;
+        imageMemoryBarrier.image = vkImage;
+        imageMemoryBarrier.subresourceRange = imageSubresourceRange;
 
-		vkCmdPipelineBarrier(
-			*this,
-			vkSrcStageMask,
-			vkDstStageMask,
-			0,
-			0, nullptr,
-			0, nullptr,
-			1, &imageMemoryBarrier);
-		return *this;
-	}
+        vkCmdPipelineBarrier(
+            *this,
+            vkSrcStageMask,
+            vkDstStageMask,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &imageMemoryBarrier);
+        return *this;
+    }
 
-	CommandBuffer& cmdPipelineBarrierImageMemory(
-		const ImageMemoryBarrier& imageMemoryBarrier,
-		VkPipelineStageFlags vkSrcStageMask,
-		VkPipelineStageFlags vkDstStageMask) {
-		vkCmdPipelineBarrier(
-			*this,
-			vkSrcStageMask,
-			vkDstStageMask,
-			0,
-			0, nullptr,
-			0, nullptr,
-			1, &imageMemoryBarrier);
+    CommandBuffer& cmdPipelineBarrierImageMemory(
+        const ImageMemoryBarrier& imageMemoryBarrier,
+        VkPipelineStageFlags vkSrcStageMask,
+        VkPipelineStageFlags vkDstStageMask)
+    {
+        vkCmdPipelineBarrier(
+            *this,
+            vkSrcStageMask,
+            vkDstStageMask,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &imageMemoryBarrier);
 
-		return *this;
-	}
+        return *this;
+    }
 
-	CommandBuffer& cmdPushDescriptorSet(
-		WriteDescriptorSetArray& writeDescriptorSetArray,
-		uint32_t	descriptorSetNumber,
-		VkPipelineLayout vkPipelineLayout) {
-		vkCmdPushDescriptorSet(
-			*this,
-			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			vkPipelineLayout,
-			descriptorSetNumber,
-			writeDescriptorSetArray.vkWriteDescriptorSetsSize(),
-			writeDescriptorSetArray.vkWriteDescriptorSetsData());
-		return *this;
-	}
+    CommandBuffer& cmdPushDescriptorSet(
+        WriteDescriptorSetArray& writeDescriptorSetArray,
+        uint32_t descriptorSetNumber,
+        VkPipelineLayout vkPipelineLayout)
+    {
+        vkCmdPushDescriptorSet(
+            *this,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            vkPipelineLayout,
+            descriptorSetNumber,
+            writeDescriptorSetArray.vkWriteDescriptorSetsSize(),
+            writeDescriptorSetArray.vkWriteDescriptorSetsData());
+        return *this;
+    }
 };
 
 }

@@ -375,8 +375,8 @@ public:
 		m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
 		// Update Descriptor Set
-		vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
-		descriptorSetUpdater
+		vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSet);
+		writeDescriptorSetArray
 			.addBufferWriteDescriptor(
 				uniformBufferBindingIndex,
 				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -387,7 +387,7 @@ public:
 				cubeMapArray.m_vkImageView,
 				cubeMapArray.m_vkImageLayout,
 				cubeMapArray.m_vkSampler);
-		descriptorSetUpdater.updateDescriptorSets();
+		writeDescriptorSetArray.updateDescriptorSets();
 
     }
 

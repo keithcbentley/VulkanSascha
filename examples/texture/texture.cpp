@@ -385,19 +385,19 @@ public:
         // The current layout of the m_vkImage(Note: Should always fit the actual use, e.g.shader read)
         textureDescriptor.imageLayout = m_texture.vkImageLayout();
 
-        vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
+        vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSet);
 
-        descriptorSetUpdater.addBufferWriteDescriptor(
+		writeDescriptorSetArray.addBufferWriteDescriptor(
             uniformBufferIndex,
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             m_uniformBuffer.m_vkDescriptorBufferInfo);
 
-        descriptorSetUpdater.addImageWriteDescriptor(
+		writeDescriptorSetArray.addImageWriteDescriptor(
             combinedImageSamplerIndex,
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             textureDescriptor);
 
-        descriptorSetUpdater.updateDescriptorSets();
+		writeDescriptorSetArray.updateDescriptorSets();
     }
 
     void preparePipelines()

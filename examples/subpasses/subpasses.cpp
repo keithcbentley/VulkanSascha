@@ -204,8 +204,8 @@ public:
 
             // Composition pass
             {
-                vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetComposition);
-                descriptorSetUpdater
+                vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSetComposition);
+				writeDescriptorSetArray
                     .addImageWriteDescriptor(
                         positionBindingIndex,
                         VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
@@ -224,19 +224,19 @@ public:
                         m_attachments.m_albedo.m_vkImageView,
                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         VK_NULL_HANDLE);
-                descriptorSetUpdater.updateDescriptorSets();
+				writeDescriptorSetArray.updateDescriptorSets();
             }
             {
                 // Forward pass
-                vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetTransparent);
-                descriptorSetUpdater
+                vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSetTransparent);
+				writeDescriptorSetArray
                     .addImageWriteDescriptor(
                         positionBindingIndex,
                         VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
                         m_attachments.m_position.m_vkImageView,
                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         VK_NULL_HANDLE);
-                descriptorSetUpdater.updateDescriptorSets();
+				writeDescriptorSetArray.updateDescriptorSets();
             }
         }
 
@@ -479,13 +479,13 @@ public:
         m_descriptorSetScene = vkcpp::DescriptorSet(m_descriptorSetLayoutScene, m_descriptorPool);
 
         //	Descriptor Set Update
-        vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetScene);
-        descriptorSetUpdater
+        vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSetScene);
+		writeDescriptorSetArray
             .addBufferWriteDescriptor(
                 vertexShaderUniformBufferDescriptorIndex,
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 m_bufferGBuffer.m_vkDescriptorBufferInfo);
-        descriptorSetUpdater.updateDescriptorSets();
+		writeDescriptorSetArray.updateDescriptorSets();
     }
 
     void preparePipelines()
@@ -572,8 +572,8 @@ public:
             m_descriptorSetComposition = vkcpp::DescriptorSet(m_descriptorSetLayoutComposition, m_descriptorPool);
 
             //	Update Descriptor Sets
-            vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetComposition);
-            descriptorSetUpdater
+            vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSetComposition);
+			writeDescriptorSetArray
                 .addImageWriteDescriptor(
                     positionInputAttachmentBindingIndex,
                     VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
@@ -596,7 +596,7 @@ public:
                     lightPositionsBindingIndex,
                     VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                     m_bufferLights.m_vkDescriptorBufferInfo);
-            descriptorSetUpdater.updateDescriptorSets();
+			writeDescriptorSetArray.updateDescriptorSets();
         }
         // Pipeline Layout
         {
@@ -669,8 +669,8 @@ public:
             m_descriptorSetTransparent = vkcpp::DescriptorSet(m_descriptorSetLayoutTransparent, m_descriptorPool);
 
             //	Update Descriptor Set
-            vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSetTransparent);
-            descriptorSetUpdater
+            vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSetTransparent);
+			writeDescriptorSetArray
                 .addBufferWriteDescriptor(
                     uniformBufferDescriptorIndexG,
                     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -685,7 +685,7 @@ public:
                     combinedImageDescriptorIndex,
                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                     m_textureGlass.m_vkDescriptorImageInfo);
-            descriptorSetUpdater.updateDescriptorSets();
+			writeDescriptorSetArray.updateDescriptorSets();
         }
 
         // Pipeline Layout

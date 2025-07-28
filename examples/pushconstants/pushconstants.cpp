@@ -155,13 +155,13 @@ public:
 		m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
 		//	Update Descriptor Set
-		vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
-		descriptorSetUpdater.addBufferWriteDescriptor(
+		vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSet);
+		writeDescriptorSetArray.addBufferWriteDescriptor(
 			uniformBufferBindingIndex,
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			uniformBuffer.m_vkDescriptorBufferInfo
 		);
-		descriptorSetUpdater.updateDescriptorSets();
+		writeDescriptorSetArray.updateDescriptorSets();
 
     }
 

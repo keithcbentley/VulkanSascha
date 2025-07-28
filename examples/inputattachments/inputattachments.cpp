@@ -387,23 +387,23 @@ public:
         constexpr int depthAttachmentIndex = 1;
         constexpr int displayParametersUniformBufferIndex = 2;
 
-        vkcpp::DescriptorSetUpdater descriptorSetUpdater(descriptorSets.attachmentRead[index]);
+        vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(descriptorSets.attachmentRead[index]);
 
-        descriptorSetUpdater.addImageWriteDescriptor(
+		writeDescriptorSetArray.addImageWriteDescriptor(
             colorAttachmentIndex,
             VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
             attachments[index].color.m_imageView,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        descriptorSetUpdater.addImageWriteDescriptor(
+		writeDescriptorSetArray.addImageWriteDescriptor(
             depthAttachmentIndex,
             VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
             attachments[index].depth.m_imageView,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        descriptorSetUpdater.addBufferWriteDescriptor(
+		writeDescriptorSetArray.addBufferWriteDescriptor(
             displayParametersUniformBufferIndex,
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             uniformBuffers.params.m_vkDescriptorBufferInfo);
-        descriptorSetUpdater.updateDescriptorSets();
+		writeDescriptorSetArray.updateDescriptorSets();
     }
 
     void setupDescriptors()

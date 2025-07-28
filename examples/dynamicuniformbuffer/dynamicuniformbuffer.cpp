@@ -221,8 +221,8 @@ public:
 		// Descriptor Set
 		m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
-		vkcpp::DescriptorSetUpdater descriptorSetUpdater(m_descriptorSet);
-		descriptorSetUpdater
+		vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSet);
+		writeDescriptorSetArray
 			.addBufferWriteDescriptor(
 				uniformBufferBindingIndex,
 				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -232,7 +232,7 @@ public:
 				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
 				uniformBuffers.dynamic.m_vkDescriptorBufferInfo);
 
-		descriptorSetUpdater.updateDescriptorSets();
+		writeDescriptorSetArray.updateDescriptorSets();
 	}
 
 	void preparePipelines()
