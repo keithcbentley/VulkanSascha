@@ -49,15 +49,14 @@ public:
     }
 };
 
-class NullPointerException : public Exception
-{
+class NullPointerException : public Exception {
 
 public:
-	NullPointerException()
-		: Exception(VK_INCOMPLETE) {
-	}
+    NullPointerException()
+        : Exception(VK_INCOMPLETE)
+    {
+    }
 };
-
 
 //	Yikes! Vulkan uses enums for bit values but uses
 //	non-typesafe uints for the combination of flags.
@@ -1961,14 +1960,12 @@ public:
 template <typename T = uint8_t>
 class Buffer_DeviceMemory {
 
-	Buffer<T> m_buffer;
-	DeviceMemory<T> m_deviceMemory;
-	TypedCount<T> m_count;
-	T* m_pMappedMemory = nullptr;
-
+    Buffer<T> m_buffer;
+    DeviceMemory<T> m_deviceMemory;
+    TypedCount<T> m_count;
+    T* m_pMappedMemory = nullptr;
 
 public:
-
     Buffer_DeviceMemory() = default;
     ~Buffer_DeviceMemory() = default;
 
@@ -2066,13 +2063,14 @@ public:
             requiredMemoryPropertyFlags);
 
         memcpy(newbdm.m_pMappedMemory, pSrcMem, newbdm.m_count.vkDeviceSize());
-		newbdm.unmapMemory();
+        newbdm.unmapMemory();
         return newbdm;
     }
 
-	Buffer<T> buffer() {
-		return m_buffer;
-	}
+    Buffer<T> buffer()
+    {
+        return m_buffer;
+    }
 
     //	Useful when porting existing apps.  Make the full Buffer_DeviceMemory
     //	in steps.  Make the buffer and device memory with explicit bind and map steps
@@ -2104,9 +2102,9 @@ public:
 
     void unmapMemory()
     {
-		if (!m_pMappedMemory) {
-			throw NullPointerException();
-		}
+        if (!m_pMappedMemory) {
+            throw NullPointerException();
+        }
         vkUnmapMemory(vkDevice(), m_deviceMemory);
         m_pMappedMemory = nullptr;
     }
@@ -4003,24 +4001,33 @@ struct DescriptorSetLayoutBinding {
 
 class DescriptorSetLayoutCreateInfo : public VkDescriptorSetLayoutCreateInfo {
 
+    //	Always up to date.
+
+	//	TODO: not doing anything with VkDescriptorSetLayoutCreateFlags yet.
+
     std::vector<VkDescriptorSetLayoutBinding> m_bindings;
 
 public:
-    VkDescriptorSetLayoutCreateInfo* operator&() = delete;
+	~DescriptorSetLayoutCreateInfo() = default;
+	DescriptorSetLayoutCreateInfo(const DescriptorSetLayoutCreateInfo&) = delete;
+	DescriptorSetLayoutCreateInfo& operator=(const DescriptorSetLayoutCreateInfo&) = delete;
+	DescriptorSetLayoutCreateInfo(DescriptorSetLayoutCreateInfo&&) noexcept = delete;
+	DescriptorSetLayoutCreateInfo& operator=(DescriptorSetLayoutCreateInfo&&) noexcept = delete;
 
-    DescriptorSetLayoutCreateInfo()
+
+	DescriptorSetLayoutCreateInfo()
         : VkDescriptorSetLayoutCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     }
 
-    DescriptorSetLayoutCreateInfo(
-        std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
-        : VkDescriptorSetLayoutCreateInfo {}
-    {
-        sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        addDescriptorSetLayoutBindings(descriptorSetLayoutBindings);
-    }
+    //DescriptorSetLayoutCreateInfo(
+    //    std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
+    //    : VkDescriptorSetLayoutCreateInfo {}
+    //{
+    //    sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    //    addDescriptorSetLayoutBindings(descriptorSetLayoutBindings);
+    //}
 
     DescriptorSetLayoutCreateInfo& addDescriptorSetLayoutBinding(
         int bindingIndex,
@@ -4033,32 +4040,24 @@ public:
         layoutBinding.descriptorType = vkDescriptorType;
         layoutBinding.descriptorCount = 1;
         layoutBinding.stageFlags = static_cast<VkShaderStageFlags>(shaderStageFlags);
-        layoutBinding.pImmutableSamplers = nullptr;
         m_bindings.push_back(layoutBinding);
+        bindingCount = static_cast<uint32_t>(m_bindings.size());
+        pBindings = m_bindings.data();
 
         return *this;
     }
 
-    void addDescriptorSetLayoutBindings(
-        std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
-    {
-        for (DescriptorSetLayoutBinding& descriptorSetLayoutBinding : descriptorSetLayoutBindings) {
-            addDescriptorSetLayoutBinding(
-                descriptorSetLayoutBinding.m_bindingIndex,
-                descriptorSetLayoutBinding.m_vkDescriptorType,
-                descriptorSetLayoutBinding.m_shaderStageFlags);
-        }
-    }
+    //void addDescriptorSetLayoutBindings(
+    //    std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
+    //{
+    //    for (DescriptorSetLayoutBinding& descriptorSetLayoutBinding : descriptorSetLayoutBindings) {
+    //        addDescriptorSetLayoutBinding(
+    //            descriptorSetLayoutBinding.m_bindingIndex,
+    //            descriptorSetLayoutBinding.m_vkDescriptorType,
+    //            descriptorSetLayoutBinding.m_shaderStageFlags);
+    //    }
+    //}
 
-    VkDescriptorSetLayoutCreateInfo* assemble()
-    {
-        pBindings = nullptr;
-        bindingCount = static_cast<uint32_t>(m_bindings.size());
-        if (bindingCount > 0) {
-            pBindings = m_bindings.data();
-        }
-        return this;
-    }
 };
 
 class DescriptorSetLayout : public InteropHandle2<VkDescriptorSetLayout> {
@@ -4105,12 +4104,12 @@ public:
     }
 
     DescriptorSetLayout(
-        DescriptorSetLayoutCreateInfo& descriptorSetLayoutCreateInfo)
+        const DescriptorSetLayoutCreateInfo& descriptorSetLayoutCreateInfo)
     {
         VkDescriptorSetLayout vkDescriptorSetLayout;
         VkResult vkResult = vkCreateDescriptorSetLayout(
             vkDevice(),
-            descriptorSetLayoutCreateInfo.assemble(),
+            &descriptorSetLayoutCreateInfo,
             nullptr,
             &vkDescriptorSetLayout);
         if (vkResult != VK_SUCCESS) {
@@ -5671,42 +5670,51 @@ public:
     Texture(Texture&&) noexcept = delete;
     Texture& operator=(Texture&&) noexcept = delete;
 
-	Image image() {
-		return m_image;
-	}
+    Image image()
+    {
+        return m_image;
+    }
 
-	//	Useful when porting.
-	void takeImage(Image&& image) {
-		m_image = std::move(image);
-	}
+    //	Useful when porting.
+    void takeImage(Image&& image)
+    {
+        m_image = std::move(image);
+    }
 
-	Sampler sampler() {
-		return m_sampler;
-	}
+    Sampler sampler()
+    {
+        return m_sampler;
+    }
 
-	void takeSampler(Sampler&& sampler) {
-		m_sampler = std::move(sampler);
-	}
+    void takeSampler(Sampler&& sampler)
+    {
+        m_sampler = std::move(sampler);
+    }
 
-	ImageView imageView() {
-		return m_imageView;
-	}
+    ImageView imageView()
+    {
+        return m_imageView;
+    }
 
-	void takeImageView(ImageView&& imageView) {
-		m_imageView = std::move(imageView);
-	}
+    void takeImageView(ImageView&& imageView)
+    {
+        m_imageView = std::move(imageView);
+    }
 
-	void allocateBindImageMemory(MemoryPropertyFlags requiredProperties) {
-		m_imageDeviceMemory = m_image.allocateDeviceMemory(requiredProperties);
-		m_image.bindImageMemory(m_imageDeviceMemory);
-	}
+    void allocateBindImageMemory(MemoryPropertyFlags requiredProperties)
+    {
+        m_imageDeviceMemory = m_image.allocateDeviceMemory(requiredProperties);
+        m_image.bindImageMemory(m_imageDeviceMemory);
+    }
 
-	void setVkImageLayout(VkImageLayout vkImageLayout) {
-		m_vkImageLayout = vkImageLayout;
-	}
+    void setVkImageLayout(VkImageLayout vkImageLayout)
+    {
+        m_vkImageLayout = vkImageLayout;
+    }
 
-	VkImageLayout vkImageLayout() {
-		return m_vkImageLayout;
-	}
+    VkImageLayout vkImageLayout()
+    {
+        return m_vkImageLayout;
+    }
 };
 }
