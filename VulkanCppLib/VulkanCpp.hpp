@@ -1953,7 +1953,7 @@ public:
         m_commandBufferInfos.emplace_back(vkCommandBufferSubmitInfo);
         commandBufferInfoCount = static_cast<uint32_t>(m_commandBufferInfos.size());
         pCommandBufferInfos = m_commandBufferInfos.data();
-		return *this;
+        return *this;
     }
 
     SubmitInfo2& addWaitSemaphore(
@@ -1967,7 +1967,7 @@ public:
         m_waitSemaphoreInfos.emplace_back(vkSemaphoreSubmitInfo);
         waitSemaphoreInfoCount = static_cast<uint32_t>(m_waitSemaphoreInfos.size());
         pWaitSemaphoreInfos = m_waitSemaphoreInfos.data();
-		return *this;
+        return *this;
     }
 
     void addSignalSemaphore(VkSemaphore vkSemaphore)
@@ -2126,13 +2126,13 @@ public:
         }
     }
 
-	void submit2(const VkSubmitInfo2& vkSubmitInfo2) const {
-		VkResult vkResult = vkQueueSubmit2(*this, 1, &vkSubmitInfo2, VK_NULL_HANDLE);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-	}
-
+    void submit2(const VkSubmitInfo2& vkSubmitInfo2) const
+    {
+        VkResult vkResult = vkQueueSubmit2(*this, 1, &vkSubmitInfo2, VK_NULL_HANDLE);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+    }
 
     void submit2Fenced(VkCommandBuffer vkCommandBuffer) const
     {
@@ -4191,41 +4191,43 @@ public:
         return *this;
     }
 
-    //CommandBuffer& cmdSetViewport(VkExtent2D vkExtent2D)
+    // CommandBuffer& cmdSetViewport(VkExtent2D vkExtent2D)
     //{
-    //    Viewport viewport;
-    //    viewport.width = static_cast<float>(vkExtent2D.width);
-    //    viewport.height = static_cast<float>(vkExtent2D.height);
-    //    viewport.minDepth = 0.0f;
-    //    viewport.maxDepth = 1.0f;
-    //    vkCmdSetViewport(*this, 0, 1, &viewport);
-    //    return *this;
-    //}
+    //     Viewport viewport;
+    //     viewport.width = static_cast<float>(vkExtent2D.width);
+    //     viewport.height = static_cast<float>(vkExtent2D.height);
+    //     viewport.minDepth = 0.0f;
+    //     viewport.maxDepth = 1.0f;
+    //     vkCmdSetViewport(*this, 0, 1, &viewport);
+    //     return *this;
+    // }
 
-    CommandBuffer& cmdSetViewport(uint32_t width, uint32_t height)
+    template <typename ArgT>
+    CommandBuffer& cmdSetViewport(ArgT width, ArgT height)
     {
         Viewport viewport;
-		viewport
-			.setWidthHeight(width, height)
-			.setMinMaxDepth(0.0, 1.0);
+        viewport
+            .setWidthHeight(width, height)
+            .setMinMaxDepth(0.0, 1.0);
         vkCmdSetViewport(*this, 0, 1, &viewport);
         return *this;
     }
 
-	CommandBuffer& cmdSetViewport(
-		uint32_t x, uint32_t y,
-		uint32_t width, uint32_t height) {
-		Viewport viewport;
-		viewport
-			.setXY(x, y)
-			.setWidthHeight(width, height)
-			.setMinMaxDepth(0.0, 1.0);
-		vkCmdSetViewport(*this, 0, 1, &viewport);
-		return *this;
-	}
+    template <typename ArgT>
+    CommandBuffer& cmdSetViewport(
+        ArgT x, ArgT y,
+        ArgT width, ArgT height)
+    {
+        Viewport viewport;
+        viewport
+            .setXY(x, y)
+            .setWidthHeight(width, height)
+            .setMinMaxDepth(0.0, 1.0);
+        vkCmdSetViewport(*this, 0, 1, &viewport);
+        return *this;
+    }
 
-	
-	CommandBuffer& cmdSetViewport(const VkViewport& vkViewport)
+    CommandBuffer& cmdSetViewport(const VkViewport& vkViewport)
     {
         vkCmdSetViewport(*this, 0, 1, &vkViewport);
         return *this;
@@ -4260,11 +4262,26 @@ public:
         return *this;
     }
 
+    CommandBuffer& cmdBindComputePipeline(VkPipeline vkPipeline)
+    {
+        vkCmdBindPipeline(*this, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
+        return *this;
+    }
+
     CommandBuffer& cmdBindDescriptorSet(
         VkDescriptorSet vkDescriptorSet,
         VkPipelineLayout vkPipelineLayout)
     {
         vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            vkPipelineLayout, 0, 1, &vkDescriptorSet, 0, nullptr);
+        return *this;
+    }
+
+    CommandBuffer& cmdBindComputeDescriptorSet(
+        VkDescriptorSet vkDescriptorSet,
+        VkPipelineLayout vkPipelineLayout)
+    {
+        vkCmdBindDescriptorSets(*this, VK_PIPELINE_BIND_POINT_COMPUTE,
             vkPipelineLayout, 0, 1, &vkDescriptorSet, 0, nullptr);
         return *this;
     }
@@ -4386,6 +4403,15 @@ public:
             descriptorSetNumber,
             writeDescriptorSetArray.vkWriteDescriptorSetsSize(),
             writeDescriptorSetArray.vkWriteDescriptorSetsData());
+        return *this;
+    }
+
+    CommandBuffer& cmdDispatch(
+        uint32_t groupCountX,
+        uint32_t groupCountY,
+        uint32_t groupCountZ)
+    {
+        vkCmdDispatch(*this, groupCountX, groupCountY, groupCountZ);
         return *this;
     }
 };
