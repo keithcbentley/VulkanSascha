@@ -98,19 +98,17 @@ public:
 
     ~VulkanExample()
     {
-        if (m_deviceOriginal) {
-            vkDestroySemaphore(m_deviceOriginal, timeLineSemaphore.handle, nullptr);
+        if (m_device) {
+            vkDestroySemaphore(m_device, timeLineSemaphore.handle, nullptr);
 
             // Graphics
-            graphics.uniformBuffer.destroy();
-            vkDestroyPipeline(m_deviceOriginal, graphics.pipeline, nullptr);
-            vkDestroyPipelineLayout(m_deviceOriginal, graphics.pipelineLayout, nullptr);
-            vkDestroyDescriptorSetLayout(m_deviceOriginal, graphics.descriptorSetLayout, nullptr);
+            vkDestroyPipeline(m_device, graphics.pipeline, nullptr);
+            vkDestroyPipelineLayout(m_device, graphics.pipelineLayout, nullptr);
+            vkDestroyDescriptorSetLayout(m_device, graphics.descriptorSetLayout, nullptr);
 
             // Compute
-            compute.uniformBuffer.destroy();
-            vkDestroyPipelineLayout(m_deviceOriginal, compute.pipelineLayout, nullptr);
-            vkDestroyDescriptorSetLayout(m_deviceOriginal, compute.descriptorSetLayout, nullptr);
+            vkDestroyPipelineLayout(m_device, compute.pipelineLayout, nullptr);
+            vkDestroyDescriptorSetLayout(m_device, compute.descriptorSetLayout, nullptr);
             vkDestroyPipeline(m_deviceOriginal, compute.pipelineCalculate, nullptr);
             vkDestroyPipeline(m_deviceOriginal, compute.pipelineIntegrate, nullptr);
             vkDestroyCommandPool(m_deviceOriginal, compute.commandPool, nullptr);

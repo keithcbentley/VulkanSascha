@@ -341,22 +341,36 @@ public:
     Viewport()
         : VkViewport {}
     {
-        maxDepth = 1.0;
     }
 
+    template <typename ArgT>
     Viewport& setWidthHeight(
-        float widthArg,
-        float heightArg)
+        ArgT widthArg,
+        ArgT heightArg)
     {
-        width = widthArg;
-        height = heightArg;
+        width = static_cast<float>(widthArg);
+        height = static_cast<float>(heightArg);
         return *this;
     }
 
-    Viewport& setX(float xArg)
+    template <typename ArgT>
+    Viewport& setXY(
+        ArgT xArg,
+        ArgT yArg)
     {
-        x = xArg;
+        x = static_cast<float>(xArg);
+        y = static_cast<float>(yArg);
         return *this;
+    }
+
+    template <typename ArgT>
+    Viewport& setMinMaxDepth(
+        ArgT minDepthArg,
+        ArgT maxDepthArg)
+    {
+		minDepth = static_cast<float>(minDepthArg);
+		maxDepth = static_cast<float>(maxDepthArg);
+		return *this;
     }
 };
 

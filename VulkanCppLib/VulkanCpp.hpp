@@ -1945,7 +1945,7 @@ public:
     SubmitInfo2(SubmitInfo2&&) noexcept = delete;
     SubmitInfo2& operator=(SubmitInfo2&&) noexcept = delete;
 
-    void addCommandBuffer(VkCommandBuffer vkCommandBuffer)
+    SubmitInfo2& addCommandBuffer(VkCommandBuffer vkCommandBuffer)
     {
         VkCommandBufferSubmitInfo vkCommandBufferSubmitInfo {};
         vkCommandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
@@ -1953,9 +1953,10 @@ public:
         m_commandBufferInfos.emplace_back(vkCommandBufferSubmitInfo);
         commandBufferInfoCount = static_cast<uint32_t>(m_commandBufferInfos.size());
         pCommandBufferInfos = m_commandBufferInfos.data();
+		return *this;
     }
 
-    void addWaitSemaphore(
+    SubmitInfo2& addWaitSemaphore(
         VkSemaphore vkSemaphore,
         PipelineStageFlags2 waitPipelineStateFlags2)
     {
@@ -1966,6 +1967,7 @@ public:
         m_waitSemaphoreInfos.emplace_back(vkSemaphoreSubmitInfo);
         waitSemaphoreInfoCount = static_cast<uint32_t>(m_waitSemaphoreInfos.size());
         pWaitSemaphoreInfos = m_waitSemaphoreInfos.data();
+		return *this;
     }
 
     void addSignalSemaphore(VkSemaphore vkSemaphore)
@@ -2123,6 +2125,14 @@ public:
             throw Exception(vkResult);
         }
     }
+
+	void submit2(const VkSubmitInfo2& vkSubmitInfo2) const {
+		VkResult vkResult = vkQueueSubmit2(*this, 1, &vkSubmitInfo2, VK_NULL_HANDLE);
+		if (vkResult != VK_SUCCESS) {
+			throw Exception(vkResult);
+		}
+	}
+
 
     void submit2Fenced(VkCommandBuffer vkCommandBuffer) const
     {
@@ -4181,29 +4191,41 @@ public:
         return *this;
     }
 
-    CommandBuffer& cmdSetViewport(VkExtent2D vkExtent2D)
-    {
-        VkViewport viewport {};
-        viewport.width = static_cast<float>(vkExtent2D.width);
-        viewport.height = static_cast<float>(vkExtent2D.height);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(*this, 0, 1, &viewport);
-        return *this;
-    }
+    //CommandBuffer& cmdSetViewport(VkExtent2D vkExtent2D)
+    //{
+    //    Viewport viewport;
+    //    viewport.width = static_cast<float>(vkExtent2D.width);
+    //    viewport.height = static_cast<float>(vkExtent2D.height);
+    //    viewport.minDepth = 0.0f;
+    //    viewport.maxDepth = 1.0f;
+    //    vkCmdSetViewport(*this, 0, 1, &viewport);
+    //    return *this;
+    //}
 
     CommandBuffer& cmdSetViewport(uint32_t width, uint32_t height)
     {
-        VkViewport viewport {};
-        viewport.width = static_cast<float>(width);
-        viewport.height = static_cast<float>(height);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
+        Viewport viewport;
+		viewport
+			.setWidthHeight(width, height)
+			.setMinMaxDepth(0.0, 1.0);
         vkCmdSetViewport(*this, 0, 1, &viewport);
         return *this;
     }
 
-    CommandBuffer& cmdSetViewport(const VkViewport& vkViewport)
+	CommandBuffer& cmdSetViewport(
+		uint32_t x, uint32_t y,
+		uint32_t width, uint32_t height) {
+		Viewport viewport;
+		viewport
+			.setXY(x, y)
+			.setWidthHeight(width, height)
+			.setMinMaxDepth(0.0, 1.0);
+		vkCmdSetViewport(*this, 0, 1, &viewport);
+		return *this;
+	}
+
+	
+	CommandBuffer& cmdSetViewport(const VkViewport& vkViewport)
     {
         vkCmdSetViewport(*this, 0, 1, &vkViewport);
         return *this;
