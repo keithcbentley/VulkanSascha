@@ -205,9 +205,7 @@ static const ShaderStageFlags SHADER_STAGE_ALL_GRAPHICS(VK_SHADER_STAGE_ALL_GRAP
 // VK_SHADER_STAGE_MESH_BIT_NV = VK_SHADER_STAGE_MESH_BIT_EXT,
 // VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
 
-
-class PipelineStageFlags2Id
-{
+class PipelineStageFlags2Id {
 };
 using PipelineStageFlags2 = Bitset<VkPipelineStageFlagBits2, VkPipelineStageFlagBits2, PipelineStageFlags2Id>;
 
@@ -259,45 +257,50 @@ PipelineStageFlags2Value(PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS);
 //	pretty effective in reducing the need for standalone
 //	structure littering the code.
 template <typename Real_t, typename ActsLike_t>
-	requires(sizeof(Real_t) == sizeof(ActsLike_t))
-ActsLike_t& smartenUp(Real_t& real) {
-	ActsLike_t* p = static_cast<ActsLike_t*>(&real);
-	return *p;
+    requires(sizeof(Real_t) == sizeof(ActsLike_t))
+ActsLike_t& smartenUp(Real_t& real)
+{
+    ActsLike_t* p = static_cast<ActsLike_t*>(&real);
+    return *p;
 }
 
-class Extent2D : public VkExtent2D
-{
+class Extent2D : public VkExtent2D {
 
 public:
-	Extent2D()
-		: VkExtent2D{} {
-	}
+    Extent2D()
+        : VkExtent2D {}
+    {
+    }
 
-	Extent2D(uint32_t widthArg, uint32_t heightArg) {
-		width = widthArg;
-		height = heightArg;
-	}
+    Extent2D(uint32_t widthArg, uint32_t heightArg)
+    {
+        width = widthArg;
+        height = heightArg;
+    }
 
-	template <typename Arg_t>
-	Extent2D setWidthHeight(
-		Arg_t widthArg,
-		Arg_t heightArg) {
-		width = static_cast<Arg_t>(widthArg);
-		height = static_cast<Arg_t>(heightArg);
-		return *this;
-	}
+    template <typename Arg_t>
+    Extent2D setWidthHeight(
+        Arg_t widthArg,
+        Arg_t heightArg)
+    {
+        width = static_cast<Arg_t>(widthArg);
+        height = static_cast<Arg_t>(heightArg);
+        return *this;
+    }
 
-	template <typename Arg_t>
-	Extent2D& setWidth(Arg_t widthArg) {
-		width = static_cast<Arg_t>(widthArg);
-		return *this;
-	}
+    template <typename Arg_t>
+    Extent2D& setWidth(Arg_t widthArg)
+    {
+        width = static_cast<Arg_t>(widthArg);
+        return *this;
+    }
 
-	template <typename Arg_t>
-	Extent2D& setHeight(Arg_t heightArg) {
-		height = static_cast<Arg_t>(heightArg);
-		return *this;
-	}
+    template <typename Arg_t>
+    Extent2D& setHeight(Arg_t heightArg)
+    {
+        height = static_cast<Arg_t>(heightArg);
+        return *this;
+    }
 };
 static_assert(sizeof(Extent2D) == sizeof(VkExtent2D));
 template Extent2D& smartenUp<VkExtent2D, Extent2D>(VkExtent2D&);
@@ -332,29 +335,29 @@ template Extent2D& smartenUp<VkExtent2D, Extent2D>(VkExtent2D&);
 // static_assert(sizeof(Rect2D) == sizeof(VkRect2D));
 // template Rect2D& smartenUp<VkRect2D, Rect2D>(VkRect2D&);
 
-class Viewport : public VkViewport
-{
+class Viewport : public VkViewport {
 
 public:
-	Viewport()
-		: VkViewport{} {
-		maxDepth = 1.0;
-	}
+    Viewport()
+        : VkViewport {}
+    {
+        maxDepth = 1.0;
+    }
 
-	Viewport& setWidthHeight(
-		float widthArg,
-		float heightArg) {
-		width = widthArg;
-		height = heightArg;
-		return *this;
-	}
+    Viewport& setWidthHeight(
+        float widthArg,
+        float heightArg)
+    {
+        width = widthArg;
+        height = heightArg;
+        return *this;
+    }
 
-	Viewport& setX(float xArg) {
-		x = xArg;
-		return *this;
-	}
+    Viewport& setX(float xArg)
+    {
+        x = xArg;
+        return *this;
+    }
 };
-
-
 
 }
