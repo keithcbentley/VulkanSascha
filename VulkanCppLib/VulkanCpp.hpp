@@ -279,18 +279,19 @@ public:
         }
     }
 
-	void reset() const {
-		VkFence vkFence = *this;
-		VkResult vkResult = vkResetFences(vkDevice(), 1, &vkFence);
-		if (vkResult != VK_SUCCESS) {
-			throw Exception(vkResult);
-		}
-	}
+    void reset() const
+    {
+        VkFence vkFence = *this;
+        VkResult vkResult = vkResetFences(vkDevice(), 1, &vkFence);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
+    }
 
-
-	VkResult vkGetFenceStatus() {
-		return ::vkGetFenceStatus(device(), *this);
-	}
+    VkResult vkGetFenceStatus()
+    {
+        return ::vkGetFenceStatus(device(), *this);
+    }
 };
 
 template <typename T = uint8_t>
@@ -2183,10 +2184,12 @@ class DescriptorPoolCreateInfo : public VkDescriptorPoolCreateInfo {
     std::vector<VkDescriptorPoolSize> m_vkDescriptorPoolSizes;
 
 public:
-    DescriptorPoolCreateInfo()
+    DescriptorPoolCreateInfo(
+        VkDescriptorPoolCreateFlags vkDescriptorPoolCreateFlags)
         : VkDescriptorPoolCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		flags = vkDescriptorPoolCreateFlags;
         maxSets = 1;
     }
 
@@ -2308,14 +2311,6 @@ public:
         sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     }
 
-    // DescriptorSetLayoutCreateInfo(
-    //     std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
-    //     : VkDescriptorSetLayoutCreateInfo {}
-    //{
-    //     sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    //     addDescriptorSetLayoutBindings(descriptorSetLayoutBindings);
-    // }
-
     DescriptorSetLayoutCreateInfo& addDescriptorSetLayoutBinding(
         int bindingIndex,
         VkDescriptorType vkDescriptorType,
@@ -2333,17 +2328,6 @@ public:
 
         return *this;
     }
-
-    // void addDescriptorSetLayoutBindings(
-    //     std::vector<DescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
-    //{
-    //     for (DescriptorSetLayoutBinding& descriptorSetLayoutBinding : descriptorSetLayoutBindings) {
-    //         addDescriptorSetLayoutBinding(
-    //             descriptorSetLayoutBinding.m_bindingIndex,
-    //             descriptorSetLayoutBinding.m_vkDescriptorType,
-    //             descriptorSetLayoutBinding.m_shaderStageFlags);
-    //     }
-    // }
 };
 
 class DescriptorSetLayout : public InteropHandle2<VkDescriptorSetLayout> {
@@ -2597,33 +2581,6 @@ public:
         : m_currentDescriptorSet(vkDescriptorSet)
     {
     }
-
-    // WriteDescriptorSetArray& addBufferWriteDescriptor(
-    //     uint32_t bindingIndex,
-    //     VkDescriptorType vkDescriptorType,
-    //     VkBuffer vkBufferArg,
-    //     VkDeviceSize offsetArg,
-    //     VkDeviceSize rangeArg)
-    //{
-
-    //    VkWriteDescriptorSet vkWriteDescriptorSet {
-    //        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    //        .dstSet = m_currentDescriptorSet,
-    //        .dstBinding = bindingIndex,
-    //        .dstArrayElement = 0,
-    //        .descriptorCount = 1,
-    //        .descriptorType = vkDescriptorType,
-    //    };
-
-    //    VkDescriptorBufferInfo vkDescriptorBufferInfo {
-    //        .buffer = vkBufferArg,
-    //        .offset = offsetArg,
-    //        .range = rangeArg
-    //    };
-
-    //    m_vkWriteDescriptorSets.emplace_back(vkWriteDescriptorSet);
-    //    return *this;
-    //}
 
     //	Handy version for Sascha Willems demos.
     //	Descriptor buffer info is already created.

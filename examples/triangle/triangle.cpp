@@ -73,25 +73,23 @@ public:
     };
 
     // Uniform buffer block object
-    struct UniformBuffer {
-	
-		//	TODO: why does the uniform buffer contain a descriptor set?
+    struct FrameData {
         vkcpp::DescriptorSet m_descriptorSet;
-
         vkcpp::Buffer_DeviceMemory<ShaderData> m_buffer_deviceMemory;
     };
 
     // We use one UBO per frame, so we can have a frame overlap and make sure that uniforms aren't updated while still in use
-    std::array<UniformBuffer, MAX_CONCURRENT_FRAMES> m_uniformBuffers;
+    std::array<FrameData, MAX_CONCURRENT_FRAMES> m_frameData;
 
-    // The m_vkPipeline layout is used by a m_vkPipeline to access the descriptor sets
-    // It defines interface (without binding any actual data) between the shader stages used by the m_vkPipeline and the shader resources
-    // A m_vkPipeline layout can be shared among multiple pipelines as long as their interfaces match
+    // The pipeline layout is used by a pipeline to access the descriptor sets
+    // It defines interface (without binding any actual data) between the shader stages used by the m_pipeline and the shader resources
+    // A pipeline layout can be shared among multiple pipelines as long as their interfaces match
     vkcpp::PipelineLayout m_pipelineLayout;
 
-    // Pipelines (often called "m_vkPipeline state objects") are used to bake all states that affect a m_vkPipeline
-    // While in OpenGL every state can be changed at (almost) any time, Vulkan requires to layout the graphics (and compute) m_vkPipeline states upfront
-    // So for each combination of non-dynamic m_vkPipeline states you need a new m_vkPipeline (there are a few exceptions to this not discussed here)
+    // Pipelines (often called "pipeline state objects") are used to bake all states that affect a pipeline
+    // While in OpenGL every state can be changed at (almost) any time,
+	// Vulkan requires to layout the graphics (and compute) pipeline states upfront
+    // So for each combination of non-dynamic m_pipeline states you need a new pipeline (there are a few exceptions to this not discussed here)
     // Even though this adds a new dimension of planning ahead, it's a great opportunity for performance optimizations by the driver
     vkcpp::GraphicsPipeline m_graphicsPipeline;
 
@@ -258,7 +256,7 @@ public:
     // Descriptors are allocated from a pool, that tells the implementation how many and what types of descriptors we are going to use (at maximum)
     void createDescriptorPool()
     {
-        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
         descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_CONCURRENT_FRAMES);
         // Set the max. number of descriptor sets that can be requested from this pool (requesting beyond this limit will result in an error)
         // Our sample will create one set per uniform buffer per frame
@@ -283,15 +281,15 @@ public:
     {
         // Allocate one descriptor set per frame from the global descriptor pool
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            m_uniformBuffers[i].m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
+            m_frameData[i].m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
             // Update the descriptor set determining the shader binding points
             // For every binding point used in a shader there needs to be one
             // descriptor set matching that binding point
 
-            vkcpp::WriteDescriptorSet writeDescriptorSet(m_uniformBuffers[i].m_descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+            vkcpp::WriteDescriptorSet writeDescriptorSet(m_frameData[i].m_descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
             writeDescriptorSet.addBufferInfo(
-                m_uniformBuffers[i].m_buffer_deviceMemory.buffer(), 0, sizeof(ShaderData));
+                m_frameData[i].m_buffer_deviceMemory.buffer(), 0, sizeof(ShaderData));
 
             vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
         }
@@ -642,7 +640,7 @@ public:
 
         // Create the buffers
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            m_uniformBuffers[i].m_buffer_deviceMemory
+            m_frameData[i].m_buffer_deviceMemory
                 = vkcpp::Buffer_DeviceMemory<ShaderData>::withMap(
                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                     vkcpp::TypedCount<ShaderData>(1),
@@ -699,7 +697,7 @@ public:
 
         // Copy the current matrices to the current frame's uniform buffer
         // Note: Since we requested a host coherent m_vkDeviceMemory type for the uniform buffer, the write is instantly visible to the GPU
-		m_uniformBuffers[m_currentFrameIndex].m_buffer_deviceMemory.mappedMemory() = shaderData;
+		m_frameData[m_currentFrameIndex].m_buffer_deviceMemory.mappedMemory() = shaderData;
 
         // Build the command buffer
         // Unlike in OpenGL all rendering commands are recorded into command buffers that are then submitted to the m_vkQueue
@@ -734,7 +732,7 @@ public:
             .cmdBeginRenderPass(renderPassBeginInfo)
             .cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight)
             .cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight)
-            .cmdBindDescriptorSet(m_uniformBuffers[m_currentFrameIndex].m_descriptorSet, m_pipelineLayout)
+            .cmdBindDescriptorSet(m_frameData[m_currentFrameIndex].m_descriptorSet, m_pipelineLayout)
             .cmdBindPipeline(m_graphicsPipeline)
             .cmdBindVertexBuffer(m_vertices.buffer())
             .cmdBindIndexBuffer(m_indices.buffer(), VK_INDEX_TYPE_UINT32)
