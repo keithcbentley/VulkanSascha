@@ -2189,7 +2189,7 @@ public:
         : VkDescriptorPoolCreateInfo {}
     {
         sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		flags = vkDescriptorPoolCreateFlags;
+        flags = vkDescriptorPoolCreateFlags;
         maxSets = 1;
     }
 
@@ -2516,6 +2516,16 @@ public:
         addBufferInfo(vkDescriptorBufferInfo);
     }
 
+    void addBufferInfo(
+        VkBuffer buffer, VkDeviceSize range)
+    {
+        VkDescriptorBufferInfo vkDescriptorBufferInfo {};
+        vkDescriptorBufferInfo.buffer = buffer;
+        vkDescriptorBufferInfo.offset = 0;
+        vkDescriptorBufferInfo.range = range;
+        addBufferInfo(vkDescriptorBufferInfo);
+    }
+
     void addImageInfo(const VkDescriptorImageInfo& vkDescriptorImageInfo)
     {
         m_vkDescriptorImageInfos.emplace_back(vkDescriptorImageInfo);
@@ -2594,6 +2604,31 @@ public:
         writeDescriptorSet.addBufferInfo(vkDescriptorBufferInfo);
         return *this;
     }
+
+    WriteDescriptorSetArray& addBufferWriteDescriptor(
+        uint32_t bindingIndex,
+        VkDescriptorType vkDescriptorType,
+        VkBuffer buffer,
+        VkDeviceSize offset,
+        VkDeviceSize range)
+    {
+        WriteDescriptorSet& writeDescriptorSet
+            = m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
+        writeDescriptorSet.addBufferInfo(buffer, offset, range);
+        return *this;
+    }
+
+	WriteDescriptorSetArray& addBufferWriteDescriptor(
+		uint32_t bindingIndex,
+		VkDescriptorType vkDescriptorType,
+		VkBuffer buffer,
+		VkDeviceSize range) {
+		WriteDescriptorSet& writeDescriptorSet
+			= m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
+		writeDescriptorSet.addBufferInfo(buffer, range);
+		return *this;
+	}
+
 
     WriteDescriptorSetArray& addImageWriteDescriptor(
         uint32_t bindingIndex,

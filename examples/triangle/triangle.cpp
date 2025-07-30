@@ -48,7 +48,7 @@ public:
         { { -1.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
         { { 0.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } }
     };
-    
+
     // Setup indices
     std::vector<uint32_t> s_vertexIndexBuffer { 0, 1, 2 };
 
@@ -88,7 +88,7 @@ public:
 
     // Pipelines (often called "pipeline state objects") are used to bake all states that affect a pipeline
     // While in OpenGL every state can be changed at (almost) any time,
-	// Vulkan requires to layout the graphics (and compute) pipeline states upfront
+    // Vulkan requires to layout the graphics (and compute) pipeline states upfront
     // So for each combination of non-dynamic m_pipeline states you need a new pipeline (there are a few exceptions to this not discussed here)
     // Even though this adds a new dimension of planning ahead, it's a great opportunity for performance optimizations by the driver
     vkcpp::GraphicsPipeline m_graphicsPipeline;
@@ -124,32 +124,31 @@ public:
         // Values not set here are initialized in the base class constructor
     }
 
-
     // Create the per-frame (in flight) Vulkan synchronization primitives used in this example
     void createSynchronizationPrimitives()
     {
         //	Fences are used to check draw command buffer completion on the host.
-		//	The normal step in the rendering loop is to wait for the fence to be
-		//	signaled by the previous render/present before preceding.  The first
-		//	time through though, there's no "previous" frame.  This means we need to
-		//	create the frame as initially signaled so the we can get through the
-		//	first time.
+        //	The normal step in the rendering loop is to wait for the fence to be
+        //	signaled by the previous render/present before preceding.  The first
+        //	time through though, there's no "previous" frame.  This means we need to
+        //	create the frame as initially signaled so the we can get through the
+        //	first time.
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-			m_waitFences.emplace_back(vkcpp::Fence(VK_FENCE_CREATE_SIGNALED_BIT));
+            m_waitFences.emplace_back(vkcpp::Fence(VK_FENCE_CREATE_SIGNALED_BIT));
         }
 
         // Semaphores are used for correct command ordering within a queue
         // Used to ensure that m_vkImage presentation is complete before starting to submit again
-		for (int i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-			m_presentCompleteSemaphores.emplace_back(vkcpp::Semaphore(0));
-		}
+        for (int i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
+            m_presentCompleteSemaphores.emplace_back(vkcpp::Semaphore(0));
+        }
 
         // Render completion
         // Semaphore used to ensure that all commands submitted have been finished before submitting the m_vkImage to the m_vkQueue
 
-		//	TODO: is there a more C++ way to iterate here?
-		for (int i = 0; i < m_swapChain.images.size(); i++)
-			m_renderCompleteSemaphores.emplace_back(vkcpp::Semaphore(0));
+        //	TODO: is there a more C++ way to iterate here?
+        for (int i = 0; i < m_swapChain.images.size(); i++)
+            m_renderCompleteSemaphores.emplace_back(vkcpp::Semaphore(0));
     }
 
     // Prepare vertex and index buffers for an indexed triangle
@@ -253,7 +252,6 @@ public:
         vkFreeCommandBuffers(m_device, m_commandPool, 1, &vkCommandBuffer);
     }
 
-    // Descriptors are allocated from a pool, that tells the implementation how many and what types of descriptors we are going to use (at maximum)
     void createDescriptorPool()
     {
         vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
@@ -279,19 +277,21 @@ public:
     // The descriptor sets make use of the descriptor set layouts created above
     void createDescriptorSets()
     {
+        constexpr uint32_t shaderDataBindingIndex = 0;
         // Allocate one descriptor set per frame from the global descriptor pool
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            m_frameData[i].m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
+            m_frameData[i].m_descriptorSet
+                = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
             // Update the descriptor set determining the shader binding points
             // For every binding point used in a shader there needs to be one
             // descriptor set matching that binding point
-
-            vkcpp::WriteDescriptorSet writeDescriptorSet(m_frameData[i].m_descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-            writeDescriptorSet.addBufferInfo(
-                m_frameData[i].m_buffer_deviceMemory.buffer(), 0, sizeof(ShaderData));
-
-            vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
+            vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_frameData[i].m_descriptorSet);
+            writeDescriptorSetArray.addBufferWriteDescriptor(
+                shaderDataBindingIndex,
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                m_frameData[i].m_buffer_deviceMemory.buffer(), sizeof(ShaderData));
+            writeDescriptorSetArray.updateDescriptorSets();
         }
     }
 
@@ -668,9 +668,9 @@ public:
             return;
 
         // Use a fence to wait until the command buffer has finished execution before using it again
-		vkcpp::Fence renderCompleteFence = m_waitFences[m_currentFrameIndex];
+        vkcpp::Fence renderCompleteFence = m_waitFences[m_currentFrameIndex];
 
-		renderCompleteFence.wait();
+        renderCompleteFence.wait();
 
         // Get the next swap chain m_vkImage from the implementation
         // Note that the implementation is free to return the images in any order, so we must use the acquire function and can't just cycle through the images/imageIndex on our own
@@ -697,7 +697,7 @@ public:
 
         // Copy the current matrices to the current frame's uniform buffer
         // Note: Since we requested a host coherent m_vkDeviceMemory type for the uniform buffer, the write is instantly visible to the GPU
-		m_frameData[m_currentFrameIndex].m_buffer_deviceMemory.mappedMemory() = shaderData;
+        m_frameData[m_currentFrameIndex].m_buffer_deviceMemory.mappedMemory() = shaderData;
 
         // Build the command buffer
         // Unlike in OpenGL all rendering commands are recorded into command buffers that are then submitted to the m_vkQueue
@@ -750,11 +750,11 @@ public:
         submitInfo.addCommandBuffer(commandBuffer);
         submitInfo.addWaitSemaphore(m_presentCompleteSemaphores[m_currentFrameIndex], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
         submitInfo.addSignalSemaphore(m_renderCompleteSemaphores[imageIndex]);
-		//	Everything went ok.  Reset the fence and submit.
-		//	We wait until the last moment to reset the fence in case something
-		//	goes wrong above.  We will still be able to get back into this
-		//	function if there is some kind of recovery.
-		renderCompleteFence.reset();
+        //	Everything went ok.  Reset the fence and submit.
+        //	We wait until the last moment to reset the fence in case something
+        //	goes wrong above.  We will still be able to get back into this
+        //	function if there is some kind of recovery.
+        renderCompleteFence.reset();
         m_queue.submit(submitInfo, m_waitFences[m_currentFrameIndex]);
 
         // Present the current frame buffer to the swap chain
@@ -805,7 +805,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         vulkanExample->initVulkan();
         vulkanExample->setupWindow(hInstance, WndProc);
         vulkanExample->prepare();
-		vkcpp::physicalDevice().getAllQueueFamilyProperties();
+        vkcpp::physicalDevice().getAllQueueFamilyProperties();
         vulkanExample->renderLoop();
         delete (vulkanExample);
     } catch (std::exception& e) {
