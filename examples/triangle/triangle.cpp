@@ -48,12 +48,9 @@ public:
         { { -1.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
         { { 0.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } }
     };
-    //        uint32_t vertexBufferSize = static_cast<uint32_t>(vertexBuffer.size()) * sizeof(Vertex);
-
+    
     // Setup indices
     std::vector<uint32_t> s_vertexIndexBuffer { 0, 1, 2 };
-    //        m_indicesCount = static_cast<uint32_t>(indexBuffer.size());
-    //        uint32_t indexBufferSize = m_indicesCount * sizeof(uint32_t);
 
     vkcpp::Buffer_DeviceMemory<Vertex> m_vertices;
     vkcpp::Buffer_DeviceMemory<uint32_t> m_indices;
@@ -77,13 +74,9 @@ public:
 
     // Uniform buffer block object
     struct UniformBuffer {
-        //        vkcpp::DeviceMemory<T> m_deviceMemoryOriginal;
-        //        vkcpp::Buffer<T> m_bufferOriginal;
-        // The descriptor set stores the resources bound to the binding points in a shader
-        // It connects the binding points of the different shaders with the buffers and images used for those bindings
+	
+		//	TODO: why does the uniform buffer contain a descriptor set?
         vkcpp::DescriptorSet m_descriptorSet;
-        // We keep a pointer to the mapped buffer, so we can easily update it's contents via a memcpy
-        //        uint8_t* m_pMappedMemory { nullptr };
 
         vkcpp::Buffer_DeviceMemory<ShaderData> m_buffer_deviceMemory;
     };
@@ -110,11 +103,11 @@ public:
     // Synchronization is an important concept of Vulkan that OpenGL mostly hid away. Getting this right is crucial to using Vulkan.
 
     // Semaphores are used to coordinate operations within the graphics m_vkQueue and ensure correct command ordering
-    std::vector<VkSemaphore> m_vkPresentCompleteSemaphores {};
-    std::vector<VkSemaphore> m_vkRenderCompleteSemaphores {};
+    std::vector<vkcpp::Semaphore> m_presentCompleteSemaphores;
+    std::vector<vkcpp::Semaphore> m_renderCompleteSemaphores;
 
     // std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> m_vkCommandBuffers {};
-    std::array<VkFence, MAX_CONCURRENT_FRAMES> m_vkWaitFences {};
+    std::vector<vkcpp::Fence> m_waitFences;
 
     // To select the correct sync and command objects, we need to keep track of the current frame
     uint32_t m_currentFrameIndex { 0 };
@@ -133,50 +126,32 @@ public:
         // Values not set here are initialized in the base class constructor
     }
 
-    ~VulkanExample() override
-    {
-        // Clean up used Vulkan resources
-        // Note: Inherited destructor cleans up resources stored in base class
-        if (m_device) {
-
-            for (size_t i = 0; i < m_vkPresentCompleteSemaphores.size(); i++) {
-                vkDestroySemaphore(m_device, m_vkPresentCompleteSemaphores[i], nullptr);
-            }
-            for (size_t i = 0; i < m_vkRenderCompleteSemaphores.size(); i++) {
-                vkDestroySemaphore(m_device, m_vkRenderCompleteSemaphores[i], nullptr);
-            }
-            for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-                vkDestroyFence(m_device, m_vkWaitFences[i], nullptr);
-            }
-        }
-    }
 
     // Create the per-frame (in flight) Vulkan synchronization primitives used in this example
     void createSynchronizationPrimitives()
     {
-        // Fences are used to check draw command buffer completion on the host
+        //	Fences are used to check draw command buffer completion on the host.
+		//	The normal step in the rendering loop is to wait for the fence to be
+		//	signaled by the previous render/present before preceding.  The first
+		//	time through though, there's no "previous" frame.  This means we need to
+		//	create the frame as initially signaled so the we can get through the
+		//	first time.
         for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-            VkFenceCreateInfo fenceCI {};
-            fenceCI.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-            // Create the fences in signaled state (so we don't wait on first render of each command buffer)
-            fenceCI.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-            // Fence used to ensure that command buffer has completed exection before using it again
-            VK_CHECK_RESULT(vkCreateFence(m_device, &fenceCI, nullptr, &m_vkWaitFences[i]));
+			m_waitFences.emplace_back(vkcpp::Fence(VK_FENCE_CREATE_SIGNALED_BIT));
         }
-        // Semaphores are used for correct command ordering within a m_vkQueue
+
+        // Semaphores are used for correct command ordering within a queue
         // Used to ensure that m_vkImage presentation is complete before starting to submit again
-        m_vkPresentCompleteSemaphores.resize(MAX_CONCURRENT_FRAMES);
-        for (auto& semaphore : m_vkPresentCompleteSemaphores) {
-            VkSemaphoreCreateInfo semaphoreCI { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-            VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCI, nullptr, &semaphore));
-        }
+		for (int i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
+			m_presentCompleteSemaphores.emplace_back(vkcpp::Semaphore(0));
+		}
+
         // Render completion
         // Semaphore used to ensure that all commands submitted have been finished before submitting the m_vkImage to the m_vkQueue
-        m_vkRenderCompleteSemaphores.resize(m_swapChain.images.size());
-        for (auto& semaphore : m_vkRenderCompleteSemaphores) {
-            VkSemaphoreCreateInfo semaphoreCI { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-            VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCI, nullptr, &semaphore));
-        }
+
+		//	TODO: is there a more C++ way to iterate here?
+		for (int i = 0; i < m_swapChain.images.size(); i++)
+			m_renderCompleteSemaphores.emplace_back(vkcpp::Semaphore(0));
     }
 
     // Prepare vertex and index buffers for an indexed triangle
@@ -695,8 +670,9 @@ public:
             return;
 
         // Use a fence to wait until the command buffer has finished execution before using it again
-        vkWaitForFences(m_device, 1, &m_vkWaitFences[m_currentFrameIndex], VK_TRUE, UINT64_MAX);
-        VK_CHECK_RESULT(vkResetFences(m_device, 1, &m_vkWaitFences[m_currentFrameIndex]));
+		vkcpp::Fence renderCompleteFence = m_waitFences[m_currentFrameIndex];
+
+		renderCompleteFence.wait();
 
         // Get the next swap chain m_vkImage from the implementation
         // Note that the implementation is free to return the images in any order, so we must use the acquire function and can't just cycle through the images/imageIndex on our own
@@ -705,7 +681,7 @@ public:
             m_device,
             m_swapChain.swapChain,
             UINT64_MAX,
-            m_vkPresentCompleteSemaphores[m_currentFrameIndex],
+            m_presentCompleteSemaphores[m_currentFrameIndex],
             VK_NULL_HANDLE,
             &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -774,16 +750,21 @@ public:
         //  The submit info structure specifies a command buffer m_vkQueue submission batch
         vkcpp::SubmitInfo submitInfo;
         submitInfo.addCommandBuffer(commandBuffer);
-        submitInfo.addWaitSemaphore(m_vkPresentCompleteSemaphores[m_currentFrameIndex], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-        submitInfo.addSignalSemaphore(m_vkRenderCompleteSemaphores[imageIndex]);
-        m_queue.submit(submitInfo, m_vkWaitFences[m_currentFrameIndex]);
+        submitInfo.addWaitSemaphore(m_presentCompleteSemaphores[m_currentFrameIndex], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        submitInfo.addSignalSemaphore(m_renderCompleteSemaphores[imageIndex]);
+		//	Everything went ok.  Reset the fence and submit.
+		//	We wait until the last moment to reset the fence in case something
+		//	goes wrong above.  We will still be able to get back into this
+		//	function if there is some kind of recovery.
+		renderCompleteFence.reset();
+        m_queue.submit(submitInfo, m_waitFences[m_currentFrameIndex]);
 
         // Present the current frame buffer to the swap chain
         // Pass the semaphore signaled by the command buffer submission from the submit info as the wait semaphore for swap chain presentation
         // This ensures that the m_vkImage is not presented to the windowing system until all commands have been submitted
 
         vkcpp::PresentInfo presentInfo;
-        presentInfo.addWaitSemaphore(m_vkRenderCompleteSemaphores[imageIndex]);
+        presentInfo.addWaitSemaphore(m_renderCompleteSemaphores[imageIndex]);
         presentInfo.addSwapchain(m_swapChain.swapChain, imageIndex);
         result = vkQueuePresentKHR(m_queue, &presentInfo);
 

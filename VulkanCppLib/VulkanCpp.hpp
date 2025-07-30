@@ -161,7 +161,7 @@ class Semaphore : public InteropHandle2<VkSemaphore> {
     }
 
 public:
-    Semaphore() = default;
+    Semaphore() = delete;
     ~Semaphore() = default;
 
     Semaphore(const Semaphore& other)
@@ -191,6 +191,11 @@ public:
         new (this) Semaphore(std::move(other));
     }
 
+    //	TODO: need a nice way to create a simple semaphore or
+    //	have some meaningful flag value for "generic".  Don't
+    //	use default constructor for this.  We want to avoid
+    //	accidentally creating real semaphores when the intention
+    //	of the default constructor was to just create a simple placeholder.
     Semaphore(VkSemaphoreCreateFlags vkSemaphoreCreateFlags)
     {
         //	TODO: how do the flags work with the newer type of semaphores?
@@ -221,7 +226,7 @@ class Fence : public InteropHandle2<VkFence> {
     }
 
 public:
-    Fence() = default;
+    Fence() = delete;
     ~Fence() = default;
 
     Fence(const Fence& other)
@@ -252,10 +257,6 @@ public:
         new (this) Fence(std::move(other));
     }
 
-    //	Kind of an exception to the argument ordering usually used.
-    //	Flags are almost always 0, so make them optional.  Only
-    //	the m_vkDevice is required.
-
     Fence(VkFenceCreateFlags vkFenceCreateFlags)
     {
         VkFenceCreateInfo vkFenceCreateInfo {};
@@ -272,8 +273,24 @@ public:
     void wait() const
     {
         VkFence vkFence = *this;
-        vkWaitForFences(vkDevice(), 1, &vkFence, VK_TRUE, UINT64_MAX);
+        VkResult vkResult = vkWaitForFences(vkDevice(), 1, &vkFence, VK_TRUE, UINT64_MAX);
+        if (vkResult != VK_SUCCESS) {
+            throw Exception(vkResult);
+        }
     }
+
+	void reset() const {
+		VkFence vkFence = *this;
+		VkResult vkResult = vkResetFences(vkDevice(), 1, &vkFence);
+		if (vkResult != VK_SUCCESS) {
+			throw Exception(vkResult);
+		}
+	}
+
+
+	VkResult vkGetFenceStatus() {
+		return ::vkGetFenceStatus(device(), *this);
+	}
 };
 
 template <typename T = uint8_t>
@@ -2138,7 +2155,7 @@ public:
     {
         SubmitInfo2 submitInfo2;
         submitInfo2.addCommandBuffer(vkCommandBuffer);
-        vkcpp::Fence completedFence;
+        vkcpp::Fence completedFence(0);
         VkResult vkResult = vkQueueSubmit2(*this, 1, &submitInfo2, completedFence);
         if (vkResult != VK_SUCCESS) {
             throw Exception(vkResult);
