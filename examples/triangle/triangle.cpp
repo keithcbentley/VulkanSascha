@@ -826,6 +826,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         vulkanExample->initVulkan();
         vulkanExample->setupWindow(hInstance, WndProc);
         vulkanExample->prepare();
+		vkcpp::physicalDevice().getAllQueueFamilyProperties();
         vulkanExample->renderLoop();
         delete (vulkanExample);
     } catch (std::exception& e) {

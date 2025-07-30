@@ -59,7 +59,17 @@ std::vector<VkQueueFamilyProperties> PhysicalDevice::getAllQueueFamilyProperties
     vkGetPhysicalDeviceQueueFamilyProperties(m_vkPhysicalDevice, &queueFamilyCount, nullptr);
 
     std::vector<VkQueueFamilyProperties> allQueueFamilyProperties(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(m_vkPhysicalDevice, &queueFamilyCount, allQueueFamilyProperties.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(
+		m_vkPhysicalDevice, &queueFamilyCount, allQueueFamilyProperties.data());
+
+	//	typedef struct VkQueueFamilyProperties
+	//{
+	//	VkQueueFlags    queueFlags;
+	//	uint32_t        queueCount;
+	//	uint32_t        timestampValidBits;
+	//	VkExtent3D      minImageTransferGranularity;
+	//} VkQueueFamilyProperties;
+
     return allQueueFamilyProperties;
 }
 
@@ -112,15 +122,23 @@ void VulkanContext::init(const VulkanContextCreateInfo& vulkanContextCreateInfo)
     m_physicalDeviceFeatures = physicalDevice().getPhysicalDeviceFeatures2();
     m_physicalDeviceProperties = physicalDevice().getPhysicalDeviceProperties2();
 	m_physicalDeviceMemoryProperties = physicalDevice().getPhysicalDeviceMemoryProperties();
+	m_allQueueFamilyProperties = physicalDevice().getAllQueueFamilyProperties();
+
 
     DeviceCreateInfo deviceCreateInfo;
     deviceCreateInfo.addExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-    deviceCreateInfo.addDeviceQueue(0, 1);
-    deviceCreateInfo.addDeviceQueue(0, 1);
-    deviceCreateInfo.addDeviceQueue(1, 1);
-    deviceCreateInfo.addDeviceQueue(1, 1);
+	//	Request all queues.
+	int queueFamilyIndex = 0;
+	for (VkQueueFamilyProperties properties : m_allQueueFamilyProperties) {
+		deviceCreateInfo.addDeviceQueue(queueFamilyIndex, properties.queueCount);
+		//std::cout << std::format("queueFlags: {:016b}\n", properties.queueFlags);
+		//std::cout << std::format("count: {}\n", properties.queueCount);
+		//std::cout << std::format("timestampValidBits {:b}\n", properties.timestampValidBits);
+		queueFamilyIndex++;
+	}
 
+	//	Request all features.
     deviceCreateInfo.setDeviceFeatures(m_physicalDeviceFeatures);
 
     //	Create (logical) device.  After this, use device().
@@ -162,13 +180,18 @@ VkDevice vkDevice()
 
 const VkPhysicalDeviceProperties& vkPhysicalDeviceProperties()
 {
-    return s_vulkanContext.vkPhysicalDeviceProperties();
+    return s_vulkanContext.vkPhysicalDevicePropertiesFromContext();
 }
 
 const VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
 {
-    return s_vulkanContext.vkPhysicalDeviceFeatures();
+    return s_vulkanContext.vkPhysicalDeviceFeaturesFromContext();
 }
+
+const std::vector<VkQueueFamilyProperties>& allQueueFamilyProperties() {
+	return s_vulkanContext.allQueueFamilyPropertiesFromContext();
+}
+
 
 uint32_t findMemoryTypeIndex(
 	uint32_t usableMemoryIndexBits,
