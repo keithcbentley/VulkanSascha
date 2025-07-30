@@ -187,6 +187,7 @@ public:
                 0,
                 vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
                 s_vertexDataBuffer.data());
+
         m_vertices = vkcpp::Buffer_DeviceMemory(
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             vkcpp::TypedCount(s_vertexDataBuffer),
@@ -200,56 +201,32 @@ public:
                 0,
                 vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
                 s_vertexIndexBuffer.data());
+
         m_indices = vkcpp::Buffer_DeviceMemory(
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             vkcpp::TypedCount(s_vertexIndexBuffer),
             0,
             vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
-        // Buffer copies have to be submitted to a m_vkQueue, so we need a command buffer for them
-        // Note: Some devices offer a dedicated transfer m_vkQueue (with only the transfer bit set) that may be faster when doing lots of copies
-        VkCommandBuffer vkCommandBuffer;
+        // Buffer copies have to be submitted to a queue, so we need a command buffer for them
+        // Note: Some devices offer a dedicated transfer queue (with only the transfer bit set) that may be faster when doing lots of copies
+        vkcpp::CommandBuffer commandBuffer(m_commandPool);
+        commandBuffer.begin();
 
-        VkCommandBufferAllocateInfo cmdBufAllocateInfo {};
-        cmdBufAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        cmdBufAllocateInfo.commandPool = m_commandPool;
-        cmdBufAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        cmdBufAllocateInfo.commandBufferCount = 1;
-        VK_CHECK_RESULT(vkAllocateCommandBuffers(m_device, &cmdBufAllocateInfo, &vkCommandBuffer));
-
-        VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
-        VK_CHECK_RESULT(vkBeginCommandBuffer(vkCommandBuffer, &cmdBufInfo));
         // Put buffer region copies into command buffer
-        VkBufferCopy copyRegion {};
-        // Vertex buffer
-        copyRegion.size = vkcpp::TypedCount(s_vertexDataBuffer).vkDeviceSize();
-        vkCmdCopyBuffer(vkCommandBuffer, verticesStagingBuffer.buffer(), m_vertices.buffer(), 1, &copyRegion);
-        // Index buffer
-        copyRegion.size = vkcpp::TypedCount(s_vertexIndexBuffer).vkDeviceSize();
-        vkCmdCopyBuffer(vkCommandBuffer, indicesStagingBuffer.buffer(), m_indices.buffer(), 1, &copyRegion);
-        VK_CHECK_RESULT(vkEndCommandBuffer(vkCommandBuffer));
+        commandBuffer.cmdCopyBuffer(
+            verticesStagingBuffer.buffer(),
+            m_vertices.buffer(),
+            vkcpp::TypedCount(s_vertexDataBuffer));
 
-        // Submit the command buffer to the m_vkQueue to finish the copy
-        VkSubmitInfo submitInfo {};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &vkCommandBuffer;
+        commandBuffer.cmdCopyBuffer(
+            indicesStagingBuffer.buffer(),
+            m_indices.buffer(),
+            vkcpp::TypedCount(s_vertexIndexBuffer));
 
-        // Create fence to ensure that the command buffer has finished executing
-        VkFenceCreateInfo fenceCI {};
-        fenceCI.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceCI.flags = 0;
-        VkFence fence;
-        VK_CHECK_RESULT(vkCreateFence(m_device, &fenceCI, nullptr, &fence));
+        commandBuffer.end();
 
-        // Submit to the m_vkQueue
-        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &submitInfo, fence));
-        // Wait for the fence to signal that command buffer has finished executing
-        VK_CHECK_RESULT(vkWaitForFences(m_device, 1, &fence, VK_TRUE, DEFAULT_FENCE_TIMEOUT));
-
-        vkDestroyFence(m_device, fence, nullptr);
-
-        vkFreeCommandBuffers(m_device, m_commandPool, 1, &vkCommandBuffer);
+        m_queue.submit2Fenced(commandBuffer);
     }
 
     void createDescriptorPool()

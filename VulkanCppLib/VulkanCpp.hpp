@@ -2618,17 +2618,17 @@ public:
         return *this;
     }
 
-	WriteDescriptorSetArray& addBufferWriteDescriptor(
-		uint32_t bindingIndex,
-		VkDescriptorType vkDescriptorType,
-		VkBuffer buffer,
-		VkDeviceSize range) {
-		WriteDescriptorSet& writeDescriptorSet
-			= m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
-		writeDescriptorSet.addBufferInfo(buffer, range);
-		return *this;
-	}
-
+    WriteDescriptorSetArray& addBufferWriteDescriptor(
+        uint32_t bindingIndex,
+        VkDescriptorType vkDescriptorType,
+        VkBuffer buffer,
+        VkDeviceSize range)
+    {
+        WriteDescriptorSet& writeDescriptorSet
+            = m_writeDescriptorSets.emplace_back(m_currentDescriptorSet, bindingIndex, vkDescriptorType);
+        writeDescriptorSet.addBufferInfo(buffer, range);
+        return *this;
+    }
 
     WriteDescriptorSetArray& addImageWriteDescriptor(
         uint32_t bindingIndex,
@@ -4058,7 +4058,7 @@ class CommandBuffer : public InteropHandle3<VkCommandBuffer, VkCommandPool> {
     }
 
 public:
-    CommandBuffer() = default;
+    CommandBuffer() = delete;
 
     CommandBuffer(VkCommandPool vkCommandPool)
     {
@@ -4164,13 +4164,14 @@ public:
     }
 
     //	TODO: do we need to implement cmdCopyBuffer2?
+    template <typename T>
     CommandBuffer& cmdCopyBuffer(
-        Buffer<> srcBuffer,
-        Buffer<> dstBuffer,
-        VkDeviceSize size)
+        Buffer<T> srcBuffer,
+        Buffer<T> dstBuffer,
+        TypedCount<T> count)
     {
         //	TODO: maybe do some size checking on the destination to avoid overwriting.
-        VkBufferCopy vkBufferCopy { .srcOffset = 0, .dstOffset = 0, .size = size };
+        VkBufferCopy vkBufferCopy { .srcOffset = 0, .dstOffset = 0, .size = count.vkDeviceSize() };
 
         vkCmdCopyBuffer(*this, srcBuffer, dstBuffer, 1, &vkBufferCopy);
         return *this;
