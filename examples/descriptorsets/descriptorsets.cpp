@@ -172,7 +172,7 @@ public:
 
         //	We need a set for each cube.
 		//	Each set will have one uniform buffer and one combined image sampler.
-        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
         descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_cubes.size());
         descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, m_cubes.size());
         descriptorPoolCreateInfo.setMaxSets(m_cubes.size());

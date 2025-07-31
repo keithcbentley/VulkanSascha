@@ -86,8 +86,10 @@ public:
                 .cmdBindDescriptorSet(m_descriptorSet, m_pipelineLayout);
 
             const float drawAreaWidth_3 = static_cast<float>(m_drawAreaWidth) / 3.0f;
+            const float drawAreaHeight_f = static_cast<float>(m_drawAreaHeight);
+
             vkcpp::Viewport viewport;
-            viewport.setWidthHeight(drawAreaWidth_3, static_cast<float>(m_drawAreaHeight));
+            viewport.setWidthHeight(drawAreaWidth_3, drawAreaHeight_f);
 
             // Left
             commandBuffer.cmdSetViewport(viewport);
@@ -95,13 +97,13 @@ public:
             scene.draw(commandBuffer);
 
             // Center
-            viewport.setX(drawAreaWidth_3); //	shift over
+            viewport.setXY(drawAreaWidth_3, 0.0f); //	shift over
             commandBuffer.cmdSetViewport(viewport);
             commandBuffer.cmdBindPipeline(m_pipelineToon);
             scene.draw(commandBuffer);
 
             // Right
-            viewport.setX(drawAreaWidth_3 * 2.0f); //	shift over 2/3 width
+            viewport.setXY(drawAreaWidth_3 * 2.0f, 0.0f); //	shift over 2/3 width
             commandBuffer.cmdSetViewport(viewport);
             commandBuffer.cmdBindPipeline(m_pipelineTextured);
             scene.draw(commandBuffer);
@@ -122,7 +124,7 @@ public:
     void setupDescriptors()
     {
         // Descriptor Pool
-        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
         descriptorPoolCreateInfo
             .addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
             .addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);
@@ -149,7 +151,7 @@ public:
         m_descriptorSet = vkcpp::DescriptorSet(m_descriptorSetLayout, m_descriptorPool);
 
         vkcpp::WriteDescriptorSetArray writeDescriptorSetArray(m_descriptorSet);
-		writeDescriptorSetArray
+        writeDescriptorSetArray
             .addBufferWriteDescriptor(
                 uniformBufferDescriptorIndex,
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -159,7 +161,7 @@ public:
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 colormap.m_vkDescriptorImageInfo);
 
-		writeDescriptorSetArray.updateDescriptorSets();
+        writeDescriptorSetArray.updateDescriptorSets();
     }
 
     void preparePipelines()
@@ -236,17 +238,17 @@ public:
 
         // Solid phong shading
         specializationData.lightingModel = 0;
-		m_pipelinePhong = vkcpp::GraphicsPipeline(pipelineCI);
-   //     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-			//m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipelinePhong));
+        m_pipelinePhong = vkcpp::GraphicsPipeline(pipelineCI);
+        //     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+        // m_device, m_vkPipelineCache, 1, &pipelineCI, nullptr, &m_vkPipelinePhong));
 
         // Phong and textured
         specializationData.lightingModel = 1;
-		m_pipelineToon = vkcpp::GraphicsPipeline(pipelineCI);
+        m_pipelineToon = vkcpp::GraphicsPipeline(pipelineCI);
 
         // Textured discard
         specializationData.lightingModel = 2;
-		m_pipelineTextured = vkcpp::GraphicsPipeline(pipelineCI);
+        m_pipelineTextured = vkcpp::GraphicsPipeline(pipelineCI);
     }
 
     // Prepare and initialize uniform buffer containing shader uniforms
@@ -254,9 +256,9 @@ public:
     {
         // Create the vertex shader uniform buffer block
         VK_CHECK_RESULT(m_pVulkanDevice->createBuffer(
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
-			&uniformBuffer, sizeof(UniformData)));
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            vkcpp::MEMORY_PROPERTY_HOST_VISIBLE | vkcpp::MEMORY_PROPERTY_HOST_COHERENT,
+            &uniformBuffer, sizeof(UniformData)));
         VK_CHECK_RESULT(uniformBuffer.map());
     }
 

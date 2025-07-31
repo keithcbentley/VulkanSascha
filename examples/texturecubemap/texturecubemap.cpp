@@ -207,15 +207,16 @@ public:
         // }
 		m_textureCubeMap.takeSampler(vkcpp::Sampler(vkSamplerCreateInfo));
 
-		vkcpp::ImageViewCreateInfo imageViewCreateInfo;
-		imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-		imageViewCreateInfo.format = format;
-		imageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		vkcpp::ImageViewCreateInfo imageViewCreateInfo(
+			m_textureCubeMap.image(),
+			VK_IMAGE_VIEW_TYPE_CUBE,
+			format,
+			VK_IMAGE_ASPECT_COLOR_BIT);
+
         // 6 array layers (faces)
 		imageViewCreateInfo.subresourceRange.layerCount = 6;
         // Set number of mip levels
 		imageViewCreateInfo.subresourceRange.levelCount = textureCubeMapMipLevelCount;
-		imageViewCreateInfo.image = m_textureCubeMap.image();
 		m_textureCubeMap.takeImageView(vkcpp::ImageView(imageViewCreateInfo));
 
         // Clean up staging resources
@@ -286,7 +287,7 @@ public:
     void setupDescriptors()
     {
         // Descriptor Pool
-        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
         descriptorPoolCreateInfo
             .addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
             .addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);

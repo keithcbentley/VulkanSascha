@@ -99,7 +99,7 @@ void VulkanRaytracingSample::setupFrameBuffer()
     VkImageView attachments[2];
 
     // Depth/Stencil attachment is the same for all frame buffers
-    attachments[1] = m_defaultDepthStencil.m_imageView;
+    attachments[1] = m_depthStencilDefault.imageView();
 
     VkFramebufferCreateInfo frameBufferCreateInfo = {};
     frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

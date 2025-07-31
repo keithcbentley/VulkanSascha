@@ -857,10 +857,12 @@ void TextureCubeMap::loadFromFile(std::string filename, VkFormat format, vks::Vu
     samplerCreateInfo.addressModeW = samplerCreateInfo.addressModeU;
     samplerCreateInfo.mipLodBias = 0.0f;
 
-    //samplerCreateInfo.maxAnisotropy = device->m_vkPhysicalDeviceFeaturesEnabled.samplerAnisotropy ? device->m_vkPhysicalDeviceProperties.limits.maxSamplerAnisotropy : 1.0f;
-    //samplerCreateInfo.anisotropyEnable = device->m_vkPhysicalDeviceFeaturesEnabled.samplerAnisotropy;
-	samplerCreateInfo.maxAnisotropy = 1.0f;
-	samplerCreateInfo.anisotropyEnable = device->m_vkPhysicalDeviceFeaturesEnabled.samplerAnisotropy;
+    samplerCreateInfo.maxAnisotropy
+		= vkcpp::vkPhysicalDeviceFeatures().samplerAnisotropy ? vkcpp::vkPhysicalDeviceProperties().limits.maxSamplerAnisotropy : 1.0f;
+    samplerCreateInfo.anisotropyEnable = vkcpp::vkPhysicalDeviceFeatures().samplerAnisotropy;
+
+	//samplerCreateInfo.maxAnisotropy = 1.0f;
+	//samplerCreateInfo.anisotropyEnable = device->m_vkPhysicalDeviceFeaturesEnabled.samplerAnisotropy;
 
     samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
     samplerCreateInfo.minLod = 0.0f;

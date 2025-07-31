@@ -250,20 +250,13 @@ public:
         // Textures are not directly accessed by the shaders and
         // are abstracted by m_vkImage views containing additional
         // information and sub resource ranges
-        vkcpp::ImageViewCreateInfo imageViewCreateInfo;
-        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        imageViewCreateInfo.format = format;
+		vkcpp::ImageViewCreateInfo imageViewCreateInfo(m_texture.image(), VK_IMAGE_VIEW_TYPE_2D, format, VK_IMAGE_ASPECT_COLOR_BIT);
         // The subresource range describes the set of mip levels (and array layers) that can be accessed through this m_vkImage m_vkImageView
         // It's possible to create multiple m_vkImage views for a single m_vkImage referring to different (and/or overlapping) ranges of the m_vkImage
-        imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
         imageViewCreateInfo.subresourceRange.layerCount = 1;
         // Linear tiling usually won't support mip maps
         // Only set mip map count if optimal tiling is used
         imageViewCreateInfo.subresourceRange.levelCount = textureMipLevelCount;
-        // The m_vkImageView will be based on the texture's m_vkImage
-        imageViewCreateInfo.image = m_texture.image();
 		m_texture.takeImageView(vkcpp::ImageView(imageViewCreateInfo));
     }
 
@@ -358,7 +351,7 @@ public:
     void setupDescriptors()
     {
         // Pool
-        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
         descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
         descriptorPoolCreateInfo.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);
         descriptorPoolCreateInfo.setMaxSets(2);

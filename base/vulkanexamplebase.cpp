@@ -14,11 +14,11 @@ void VulkanExampleBase::renderFrame()
 {
     VulkanExampleBase::prepareFrame();
     //	TODO: use smarter submit info.
-    m_vkSubmitInfo.commandBufferCount = 1;
-    VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-    m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
-    m_queue.submit(m_vkSubmitInfo, VK_NULL_HANDLE);
-    VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+//    m_vkSubmitInfo.commandBufferCount = 1;
+//    VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
+//    m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
+	m_queue.submit2(m_drawCommandBuffers[m_currentBufferIndex]);
+//    VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
     VulkanExampleBase::submitFrame();
 }
 
@@ -774,49 +774,20 @@ void VulkanExampleBase::createCommandPool()
 
 void VulkanExampleBase::setupDepthStencil()
 {
-    VkImageCreateInfo vkImageCreateInfo {};
-    vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-    vkImageCreateInfo.format = m_vkFormatDepth;
-    vkImageCreateInfo.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
-    vkImageCreateInfo.mipLevels = 1;
-    vkImageCreateInfo.arrayLayers = 1;
-    vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo);
-    // VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &vkImageCreateInfo, nullptr, &m_defaultDepthStencil.m_vkImage));
+	vkcpp::ImageCreateInfo imageCreateInfo(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+	imageCreateInfo.setExtent(m_drawAreaWidth, m_drawAreaHeight);
 
-    VkMemoryRequirements memReqs {};
-    vkGetImageMemoryRequirements(m_device, m_defaultDepthStencil.m_image, &memReqs);
+	vkcpp::ImageViewCreateInfo imageViewCreateInfo(
+		VK_NULL_HANDLE,
+		VK_IMAGE_VIEW_TYPE_2D,
+		m_vkFormatDepth,
+		VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
-    VkMemoryAllocateInfo memAlloc {};
-    memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex
-		= vkcpp::findMemoryTypeIndex(memReqs.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
-    m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(memAlloc);
+	m_depthStencilDefault = vkcpp::Image_Memory_View(
+		imageCreateInfo,
+		vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+		imageViewCreateInfo);
 
-    // VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAllloc, nullptr, &m_defaultDepthStencil.m_deviceMemory));
-
-    VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
-
-    VkImageViewCreateInfo vkImageViewCreateInfo {};
-    vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    vkImageViewCreateInfo.image = m_defaultDepthStencil.m_image;
-    vkImageViewCreateInfo.format = m_vkFormatDepth;
-    vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-    vkImageViewCreateInfo.subresourceRange.levelCount = 1;
-    vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-    vkImageViewCreateInfo.subresourceRange.layerCount = 1;
-    vkImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    // Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT
-    if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
-        vkImageViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo);
-    // VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &imageViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
 }
 
 void VulkanExampleBase::setupFrameBuffer()
@@ -827,7 +798,7 @@ void VulkanExampleBase::setupFrameBuffer()
         const VkImageView attachments[2] = {
             m_swapChain.imageViews[i],
             // Depth/Stencil attachment is the same for all frame buffers
-            m_defaultDepthStencil.m_imageView
+            m_depthStencilDefault.imageView()
         };
         VkFramebufferCreateInfo frameBufferCreateInfo {};
         frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

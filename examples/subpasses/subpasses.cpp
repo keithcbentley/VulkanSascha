@@ -258,7 +258,7 @@ public:
             attachments[1] = m_attachments.m_position.m_vkImageView;
             attachments[2] = m_attachments.m_normal.m_vkImageView;
             attachments[3] = m_attachments.m_albedo.m_vkImageView;
-            attachments[4] = m_defaultDepthStencil.m_imageView;
+            attachments[4] = m_depthStencilDefault.imageView();
             VK_CHECK_RESULT(vkCreateFramebuffer(m_device, &frameBufferCreateInfo, nullptr, &m_vkFrameBuffers[i]));
         }
     }
@@ -455,7 +455,7 @@ public:
     void setupDescriptors()
     {
         //	Descriptor Pool
-        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+        vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
         descriptorPoolCreateInfo
             .addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4)
             .addDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)

@@ -230,12 +230,14 @@ public:
 	std::string name = "vulkanExample";
 	uint32_t m_requestedApiVersion = VK_API_VERSION_1_0;
 
-	/** @brief Default depth stencil attachment used by the default render pass */
-	struct {
-		vkcpp::Image m_image;
-		vkcpp::DeviceMemory<> m_deviceMemory;
-		vkcpp::ImageView m_imageView;
-	} m_defaultDepthStencil{};
+	///** @brief Default depth stencil attachment used by the default render pass */
+	//struct {
+	//	vkcpp::Image m_image;
+	//	vkcpp::DeviceMemory<> m_deviceMemory;
+	//	vkcpp::ImageView m_imageView;
+	//} m_defaultDepthStencil{};
+
+	vkcpp::Image_Memory_View m_depthStencilDefault;
 
 	// OS specific
 	HWND m_hwnd;

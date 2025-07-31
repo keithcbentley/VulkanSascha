@@ -349,7 +349,7 @@ public:
     void setupDescriptors()
     {
         // Descriptor Pool
-		vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+		vkcpp::DescriptorPoolCreateInfo descriptorPoolCreateInfo(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
 		descriptorPoolCreateInfo
 			.addDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
 			.addDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);

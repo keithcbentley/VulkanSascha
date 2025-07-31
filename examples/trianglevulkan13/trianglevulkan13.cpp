@@ -392,50 +392,20 @@ public:
     // While we don't do any depth testing in this sample, having depth testing is very common so it's a good idea to learn it from the very start
     void setupDepthStencil() override
     {
-        // Create an optimal tiled m_vkImage used as the depth stencil attachment
-        VkImageCreateInfo imageCI { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-        imageCI.imageType = VK_IMAGE_TYPE_2D;
-        imageCI.format = m_vkFormatDepth;
-        imageCI.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
-        imageCI.mipLevels = 1;
-        imageCI.arrayLayers = 1;
-        imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		m_defaultDepthStencil.m_image = vkcpp::Image(imageCI);
-        //VK_CHECK_RESULT(vkCreateImage(m_deviceOriginal, &imageCI, nullptr, &m_defaultDepthStencil.m_vkImage));
+		vkcpp::ImageCreateInfo imageCreateInfo(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+		imageCreateInfo.setExtent(m_drawAreaWidth, m_drawAreaHeight);
 
-        // Allocate m_vkDeviceMemory for the m_vkImage (m_vkDevice local) and bind it to our m_vkImage
-        VkMemoryAllocateInfo memAlloc { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-        VkMemoryRequirements memReqs;
-        vkGetImageMemoryRequirements(m_device, m_defaultDepthStencil.m_image, &memReqs);
-        memAlloc.allocationSize = memReqs.size;
-        memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(memAlloc);
-        //VK_CHECK_RESULT(vkAllocateMemory(m_deviceOriginal, &memAlloc, nullptr, &m_defaultDepthStencil.m_vkDeviceMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
+		vkcpp::ImageViewCreateInfo imageViewCreateInfo(
+			VK_NULL_HANDLE,
+			VK_IMAGE_VIEW_TYPE_2D,
+			m_vkFormatDepth,
+			VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
-        // Create a m_vkImageView for the depth stencil m_vkImage
-        // Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
-        // This allows for multiple views of one m_vkImage with differing ranges (e.g. for different layers)
-        VkImageViewCreateInfo depthStencilViewCI { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-        depthStencilViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        depthStencilViewCI.format = m_vkFormatDepth;
-        depthStencilViewCI.subresourceRange = {};
-        depthStencilViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        // Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT)
-        if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
-            depthStencilViewCI.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-        }
-        depthStencilViewCI.subresourceRange.baseMipLevel = 0;
-        depthStencilViewCI.subresourceRange.levelCount = 1;
-        depthStencilViewCI.subresourceRange.baseArrayLayer = 0;
-        depthStencilViewCI.subresourceRange.layerCount = 1;
-        depthStencilViewCI.image = m_defaultDepthStencil.m_image;
-		m_defaultDepthStencil.m_imageView = vkcpp::ImageView(depthStencilViewCI);
-        //VK_CHECK_RESULT(vkCreateImageView(m_deviceOriginal, &depthStencilViewCI, nullptr, &m_defaultDepthStencil.m_vkImageView));
-    }
+		m_depthStencilDefault = vkcpp::Image_Memory_View(
+			imageCreateInfo,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+			imageViewCreateInfo);
+	}
 
     // Vulkan loads its shaders from an immediate binary representation called SPIR-V
     // Shaders are compiled offline from e.g. GLSL using the reference glslang compiler
@@ -634,7 +604,7 @@ public:
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             vkcpp::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT));
         commandBuffer.cmdPipelineBarrierImageMemory(
-            m_defaultDepthStencil.m_image,
+            m_depthStencilDefault.image(),
             VK_ACCESS_NONE,
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED,
@@ -653,7 +623,7 @@ public:
         colorAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
         // Depth/stencil attachment
         vkcpp::RenderingAttachmentInfo depthStencilAttachment;
-        depthStencilAttachment.imageView = m_defaultDepthStencil.m_imageView;
+        depthStencilAttachment.imageView = m_depthStencilDefault.imageView();
         depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -700,7 +670,7 @@ public:
         //  We don't really care about the image layout, we just want the memory sync.
         //	Not sure if this is the minimum required but it's close.
         commandBuffer.cmdPipelineBarrierImageMemory(
-            m_defaultDepthStencil.m_image,
+            m_depthStencilDefault.image(),
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             VK_ACCESS_NONE,
             VK_IMAGE_LAYOUT_UNDEFINED,

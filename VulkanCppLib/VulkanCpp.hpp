@@ -3630,6 +3630,8 @@ public:
 
 class Image_DeviceMemory {
 
+	//	TODO: is this really necessary?
+	//	Maybe make public if useful for porting? Remove?
     Image_DeviceMemory(Image&& image, DeviceMemory<>&& deviceMemory)
         : m_image(std::move(image))
         , m_deviceMemory(std::move(deviceMemory))
@@ -3692,14 +3694,16 @@ public:
 
 class Image_Memory_View {
 
+	Image m_image;
+	DeviceMemory<> m_deviceMemory;
+	ImageView m_imageView;
+
 public:
-    Image m_image;
-    DeviceMemory<> m_deviceMemory;
-    ImageView m_imageView;
 
     Image_Memory_View() = default;
     ~Image_Memory_View() = default;
 
+	//	TODO: do we ever need to make copies?
     Image_Memory_View(const Image_Memory_View&) = delete;
     Image_Memory_View& operator=(const Image_Memory_View&) = delete;
 
@@ -3717,9 +3721,10 @@ public:
         }
         this->~Image_Memory_View();
         new (this) Image_Memory_View(std::move(other));
+		return *this;
     }
 
-    //	Handy move constructor.
+    //	Handy move constructor for porting.
     Image_Memory_View(
         Image&& image,
         DeviceMemory<>&& deviceMemory,
@@ -3729,6 +3734,40 @@ public:
         , m_imageView(std::move(imageView))
     {
     }
+
+	Image_Memory_View(
+		const ImageCreateInfo& imageCreateInfo,
+		MemoryPropertyFlags properties,
+		ImageViewCreateInfo imageViewCreateInfo) {
+
+		Image newImage(imageCreateInfo);
+		DeviceMemory newDeviceMemory = newImage.allocateDeviceMemory(properties);
+
+		VkResult vkResult = vkBindImageMemory(vkDevice(), newImage, newDeviceMemory, 0);
+		if (vkResult != VK_SUCCESS) {
+			throw Exception(vkResult);
+		}
+
+		imageViewCreateInfo.image = newImage;
+		ImageView newImageView = vkcpp::ImageView(imageViewCreateInfo);
+
+		m_image = std::move(newImage);
+		m_deviceMemory = std::move(newDeviceMemory);
+		m_imageView = std::move(newImageView);
+	}
+
+	Image image() {
+		return m_image;
+	}
+
+	DeviceMemory<> deviceMemory() {
+		return m_deviceMemory;
+	}
+
+	ImageView imageView() {
+		return m_imageView;
+	}
+
 };
 
 class Framebuffer : public InteropHandle2<VkFramebuffer> {
@@ -3853,7 +3892,7 @@ private:
             FramebufferCreateInfo framebufferCreateInfo(m_renderPass, m_swapchain.imageExtent());
             framebufferCreateInfo
                 .addAttachment(imageView)
-                .addAttachment(depthBuffer.m_imageView);
+                .addAttachment(depthBuffer.imageView());
 
             Framebuffer framebuffer(framebufferCreateInfo);
             framebuffer.take(std::move(depthBuffer));

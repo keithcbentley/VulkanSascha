@@ -239,15 +239,11 @@ public:
         m_texture3d.takeSampler(vkcpp::Sampler(vkSamplerCreateInfo));
 
         // Create m_vkImage m_vkImageView
-        vkcpp::ImageViewCreateInfo imageViewCreateInfo;
-        imageViewCreateInfo.image = m_texture3d.image();
-        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
-        imageViewCreateInfo.format = m_texture3dConfig.m_vkFormat;
-        imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-        imageViewCreateInfo.subresourceRange.layerCount = 1;
-        imageViewCreateInfo.subresourceRange.levelCount = 1;
+        vkcpp::ImageViewCreateInfo imageViewCreateInfo(
+			m_texture3d.image(),
+			VK_IMAGE_VIEW_TYPE_3D,
+			m_texture3dConfig.m_vkFormat,
+			VK_IMAGE_ASPECT_COLOR_BIT);
         m_texture3d.takeImageView(vkcpp::ImageView(imageViewCreateInfo));
 
         // VK_CHECK_RESULT(vkCreateImageView(m_device, &view, nullptr, &m_textureSascha.m_vkImageView));

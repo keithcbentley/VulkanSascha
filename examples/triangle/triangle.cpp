@@ -276,22 +276,20 @@ public:
     // Note: Override of virtual function in the base class and called from within VulkanExampleBase::prepare
     void setupDepthStencil() override
     {
-		vkcpp::ImageCreateInfo imageCreateInfo(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-		imageCreateInfo.setExtent(m_drawAreaWidth, m_drawAreaHeight);
-        m_defaultDepthStencil.m_image = vkcpp::Image(imageCreateInfo);
+        vkcpp::ImageCreateInfo imageCreateInfo(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+        imageCreateInfo.setExtent(m_drawAreaWidth, m_drawAreaHeight);
 
-		m_defaultDepthStencil.m_deviceMemory =
-			m_defaultDepthStencil.m_image.allocateDeviceMemory(vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
+        vkcpp::ImageViewCreateInfo imageViewCreateInfo(
+            VK_NULL_HANDLE,
+            VK_IMAGE_VIEW_TYPE_2D,
+            m_vkFormatDepth,
+            VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
-        VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
+        m_depthStencilDefault = vkcpp::Image_Memory_View(
+            imageCreateInfo,
+            vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+            imageViewCreateInfo);
 
-		vkcpp::ImageViewCreateInfo imageViewCreateInfo(
-			m_defaultDepthStencil.m_image,
-			VK_IMAGE_VIEW_TYPE_2D,
-			m_vkFormatDepth,
-			VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-
-        m_defaultDepthStencil.m_imageView = vkcpp::ImageView(imageViewCreateInfo);
     }
 
     // Create a frame buffer for each swap chain m_vkImage
@@ -305,7 +303,7 @@ public:
             // Color attachment is the m_vkImageView of the swapchain m_vkImage
             attachments[0] = m_swapChain.imageViews[i];
             // Depth/Stencil attachment is the same for all frame buffers due to how depth works with current GPUs
-            attachments[1] = m_defaultDepthStencil.m_imageView;
+            attachments[1] = m_depthStencilDefault.imageView();
 
             VkFramebufferCreateInfo frameBufferCI {};
             frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

@@ -201,13 +201,13 @@ public:
 		//VK_CHECK_RESULT(vkCreateSampler(m_device, &vkSamplerCreateInfo, nullptr, &textureArray.m_vkSampler));
 
 		// Create texture ImageView
-		vkcpp::ImageViewCreateInfo imageViewCreateInfo;
-		imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-		imageViewCreateInfo.format = format;
-		imageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		vkcpp::ImageViewCreateInfo imageViewCreateInfo(
+			m_textureArray.image(),
+			VK_IMAGE_VIEW_TYPE_2D_ARRAY,
+			format,
+			VK_IMAGE_ASPECT_COLOR_BIT);
 		imageViewCreateInfo.subresourceRange.layerCount = textureLayerCount;
-		imageViewCreateInfo.subresourceRange.levelCount = 1;
-		imageViewCreateInfo.image = m_textureArray.image();
+
 		m_textureArray.takeImageView(vkcpp::ImageView(imageViewCreateInfo));
 
 		// Clean up staging resources
