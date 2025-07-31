@@ -152,7 +152,7 @@ public:
     }
 
     // Prepare vertex and index buffers for an indexed triangle
-    // Also uploads them to m_vkDevice local m_vkDeviceMemory using staging and initializes vertex input and attribute binding to match the vertex shader
+    // Also uploads them to device local memory using staging and initializes vertex input and attribute binding to match the vertex shader
     void createVertexBuffer()
     {
         //	A note on m_vkDeviceMemory management in Vulkan in general:
@@ -161,7 +161,7 @@ public:
         //	what should be done a real-world application, where you should allocate
         //	large chunks of m_vkDeviceMemory at once instead.
 
-        // Static data like vertex and index buffer should be stored on the m_vkDevice m_vkDeviceMemory for optimal (and fastest) access by the GPU
+        // Static data like vertex and index buffer should be stored on the dvice memory for optimal (and fastest) access by the GPU
         //
         // To achieve this we use so-called "staging buffers" :
         // - Create a buffer that's visible to the host (and can be mapped)
@@ -276,51 +276,22 @@ public:
     // Note: Override of virtual function in the base class and called from within VulkanExampleBase::prepare
     void setupDepthStencil() override
     {
-        // Create an optimal m_vkImage used as the depth stencil attachment
-        VkImageCreateInfo vkImageCreateInfo {};
-        vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-        vkImageCreateInfo.format = m_vkFormatDepth;
-        vkImageCreateInfo.extent = { m_drawAreaWidth, m_drawAreaHeight, 1 };
-        vkImageCreateInfo.mipLevels = 1;
-        vkImageCreateInfo.arrayLayers = 1;
-        vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        vkImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        vkImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        vkImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        m_defaultDepthStencil.m_image = vkcpp::Image(vkImageCreateInfo);
+		vkcpp::ImageCreateInfo imageCreateInfo(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+		imageCreateInfo.setExtent(m_drawAreaWidth, m_drawAreaHeight);
+        m_defaultDepthStencil.m_image = vkcpp::Image(imageCreateInfo);
 
-        // Allocate m_vkDeviceMemory for the m_vkImage (m_vkDevice local) and bind it to our m_vkImage
-        VkMemoryAllocateInfo vkMemoryAllocateInfo {};
-        vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        VkMemoryRequirements vkMemoryRequirements;
-        vkGetImageMemoryRequirements(m_device, m_defaultDepthStencil.m_image, &vkMemoryRequirements);
-        vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
-        vkMemoryAllocateInfo.memoryTypeIndex
-            = vkcpp::findMemoryTypeIndex(vkMemoryRequirements.memoryTypeBits, vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
-        m_defaultDepthStencil.m_deviceMemory = vkcpp::DeviceMemory(vkMemoryAllocateInfo);
+		m_defaultDepthStencil.m_deviceMemory =
+			m_defaultDepthStencil.m_image.allocateDeviceMemory(vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL);
 
         VK_CHECK_RESULT(vkBindImageMemory(m_device, m_defaultDepthStencil.m_image, m_defaultDepthStencil.m_deviceMemory, 0));
 
-        // Create a vkImageView for the depth stencil m_vkImage
-        // Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
-        // This allows for multiple views of one m_vkImage with differing ranges (e.g. for different layers)
-        VkImageViewCreateInfo vkImageViewCreateInfo {};
-        vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        vkImageViewCreateInfo.format = m_vkFormatDepth;
-        vkImageViewCreateInfo.subresourceRange = {};
-        vkImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        // Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT)
-        if (m_vkFormatDepth >= VK_FORMAT_D16_UNORM_S8_UINT) {
-            vkImageViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-        }
-        vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-        vkImageViewCreateInfo.subresourceRange.levelCount = 1;
-        vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-        vkImageViewCreateInfo.subresourceRange.layerCount = 1;
-        vkImageViewCreateInfo.image = m_defaultDepthStencil.m_image;
-        m_defaultDepthStencil.m_imageView = vkcpp::ImageView(vkImageViewCreateInfo);
+		vkcpp::ImageViewCreateInfo imageViewCreateInfo(
+			m_defaultDepthStencil.m_image,
+			VK_IMAGE_VIEW_TYPE_2D,
+			m_vkFormatDepth,
+			VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+
+        m_defaultDepthStencil.m_imageView = vkcpp::ImageView(imageViewCreateInfo);
     }
 
     // Create a frame buffer for each swap chain m_vkImage

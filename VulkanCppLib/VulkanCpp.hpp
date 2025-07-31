@@ -1332,6 +1332,9 @@ public:
 
 class ImageCreateInfo : public VkImageCreateInfo {
 
+	//	TODO: doesn't handle flags
+	//	TODO: doesn't handle queues.
+	//	TODO: defaults to VK_IMAGE_TYPE_2D
 public:
     ImageCreateInfo(
         VkFormat vkFormat,
@@ -1341,13 +1344,13 @@ public:
         sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         format = vkFormat;
         usage = vkUsage;
-
         imageType = VK_IMAGE_TYPE_2D;
 
         extent.depth = 1;
         mipLevels = 1;
         arrayLayers = 1;
         initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		tiling = VK_IMAGE_TILING_OPTIMAL;
 
         samples = VK_SAMPLE_COUNT_1_BIT;
         sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -1359,7 +1362,16 @@ public:
         extent.height = vkExtent2D.height;
         return *this;
     }
+
+	ImageCreateInfo& setExtent(uint32_t widthArg, uint32_t heightArg) {
+		extent.width = widthArg;
+		extent.height = heightArg;
+		return *this;
+	}
+
 };
+
+
 
 class Image : public InteropHandle2<VkImage> {
 
@@ -1454,12 +1466,17 @@ public:
 
 class ImageViewCreateInfo : public VkImageViewCreateInfo {
 
+	//	TODO: doesn't support flags
+	//	TODO: rgba components are fixed to identity
+	//	TODO: mips and levels starts and counts are both set to 0,1
 public:
-    ImageViewCreateInfo()
-        : VkImageViewCreateInfo {}
-    {
-    }
-    ImageViewCreateInfo(
+
+    //ImageViewCreateInfo()
+    //    : VkImageViewCreateInfo {}
+    //{
+    //}
+
+	ImageViewCreateInfo(
         VkImage vkImage,
         VkImageViewType vkImageViewType,
         VkFormat vkFormat,
@@ -1481,6 +1498,8 @@ public:
         subresourceRange.layerCount = 1;
     }
 };
+
+
 
 class ImageView : public InteropHandle2<VkImageView> {
 
