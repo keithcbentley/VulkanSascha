@@ -400,9 +400,7 @@ public:
 
     void draw()
     {
-        VulkanExampleBase::prepareFrame();
-        m_queue.submit2(m_drawCommandBuffers[m_currentBufferIndex]);
-        VulkanExampleBase::submitFrame();
+        VulkanExampleBase::prepareSubmitFrameBase(m_drawCommandBuffers[m_currentBufferIndex]);
     }
 
     virtual void render()

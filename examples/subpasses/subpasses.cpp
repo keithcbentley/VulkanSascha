@@ -772,17 +772,7 @@ public:
 
     void draw()
     {
-        VulkanExampleBase::prepareFrame();
-
-        // Command buffer to be submitted to the m_vkQueue
-        m_vkSubmitInfo.commandBufferCount = 1;
-        VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-        m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
-
-        // Submit to m_vkQueue
-        VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
-
-        VulkanExampleBase::submitFrame();
+		VulkanExampleBase::prepareSubmitFrameBase(m_drawCommandBuffers[m_currentBufferIndex]);
     }
 
     void prepare()

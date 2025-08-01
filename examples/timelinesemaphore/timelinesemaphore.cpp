@@ -10,6 +10,9 @@
 
 #include "vulkanexamplebase.h"
 
+vkcpp::VulkanContext vkcpp::s_vulkanContext;
+
+
 #if defined(__ANDROID__)
 // Lower particle count on Android for performance reasons
 #define PARTICLES_PER_ATTRACTOR 3 * 1024
@@ -93,7 +96,7 @@ public:
         enabledTimelineSemaphoreFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR;
         enabledTimelineSemaphoreFeaturesKHR.timelineSemaphore = VK_TRUE;
 
-        m_deviceCreatepNextChain = &enabledTimelineSemaphoreFeaturesKHR;
+//        m_deviceCreatepNextChain = &enabledTimelineSemaphoreFeaturesKHR;
     }
 
     ~VulkanExample()
@@ -109,11 +112,10 @@ public:
             // Compute
             vkDestroyPipelineLayout(m_device, compute.pipelineLayout, nullptr);
             vkDestroyDescriptorSetLayout(m_device, compute.descriptorSetLayout, nullptr);
-            vkDestroyPipeline(m_deviceOriginal, compute.pipelineCalculate, nullptr);
-            vkDestroyPipeline(m_deviceOriginal, compute.pipelineIntegrate, nullptr);
-            vkDestroyCommandPool(m_deviceOriginal, compute.commandPool, nullptr);
+            vkDestroyPipeline(m_device, compute.pipelineCalculate, nullptr);
+            vkDestroyPipeline(m_device, compute.pipelineIntegrate, nullptr);
+            vkDestroyCommandPool(m_device, compute.commandPool, nullptr);
 
-            storageBuffer.destroy();
 
             textures.particle.destroy();
             textures.gradient.destroy();
@@ -122,20 +124,26 @@ public:
 
     void loadAssets()
     {
-        textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
-        textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, m_pVulkanDevice, m_vkQueue);
+        textures.particle.loadFromFile(
+			getAssetPath() + "textures/particle01_rgba.ktx",
+			VK_FORMAT_R8G8B8A8_UNORM,
+			m_pVulkanDevice,
+			m_queue);
+        textures.gradient.loadFromFile(
+			getAssetPath() + "textures/particle_gradient_rgba.ktx",
+			VK_FORMAT_R8G8B8A8_UNORM,
+			m_pVulkanDevice,
+			m_queue);
     }
 
     void buildCommandBuffers()
     {
-        VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
-
         VkClearValue clearValues[2];
         clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
         clearValues[1].depthStencil = { 1.0f, 0 };
 
         VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
-        renderPassBeginInfo.renderPass = m_vkRenderPass;
+        renderPassBeginInfo.renderPass = m_renderPassOriginal;
         renderPassBeginInfo.renderArea.offset.x = 0;
         renderPassBeginInfo.renderArea.offset.y = 0;
         renderPassBeginInfo.renderArea.extent.width = m_drawAreaWidth;
@@ -143,11 +151,12 @@ public:
         renderPassBeginInfo.clearValueCount = 2;
         renderPassBeginInfo.pClearValues = clearValues;
 
-        for (int32_t i = 0; i < drawCmdBuffers.size(); ++i) {
+        for (int32_t i = 0; i < m_drawCommandBuffers.size(); ++i) {
+			vkcpp::CommandBuffer commandBuffer = m_drawCommandBuffers[i];
+
             // Set target frame buffer
             renderPassBeginInfo.framebuffer = m_vkFrameBuffers[i];
-
-            VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
+			commandBuffer.begin();
 
             // Acquire barrier
             if (graphics.queueFamilyIndex != compute.queueFamilyIndex) {
@@ -158,13 +167,13 @@ public:
                     VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
                     compute.queueFamilyIndex,
                     graphics.queueFamilyIndex,
-                    storageBuffer.buffer,
+                    storageBuffer.m_buffer,
                     0,
-                    storageBuffer.size
+                    storageBuffer.m_size
                 };
 
                 vkCmdPipelineBarrier(
-                    drawCmdBuffers[i],
+                    commandBuffer,
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                     VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
                     0,
@@ -174,24 +183,17 @@ public:
             }
 
             // Draw the particle system using the update vertex buffer
-            vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+			commandBuffer.cmdBeginRenderPass(renderPassBeginInfo);
+			commandBuffer.cmdSetViewport(m_drawAreaWidth, m_drawAreaHeight);
+			commandBuffer.cmdSetScissor(m_drawAreaWidth, m_drawAreaHeight);
+			commandBuffer.cmdBindPipeline(graphics.pipeline);
+			commandBuffer.cmdBindDescriptorSet(graphics.descriptorSet, graphics.pipelineLayout);
+			commandBuffer.cmdBindVertexBuffer(storageBuffer.m_buffer);
+			commandBuffer.cmdDraw(numParticles,1);
 
-            VkViewport viewport = vks::initializers::viewport((float)m_drawAreaWidth, (float)m_drawAreaHeight, 0.0f, 1.0f);
-            vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+            drawUI(commandBuffer);
 
-            VkRect2D scissor = vks::initializers::rect2D(m_drawAreaWidth, m_drawAreaHeight, 0, 0);
-            vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
-
-            vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
-            vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSet, 0, nullptr);
-
-            VkDeviceSize offsets[1] = { 0 };
-            vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &storageBuffer.buffer, offsets);
-            vkCmdDraw(drawCmdBuffers[i], numParticles, 1, 0, 0);
-
-            drawUI(drawCmdBuffers[i]);
-
-            vkCmdEndRenderPass(drawCmdBuffers[i]);
+			commandBuffer.cmdEndRenderPass();
 
             // Release barrier
             if (graphics.queueFamilyIndex != compute.queueFamilyIndex) {
@@ -202,13 +204,13 @@ public:
                     0,
                     graphics.queueFamilyIndex,
                     compute.queueFamilyIndex,
-                    storageBuffer.buffer,
+                    storageBuffer.m_buffer,
                     0,
-                    storageBuffer.size
+                    storageBuffer.m_size
                 };
 
                 vkCmdPipelineBarrier(
-                    drawCmdBuffers[i],
+                    commandBuffer,
                     VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
                     VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                     0,
@@ -216,8 +218,7 @@ public:
                     1, &buffer_barrier,
                     0, nullptr);
             }
-
-            VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
+			commandBuffer.end();
         }
     }
 
@@ -236,9 +237,9 @@ public:
                 VK_ACCESS_SHADER_WRITE_BIT,
                 graphics.queueFamilyIndex,
                 compute.queueFamilyIndex,
-                storageBuffer.buffer,
+                storageBuffer.m_buffer,
                 0,
-                storageBuffer.size
+                storageBuffer.m_size
             };
 
             vkCmdPipelineBarrier(
@@ -259,8 +260,8 @@ public:
 
         // Add m_vkDeviceMemory barrier to ensure that the computer shader has finished writing to the buffer
         VkBufferMemoryBarrier bufferBarrier = vks::initializers::bufferMemoryBarrier();
-        bufferBarrier.buffer = storageBuffer.buffer;
-        bufferBarrier.size = storageBuffer.descriptor.range;
+        bufferBarrier.buffer = storageBuffer.m_buffer;
+        bufferBarrier.size = storageBuffer.m_vkDescriptorBufferInfo.range;
         bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         bufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         // Transfer ownership if compute and graphics m_vkQueue family indices differ
@@ -290,9 +291,9 @@ public:
                 0,
                 compute.queueFamilyIndex,
                 graphics.queueFamilyIndex,
-                storageBuffer.buffer,
+                storageBuffer.m_buffer,
                 0,
-                storageBuffer.size
+                storageBuffer.m_size
             };
 
             vkCmdPipelineBarrier(
@@ -363,14 +364,23 @@ public:
 
         // Staging
         vks::Buffer stagingBuffer;
-        m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, storageBufferSize, particleBuffer.data());
-        m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &storageBuffer, storageBufferSize);
+        m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+			&stagingBuffer,
+			storageBufferSize, particleBuffer.data());
+        m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+			| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+			| VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+			&storageBuffer, storageBufferSize);
 
         // Copy from staging buffer to storage buffer
         VkCommandBuffer copyCmd = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
         VkBufferCopy copyRegion = {};
         copyRegion.size = storageBufferSize;
-        vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, storageBuffer.buffer, 1, &copyRegion);
+        vkCmdCopyBuffer(copyCmd, stagingBuffer.m_buffer, storageBuffer.m_buffer, 1, &copyRegion);
         // Execute a transfer barrier to the compute m_vkQueue, if necessary
         if (graphics.queueFamilyIndex != compute.queueFamilyIndex) {
             VkBufferMemoryBarrier buffer_barrier = {
@@ -380,9 +390,9 @@ public:
                 0,
                 graphics.queueFamilyIndex,
                 compute.queueFamilyIndex,
-                storageBuffer.buffer,
+                storageBuffer.m_buffer,
                 0,
-                storageBuffer.size
+                storageBuffer.m_size
             };
 
             vkCmdPipelineBarrier(
@@ -394,15 +404,16 @@ public:
                 1, &buffer_barrier,
                 0, nullptr);
         }
-        m_pVulkanDevice->flushCommandBuffer(copyCmd, m_vkQueue, true);
-
-        stagingBuffer.destroy();
+        m_pVulkanDevice->flushCommandBuffer(copyCmd, m_queue, true);
     }
 
     void prepareGraphics()
     {
         // Vertex shader uniform buffer block
-        m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &graphics.uniformBuffer, sizeof(Graphics::UniformData));
+        m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+			&graphics.uniformBuffer, sizeof(Graphics::UniformData));
         VK_CHECK_RESULT(graphics.uniformBuffer.map());
 
         // Descriptor pool
@@ -412,7 +423,8 @@ public:
             vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2)
         };
         VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 2);
-        VK_CHECK_RESULT(vkCreateDescriptorPool(m_deviceOriginal, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
+		m_descriptorPool = vkcpp::DescriptorPool(descriptorPoolInfo);
+        //VK_CHECK_RESULT(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &m_vkDescriptorPool));
 
         // Descriptor layout
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
@@ -423,22 +435,36 @@ public:
         };
 
         VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &graphics.descriptorSetLayout));
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &graphics.descriptorSetLayout));
 
         // Descriptor set
-        VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &graphics.descriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &graphics.descriptorSet));
+        VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(
+			m_descriptorPool, &graphics.descriptorSetLayout, 1);
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(
+			m_device, &allocInfo, &graphics.descriptorSet));
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-            vks::initializers::writeDescriptorSet(graphics.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &textures.particle.descriptor),
-            vks::initializers::writeDescriptorSet(graphics.descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textures.gradient.descriptor),
-            vks::initializers::writeDescriptorSet(graphics.descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &graphics.uniformBuffer.descriptor),
+            vks::initializers::writeDescriptorSet(
+				graphics.descriptorSet,
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				0,
+				&textures.particle.m_vkDescriptorImageInfo),
+            vks::initializers::writeDescriptorSet(
+				graphics.descriptorSet,
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				1,
+				&textures.gradient.m_vkDescriptorImageInfo),
+            vks::initializers::writeDescriptorSet(
+				graphics.descriptorSet,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				2,
+				&graphics.uniformBuffer.m_vkDescriptorBufferInfo),
         };
-        vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 
         // Pipeline layout
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&graphics.descriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &graphics.pipelineLayout));
+        VK_CHECK_RESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &graphics.pipelineLayout));
 
         // Pipeline
         VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = vks::initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_POINT_LIST, 0, VK_FALSE);
@@ -470,7 +496,9 @@ public:
         shaderStages[0] = loadShader(getShadersPath() + "computenbody/particle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
         shaderStages[1] = loadShader(getShadersPath() + "computenbody/particle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-        VkGraphicsPipelineCreateInfo pipelineCreateInfo = vks::initializers::pipelineCreateInfo(graphics.pipelineLayout, m_vkRenderPass, 0);
+        VkGraphicsPipelineCreateInfo pipelineCreateInfo
+			= vks::initializers::pipelineCreateInfo(
+				graphics.pipelineLayout, m_renderPassOriginal, 0);
         pipelineCreateInfo.pVertexInputState = &vertexInputState;
         pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
         pipelineCreateInfo.pRasterizationState = &rasterizationState;
@@ -481,7 +509,7 @@ public:
         pipelineCreateInfo.pDynamicState = &dynamicState;
         pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
         pipelineCreateInfo.pStages = shaderStages.data();
-        pipelineCreateInfo.renderPass = m_vkRenderPass;
+        pipelineCreateInfo.renderPass = m_renderPassOriginal;
 
         // Additive blending
         blendAttachmentState.colorWriteMask = 0xF;
@@ -493,15 +521,19 @@ public:
         blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
 
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(m_deviceOriginal, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+			m_device, m_vkPipelineCache, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
 
         buildCommandBuffers();
     }
 
     void prepareCompute()
     {
-        vkGetDeviceQueue(m_deviceOriginal, compute.queueFamilyIndex, 0, &compute.queue);
-        m_pVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &compute.uniformBuffer, sizeof(Compute::UniformData));
+        vkGetDeviceQueue(m_device, compute.queueFamilyIndex, 0, &compute.queue);
+        m_pVulkanDevice->createBuffer(
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vkcpp::MEMORY_PROPERTY_HOST_VISIBLE_COHERENT,
+			&compute.uniformBuffer, sizeof(Compute::UniformData));
         VK_CHECK_RESULT(compute.uniformBuffer.map());
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
             // Binding 0 : Particle position storage buffer
@@ -510,30 +542,50 @@ public:
             vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1),
         };
         VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_deviceOriginal, &descriptorLayout, nullptr, &compute.descriptorSetLayout));
-        VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(m_vkDescriptorPool, &compute.descriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(m_deviceOriginal, &allocInfo, &compute.descriptorSet));
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(m_device, &descriptorLayout, nullptr, &compute.descriptorSetLayout));
+        VkDescriptorSetAllocateInfo allocInfo
+			= vks::initializers::descriptorSetAllocateInfo(
+				m_descriptorPool, &compute.descriptorSetLayout, 1);
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(
+			m_device, &allocInfo, &compute.descriptorSet));
         std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
-            vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0, &storageBuffer.descriptor),
-            vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &compute.uniformBuffer.descriptor)
+            vks::initializers::writeDescriptorSet(
+				compute.descriptorSet,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				0, &storageBuffer.m_vkDescriptorBufferInfo),
+            vks::initializers::writeDescriptorSet(
+				compute.descriptorSet,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				1, &compute.uniformBuffer.m_vkDescriptorBufferInfo)
         };
-        vkUpdateDescriptorSets(m_deviceOriginal, static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
+        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(&compute.descriptorSetLayout, 1);
-        VK_CHECK_RESULT(vkCreatePipelineLayout(m_deviceOriginal, &pipelineLayoutCreateInfo, nullptr, &compute.pipelineLayout));
+        VK_CHECK_RESULT(
+			vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &compute.pipelineLayout));
         VkComputePipelineCreateInfo computePipelineCreateInfo = vks::initializers::computePipelineCreateInfo(compute.pipelineLayout, 0);
         computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computenbody/particle_calculate.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
-        uint32_t sharedDataSize = std::min((uint32_t)1024, (uint32_t)(m_pVulkanDevice->m_vkPhysicalDeviceProperties.limits.maxComputeSharedMemorySize / sizeof(glm::vec4)));
+        uint32_t sharedDataSize = std::min(
+			(uint32_t)1024,
+			(uint32_t)(vkcpp::vkPhysicalDeviceProperties().limits.maxComputeSharedMemorySize / sizeof(glm::vec4)));
         VkSpecializationMapEntry specializationMapEntry = vks::initializers::specializationMapEntry(0, 0, sizeof(uint32_t));
         VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(1, &specializationMapEntry, sizeof(int32_t), &sharedDataSize);
         computePipelineCreateInfo.stage.pSpecializationInfo = &specializationInfo;
-        VK_CHECK_RESULT(vkCreateComputePipelines(m_vkDevice, m_vkPipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineCalculate));
-        computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computenbody/particle_integrate.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
-        VK_CHECK_RESULT(vkCreateComputePipelines(m_vkDevice, m_vkPipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineIntegrate));
+        VK_CHECK_RESULT(vkCreateComputePipelines(
+			m_device,
+			m_vkPipelineCache, 1,
+			&computePipelineCreateInfo, nullptr, &compute.pipelineCalculate));
+        computePipelineCreateInfo.stage = loadShader(
+			getShadersPath() + "computenbody/particle_integrate.comp.spv",
+			VK_SHADER_STAGE_COMPUTE_BIT);
+        VK_CHECK_RESULT(vkCreateComputePipelines(
+			m_device,
+			m_vkPipelineCache, 1,
+			&computePipelineCreateInfo, nullptr, &compute.pipelineIntegrate));
         VkCommandPoolCreateInfo cmdPoolInfo = {};
         cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         cmdPoolInfo.queueFamilyIndex = compute.queueFamilyIndex;
         cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        VK_CHECK_RESULT(vkCreateCommandPool(m_deviceOriginal, &cmdPoolInfo, nullptr, &compute.commandPool));
+        VK_CHECK_RESULT(vkCreateCommandPool(m_device, &cmdPoolInfo, nullptr, &compute.commandPool));
         compute.commandBuffer = m_pVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute.commandPool);
         buildComputeCommandBuffer();
     }
@@ -541,7 +593,7 @@ public:
     void updateComputeUniformBuffers()
     {
         compute.uniformData.deltaT = paused ? 0.0f : m_frameTimer * 0.05f;
-        memcpy(compute.uniformBuffer.mapped, &compute.uniformData, sizeof(Compute::UniformData));
+        memcpy(compute.uniformBuffer.m_pMapped, &compute.uniformData, sizeof(Compute::UniformData));
     }
 
     void updateGraphicsUniformBuffers()
@@ -549,14 +601,14 @@ public:
         graphics.uniformData.projection = camera.matrices.perspective;
         graphics.uniformData.view = camera.matrices.view;
         graphics.uniformData.screenDim = glm::vec2((float)m_drawAreaWidth, (float)m_drawAreaHeight);
-        memcpy(graphics.uniformBuffer.mapped, &graphics.uniformData, sizeof(Graphics::UniformData));
+        memcpy(graphics.uniformBuffer.m_pMapped, &graphics.uniformData, sizeof(Graphics::UniformData));
     }
 
     void prepare()
     {
         VulkanExampleBase::prepare();
-        graphics.queueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.graphics;
-        compute.queueFamilyIndex = m_pVulkanDevice->queueFamilyIndices.compute;
+        graphics.queueFamilyIndex = m_pVulkanDevice->m_queueFamilyIndices.m_graphics;
+        compute.queueFamilyIndex = m_pVulkanDevice->m_queueFamilyIndices.m_compute;
 
         // Setup the timeline semaphore
         VkSemaphoreCreateInfo semaphoreCI {};
@@ -568,7 +620,7 @@ public:
         semaphoreTypeCI.initialValue = timeLineSemaphore.value;
 
         semaphoreCI.pNext = &semaphoreTypeCI;
-        VK_CHECK_RESULT(vkCreateSemaphore(m_vkDevice, &semaphoreCI, nullptr, &timeLineSemaphore.handle));
+        VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCI, nullptr, &timeLineSemaphore.handle));
 
         loadAssets();
         prepareStorageBuffers();
@@ -577,52 +629,59 @@ public:
         m_prepared = true;
     }
 
-    void draw()
-    {
-        // Wait for rendering finished
-        VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	void draw() {
+		// Wait for rendering finished
+		VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
-        // Submit compute commands
+		// Submit compute commands
 
-        // Define incremental timeline sempahore states
-        const uint64_t graphics_finished = timeLineSemaphore.value;
-        const uint64_t compute_finished = timeLineSemaphore.value + 1;
-        const uint64_t all_finished = timeLineSemaphore.value + 2;
+		// Define incremental timeline sempahore states
+		const uint64_t graphics_finished = timeLineSemaphore.value;
+		const uint64_t compute_finished = timeLineSemaphore.value + 1;
+		const uint64_t all_finished = timeLineSemaphore.value + 2;
 
-        // With timeline semaphores, we can state on what value we want to wait on / signal on
-        VkTimelineSemaphoreSubmitInfoKHR timeLineSubmitInfo { VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO_KHR };
-        timeLineSubmitInfo.waitSemaphoreValueCount = 1;
-        timeLineSubmitInfo.pWaitSemaphoreValues = &graphics_finished;
-        timeLineSubmitInfo.signalSemaphoreValueCount = 1;
-        timeLineSubmitInfo.pSignalSemaphoreValues = &compute_finished;
+		// With timeline semaphores, we can state on what value we want to wait on / signal on
+		VkTimelineSemaphoreSubmitInfoKHR timeLineSubmitInfo{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO_KHR};
+		timeLineSubmitInfo.waitSemaphoreValueCount = 1;
+		timeLineSubmitInfo.pWaitSemaphoreValues = &graphics_finished;
+		timeLineSubmitInfo.signalSemaphoreValueCount = 1;
+		timeLineSubmitInfo.pSignalSemaphoreValues = &compute_finished;
 
-        VkSubmitInfo computeSubmitInfo = vks::initializers::submitInfo();
-        computeSubmitInfo.commandBufferCount = 1;
-        computeSubmitInfo.pCommandBuffers = &compute.commandBuffer;
-        computeSubmitInfo.waitSemaphoreCount = 1;
-        computeSubmitInfo.pWaitSemaphores = &timeLineSemaphore.handle;
-        computeSubmitInfo.pWaitDstStageMask = &waitStageMask;
-        computeSubmitInfo.signalSemaphoreCount = 1;
-        computeSubmitInfo.pSignalSemaphores = &timeLineSemaphore.handle;
+		VkSubmitInfo computeSubmitInfo = vks::initializers::submitInfo();
+		computeSubmitInfo.commandBufferCount = 1;
+		computeSubmitInfo.pCommandBuffers = &compute.commandBuffer;
+		computeSubmitInfo.waitSemaphoreCount = 1;
+		computeSubmitInfo.pWaitSemaphores = &timeLineSemaphore.handle;
+		computeSubmitInfo.pWaitDstStageMask = &waitStageMask;
+		computeSubmitInfo.signalSemaphoreCount = 1;
+		computeSubmitInfo.pSignalSemaphores = &timeLineSemaphore.handle;
 
-        computeSubmitInfo.pNext = &timeLineSubmitInfo;
+		computeSubmitInfo.pNext = &timeLineSubmitInfo;
 
-        VK_CHECK_RESULT(vkQueueSubmit(compute.queue, 1, &computeSubmitInfo, VK_NULL_HANDLE));
+		VK_CHECK_RESULT(vkQueueSubmit(compute.queue, 1, &computeSubmitInfo, VK_NULL_HANDLE));
 
-        VulkanExampleBase::prepareFrame();
+		VulkanExampleBase::prepareFrame();
 
-        VkPipelineStageFlags graphicsWaitStageMasks[] = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-        VkSemaphore graphicsWaitSemaphores[] = { timeLineSemaphore.handle, semaphores.m_vkSemaphorePresentComplete };
-        VkSemaphore graphicsSignalSemaphores[] = { timeLineSemaphore.handle, semaphores.m_vkSemaphoreRenderComplete };
+		VkPipelineStageFlags graphicsWaitStageMasks[]
+			= {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+		VkSemaphore graphicsWaitSemaphores[]
+			= {timeLineSemaphore.handle, m_semaphores.m_vkSemaphorePresentComplete};
+		VkSemaphore graphicsSignalSemaphores[]
+			= {timeLineSemaphore.handle, m_semaphores.m_vkSemaphoreRenderComplete};
 
-        // Submit graphics commands
-        m_vkSubmitInfo.commandBufferCount = 1;
-        m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
-        m_vkSubmitInfo.waitSemaphoreCount = 2;
-        m_vkSubmitInfo.pWaitSemaphores = graphicsWaitSemaphores;
-        m_vkSubmitInfo.pWaitDstStageMask = graphicsWaitStageMasks;
-        m_vkSubmitInfo.signalSemaphoreCount = 2;
-        m_vkSubmitInfo.pSignalSemaphores = graphicsSignalSemaphores;
+		// Submit graphics commands
+		vkcpp::SubmitInfo submitInfo;
+		submitInfo.addCommandBuffer(m_drawCommandBuffers[m_currentBufferIndex]);
+		//m_vkSubmitInfo.commandBufferCount = 1;
+		//m_vkSubmitInfo.pCommandBuffers = &drawCmdBuffers[m_currentBufferIndex];
+		submitInfo.addWaitSemaphore(
+			timeLineSemaphore.handle, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+		submitInfo.addWaitSemaphore(
+			m_semaphores.m_vkSemaphorePresentComplete,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+		submitInfo.addSignalSemaphore(timeLineSemaphore.handle);
+		submitInfo.addSignalSemaphore(m_semaphores.m_vkSemaphoreRenderComplete);
 
         uint64_t wait_values[2] = { compute_finished, compute_finished };
         uint64_t signal_values[2] = { all_finished, all_finished };
@@ -632,9 +691,10 @@ public:
         timeLineSubmitInfo.signalSemaphoreValueCount = 2;
         timeLineSubmitInfo.pSignalSemaphoreValues = &signal_values[0];
 
-        m_vkSubmitInfo.pNext = &timeLineSubmitInfo;
+		//	TODO: need better way to handle.
+        submitInfo.pNext = &timeLineSubmitInfo;
 
-        VK_CHECK_RESULT(vkQueueSubmit(m_vkQueue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+		m_queue.submit(submitInfo, VK_NULL_HANDLE);
 
         // Increase timeline value base for next frame
         timeLineSemaphore.value = all_finished;

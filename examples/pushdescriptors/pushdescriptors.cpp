@@ -140,9 +140,9 @@ public:
                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                         cube.texture.m_vkDescriptorImageInfo);
 
-				//	TODO: 0 is kind of a magic number here.
-				//	Where does it really come from? Is it because it's the first descriptor set?
-				commandBuffer.cmdPushDescriptorSet(writeDescriptorSetArray,0,m_vkPipelineLayout);
+                //	TODO: 0 is kind of a magic number here.
+                //	Where does it really come from? Is it because it's the first descriptor set?
+                commandBuffer.cmdPushDescriptorSet(writeDescriptorSetArray, 0, m_vkPipelineLayout);
 
                 model.draw(commandBuffer);
             }
@@ -330,9 +330,7 @@ public:
 
     void draw()
     {
-        VulkanExampleBase::prepareFrame();
-        m_queue.submit2(m_drawCommandBuffers[m_currentBufferIndex]);
-        VulkanExampleBase::submitFrame();
+        VulkanExampleBase::prepareSubmitFrameBase(m_drawCommandBuffers[m_currentBufferIndex]);
     }
 
     virtual void render()
