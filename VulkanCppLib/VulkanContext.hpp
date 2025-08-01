@@ -1057,7 +1057,7 @@ class VulkanContext {
 
     VulkanInstance m_vulkanInstanceOriginal;
     PhysicalDevice m_physicalDeviceOriginal;
-    VkPhysicalDevice m_vkPhysicalDeviceOriginal;
+	VkPhysicalDevice m_vkPhysicalDeviceOriginal{};
     Device m_deviceOriginal;
     VkDevice m_vkDeviceOriginal {};
 
@@ -1106,7 +1106,7 @@ public:
         return m_physicalDeviceFeatures.vkPhysicalDeviceFeatures();
     }
 
-    PhysicalDeviceMemoryProperties& physicalDeviceMemoryPropertiesFromContext()
+    const PhysicalDeviceMemoryProperties& physicalDeviceMemoryPropertiesFromContext()
     {
         return m_physicalDeviceMemoryProperties;
     }
@@ -1142,7 +1142,7 @@ Device device();
 VkDevice vkDevice();
 const VkPhysicalDeviceProperties& vkPhysicalDeviceProperties();
 const VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures();
-PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties();
+const PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties();
 const std::vector<VkQueueFamilyProperties>& allQueueFamilyProperties();
 
 uint32_t findMemoryTypeIndex(uint32_t usableMemoryIndexBits, MemoryPropertyFlags requiredPropertiesArg);

@@ -10,15 +10,15 @@
 
 std::vector<const char*> VulkanExampleBase::args;
 
-void VulkanExampleBase::renderFrame()
+void VulkanExampleBase::prepareSubmitFrameBase(VkCommandBuffer vkCommandBuffer)
 {
     VulkanExampleBase::prepareFrame();
-    //	TODO: use smarter submit info.
-//    m_vkSubmitInfo.commandBufferCount = 1;
-//    VkCommandBuffer vkCommandBuffer = m_drawCommandBuffers[m_currentBufferIndex];
-//    m_vkSubmitInfo.pCommandBuffers = &vkCommandBuffer;
-	m_queue.submit2(m_drawCommandBuffers[m_currentBufferIndex]);
-//    VK_CHECK_RESULT(vkQueueSubmit(m_queue, 1, &m_vkSubmitInfo, VK_NULL_HANDLE));
+
+    vkcpp::SubmitInfo submitInfo;
+    submitInfo.addCommandBuffer(m_drawCommandBuffers[m_currentBufferIndex]);
+    submitInfo.addWaitSemaphore(m_semaphores.m_vkSemaphorePresentComplete, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    submitInfo.addSignalSemaphore(m_semaphores.m_vkSemaphoreRenderComplete);
+    m_queue.submit(submitInfo, VK_NULL_HANDLE);
     VulkanExampleBase::submitFrame();
 }
 
@@ -246,7 +246,7 @@ void VulkanExampleBase::drawUI(const VkCommandBuffer commandBuffer)
 void VulkanExampleBase::prepareFrame()
 {
     // Acquire the next m_vkImage from the swap chain
-    VkResult result = m_swapChain.acquireNextImage(semaphores.m_vkSemaphorePresentComplete, m_currentBufferIndex);
+    VkResult result = m_swapChain.acquireNextImage(m_semaphores.m_vkSemaphorePresentComplete, m_currentBufferIndex);
     // Recreate the swapchain if it's no longer compatible with the m_vkSurface (OUT_OF_DATE)
     // SRS - If no longer optimal (VK_SUBOPTIMAL_KHR), wait until submitFrame() in case number of swapchain images will change on resize
     if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
@@ -261,7 +261,7 @@ void VulkanExampleBase::prepareFrame()
 
 void VulkanExampleBase::submitFrame()
 {
-    VkResult result = m_swapChain.queuePresent(m_queue, m_currentBufferIndex, semaphores.m_vkSemaphoreRenderComplete);
+    VkResult result = m_swapChain.queuePresent(m_queue, m_currentBufferIndex, m_semaphores.m_vkSemaphoreRenderComplete);
     // Recreate the swapchain if it's no longer compatible with the m_vkSurface (OUT_OF_DATE) or no longer optimal for presentation (SUBOPTIMAL)
     if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
         windowResize();
@@ -402,8 +402,8 @@ VulkanExampleBase::~VulkanExampleBase()
 
     //    vkDestroyCommandPool(m_device, m_vkCommandPool, nullptr);
 
-    vkDestroySemaphore(m_device, semaphores.m_vkSemaphorePresentComplete, nullptr);
-    vkDestroySemaphore(m_device, semaphores.m_vkSemaphoreRenderComplete, nullptr);
+    vkDestroySemaphore(m_device, m_semaphores.m_vkSemaphorePresentComplete, nullptr);
+    vkDestroySemaphore(m_device, m_semaphores.m_vkSemaphoreRenderComplete, nullptr);
     for (auto& fence : m_vkFences) {
         vkDestroyFence(m_device, fence, nullptr);
     }
@@ -464,20 +464,20 @@ bool VulkanExampleBase::initVulkan()
     VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
     // Create a semaphore used to synchronize m_vkImage presentation
     // Ensures that the m_vkImage is displayed before we start submitting new commands to the m_vkQueue
-    VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &semaphores.m_vkSemaphorePresentComplete));
+    VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_semaphores.m_vkSemaphorePresentComplete));
     // Create a semaphore used to synchronize command submission
     // Ensures that the m_vkImage is not presented until all commands have been submitted and executed
-    VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &semaphores.m_vkSemaphoreRenderComplete));
+    VK_CHECK_RESULT(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_semaphores.m_vkSemaphoreRenderComplete));
 
     // Set up submit info structure
     // Semaphores will stay the same during application lifetime
     // Command buffer submission info is set by each example
-    m_vkSubmitInfo = vks::initializers::submitInfo();
-    m_vkSubmitInfo.pWaitDstStageMask = &submitPipelineStages;
-    m_vkSubmitInfo.waitSemaphoreCount = 1;
-    m_vkSubmitInfo.pWaitSemaphores = &semaphores.m_vkSemaphorePresentComplete;
-    m_vkSubmitInfo.signalSemaphoreCount = 1;
-    m_vkSubmitInfo.pSignalSemaphores = &semaphores.m_vkSemaphoreRenderComplete;
+    //m_vkSubmitInfo = vks::initializers::submitInfo();
+    //m_vkSubmitInfo.pWaitDstStageMask = &submitPipelineStages;
+    //m_vkSubmitInfo.waitSemaphoreCount = 1;
+    //m_vkSubmitInfo.pWaitSemaphores = &m_semaphores.m_vkSemaphorePresentComplete;
+    //m_vkSubmitInfo.signalSemaphoreCount = 1;
+    //m_vkSubmitInfo.pSignalSemaphores = &m_semaphores.m_vkSemaphoreRenderComplete;
 
     return true;
 }
@@ -774,20 +774,19 @@ void VulkanExampleBase::createCommandPool()
 
 void VulkanExampleBase::setupDepthStencil()
 {
-	vkcpp::ImageCreateInfo imageCreateInfo(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-	imageCreateInfo.setExtent(m_drawAreaWidth, m_drawAreaHeight);
+    vkcpp::ImageCreateInfo imageCreateInfo(m_vkFormatDepth, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    imageCreateInfo.setExtent(m_drawAreaWidth, m_drawAreaHeight);
 
-	vkcpp::ImageViewCreateInfo imageViewCreateInfo(
-		VK_NULL_HANDLE,
-		VK_IMAGE_VIEW_TYPE_2D,
-		m_vkFormatDepth,
-		VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    vkcpp::ImageViewCreateInfo imageViewCreateInfo(
+        VK_NULL_HANDLE,
+        VK_IMAGE_VIEW_TYPE_2D,
+        m_vkFormatDepth,
+        VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
-	m_depthStencilDefault = vkcpp::Image_Memory_View(
-		imageCreateInfo,
-		vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
-		imageViewCreateInfo);
-
+    m_depthStencilDefault = vkcpp::Image_Memory_View(
+        imageCreateInfo,
+        vkcpp::MEMORY_PROPERTY_DEVICE_LOCAL,
+        imageViewCreateInfo);
 }
 
 void VulkanExampleBase::setupFrameBuffer()

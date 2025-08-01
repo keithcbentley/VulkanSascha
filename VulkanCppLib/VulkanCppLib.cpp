@@ -188,6 +188,10 @@ const VkPhysicalDeviceFeatures& vkPhysicalDeviceFeatures()
     return s_vulkanContext.vkPhysicalDeviceFeaturesFromContext();
 }
 
+const PhysicalDeviceMemoryProperties& physicalDeviceMemoryProperties() {
+	return s_vulkanContext.physicalDeviceMemoryPropertiesFromContext();
+}
+
 const std::vector<VkQueueFamilyProperties>& allQueueFamilyProperties() {
 	return s_vulkanContext.allQueueFamilyPropertiesFromContext();
 }
